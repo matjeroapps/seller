@@ -1,5 +1,4 @@
 package redisx
-package redisx
 
 import (
 	"context"
