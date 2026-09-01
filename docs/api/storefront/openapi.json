@@ -769,6 +769,1389 @@
           "Markets"
         ]
       }
+    },
+    "/v1/storefront/categories": {
+      "get": {
+        "description": "Returns the public category tree for the resolved store. Each node carries its parent slug so a client can rebuild the hierarchy.",
+        "operationId": "listStorefrontCategories",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "parent_slug": {
+                            "type": "string"
+                          },
+                          "product_count": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "product_count",
+                          "slug"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public category collection"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "List public categories",
+        "tags": [
+          "Storefront",
+          "Categories"
+        ]
+      }
+    },
+    "/v1/storefront/categories/{slug}": {
+      "get": {
+        "description": "Resolves a category slug within the store resolved from the request host. A slug belonging to another store returns 404.",
+        "operationId": "getStorefrontCategory",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Public category slug",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "category": {
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "parent_slug": {
+                          "type": "string"
+                        },
+                        "product_count": {
+                          "format": "int64",
+                          "type": "integer"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "product_count",
+                        "slug"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public category"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Get a public category by slug",
+        "tags": [
+          "Storefront",
+          "Categories"
+        ]
+      }
+    },
+    "/v1/storefront/products": {
+      "get": {
+        "description": "Returns a bounded page of publicly listed products for the resolved store. Prices are seller listing prices in the store market currency.",
+        "operationId": "listStorefrontProducts",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Keyword matched against localized product name, description and slug",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by public category slug",
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Minimum price in currency minor units",
+            "in": "query",
+            "name": "min_price",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum price in currency minor units",
+            "in": "query",
+            "name": "max_price",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter by derived availability: in_stock or out_of_stock",
+            "in": "query",
+            "name": "availability",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort order: newest, price_asc, price_desc or name_asc",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, default 24, maximum 60",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Zero-based offset",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "availability": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "nullable": true,
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "slug"
+                            ],
+                            "type": "object"
+                          },
+                          "image": {
+                            "nullable": true,
+                            "properties": {
+                              "alt_text": {
+                                "type": "string"
+                              },
+                              "uri": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "uri"
+                            ],
+                            "type": "object"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "price": {
+                            "properties": {
+                              "amount_minor": {
+                                "format": "int64",
+                                "type": "integer"
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "amount_minor",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "variant_count": {
+                            "format": "int64",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "availability",
+                          "name",
+                          "price",
+                          "slug",
+                          "variant_count"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "pagination": {
+                      "properties": {
+                        "limit": {
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "total": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "offset",
+                        "total"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "pagination"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public product collection"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Browse public products",
+        "tags": [
+          "Storefront",
+          "Catalog",
+          "Products"
+        ]
+      }
+    },
+    "/v1/storefront/products/{slug}": {
+      "get": {
+        "description": "Resolves a product slug within the store resolved from the request host. A slug not publicly listed by this store returns 404.",
+        "operationId": "getStorefrontProduct",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Public product slug",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "product": {
+                      "properties": {
+                        "availability": {
+                          "type": "string"
+                        },
+                        "categories": {
+                          "items": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "slug"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "images": {
+                          "items": {
+                            "properties": {
+                              "alt_text": {
+                                "type": "string"
+                              },
+                              "uri": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "uri"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "price": {
+                          "properties": {
+                            "amount_minor": {
+                              "format": "int64",
+                              "type": "integer"
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "amount_minor",
+                            "currency"
+                          ],
+                          "type": "object"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "variants": {
+                          "items": {
+                            "properties": {
+                              "availability": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "skus": {
+                                "items": {
+                                  "properties": {
+                                    "availability": {
+                                      "type": "string"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "availability",
+                                    "id"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "availability",
+                              "code",
+                              "skus"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "availability",
+                        "categories",
+                        "images",
+                        "name",
+                        "price",
+                        "slug",
+                        "variants"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "product"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public product detail"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Get a public product by slug",
+        "tags": [
+          "Storefront",
+          "Products"
+        ]
+      }
+    },
+    "/v1/storefront/search": {
+      "get": {
+        "description": "Keyword search across localized product name, description and slug, scoped to the resolved store. Accepts the same filters, sort and pagination as product browsing.",
+        "operationId": "searchStorefrontProducts",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Keyword matched against localized product name, description and slug",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by public category slug",
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Minimum price in currency minor units",
+            "in": "query",
+            "name": "min_price",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum price in currency minor units",
+            "in": "query",
+            "name": "max_price",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter by derived availability: in_stock or out_of_stock",
+            "in": "query",
+            "name": "availability",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort order: newest, price_asc, price_desc or name_asc",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size, default 24, maximum 60",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Zero-based offset",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "availability": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "nullable": true,
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "slug"
+                            ],
+                            "type": "object"
+                          },
+                          "image": {
+                            "nullable": true,
+                            "properties": {
+                              "alt_text": {
+                                "type": "string"
+                              },
+                              "uri": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "uri"
+                            ],
+                            "type": "object"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "price": {
+                            "properties": {
+                              "amount_minor": {
+                                "format": "int64",
+                                "type": "integer"
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "amount_minor",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "variant_count": {
+                            "format": "int64",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "availability",
+                          "name",
+                          "price",
+                          "slug",
+                          "variant_count"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "pagination": {
+                      "properties": {
+                        "limit": {
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "total": {
+                          "format": "int64",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "limit",
+                        "offset",
+                        "total"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "pagination"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public search results"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Search public products",
+        "tags": [
+          "Storefront",
+          "Search",
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/storefront/store": {
+      "get": {
+        "description": "Returns the public store identity, market, currency, locales, public settings, and the published theme for the store resolved from the request host. Draft theme configuration is never returned.",
+        "operationId": "getStorefrontStore",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "store": {
+                      "properties": {
+                        "currency": {
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "minor_unit": {
+                              "format": "int32",
+                              "type": "integer"
+                            },
+                            "symbol": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "minor_unit",
+                            "symbol"
+                          ],
+                          "type": "object"
+                        },
+                        "default_locale": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        },
+                        "market": {
+                          "type": "string"
+                        },
+                        "settings": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "store_code": {
+                          "type": "string"
+                        },
+                        "store_name": {
+                          "type": "string"
+                        },
+                        "supported_locales": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "theme": {
+                          "nullable": true,
+                          "properties": {
+                            "configuration": {
+                              "additionalProperties": true,
+                              "type": "object"
+                            },
+                            "configuration_revision": {
+                              "format": "int32",
+                              "type": "integer"
+                            },
+                            "key": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "configuration",
+                            "configuration_revision",
+                            "key",
+                            "version"
+                          ],
+                          "type": "object"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "currency",
+                        "default_locale",
+                        "market",
+                        "settings",
+                        "store_code",
+                        "store_name",
+                        "supported_locales",
+                        "timezone"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "store"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Public storefront context"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Storefront or resource not available"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "summary": "Load public storefront context",
+        "tags": [
+          "Storefront"
+        ]
+      }
     }
   },
   "servers": [
@@ -786,18 +2169,6 @@
       "name": "Markets"
     },
     {
-      "description": "Supplier profile and supplier management",
-      "name": "Suppliers"
-    },
-    {
-      "description": "Seller profile and seller management",
-      "name": "Sellers"
-    },
-    {
-      "description": "Seller store management",
-      "name": "Stores"
-    },
-    {
       "description": "Catalog browsing and product management",
       "name": "Catalog"
     },
@@ -806,36 +2177,16 @@
       "name": "Categories"
     },
     {
-      "description": "Attribute management",
-      "name": "Attributes"
+      "description": "Public storefront bootstrap resolved from the request host",
+      "name": "Storefront"
     },
     {
-      "description": "Variant management",
-      "name": "Variants"
+      "description": "Public product browsing and product detail",
+      "name": "Products"
     },
     {
-      "description": "SKU management",
-      "name": "SKUs"
-    },
-    {
-      "description": "Supplier fulfillment locations",
-      "name": "Fulfillment Locations"
-    },
-    {
-      "description": "Supplier offers and availability",
-      "name": "Supplier Offers"
-    },
-    {
-      "description": "Seller listings and price/status controls",
-      "name": "Seller Listings"
-    },
-    {
-      "description": "Inventory snapshots and movements",
-      "name": "Inventory"
-    },
-    {
-      "description": "Administrative moderation and operational inspection",
-      "name": "Audit"
+      "description": "Public catalog search",
+      "name": "Search"
     }
   ]
 }

@@ -5,7 +5,8 @@ go 1.26
 require (
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-chi/chi/v5 v5.2.3
-	github.com/matjeroapps/core v0.0.0-20260831221729-6a3a841a5736
+	github.com/jackc/pgx/v5 v5.7.6
+	github.com/matjeroapps/core v0.0.0-20260901072638-c63d084863d5
 )
 
 require (
@@ -22,7 +23,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.7.6 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
