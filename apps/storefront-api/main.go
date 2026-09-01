@@ -69,12 +69,12 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	router.Mount("/", openapi.NewRouter(openapi.RouterConfig{
+	openapi.Register(router, openapi.RouterConfig{
 		Enabled:   cfg.OpenAPIDocsEnabled,
 		SpecPath:  "/openapi.json",
 		DocsPath:  "/docs",
 		SpecBytes: specBytes,
-	}))
+	})
 
 	// The storefront is anonymous: no OIDC verifier is mounted. Tenant authority
 	// is the trusted host, never a client-supplied identifier.
