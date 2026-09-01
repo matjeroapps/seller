@@ -1,3 +1,9 @@
+// Command seller-api serves the authenticated Seller Platform HTTP surface.
+//
+// It owns request parsing, end-user authentication, and the public response
+// contract. Every business capability is a Core-owned runtime call over the
+// internal API (ADR-017); this service holds no database connection and imports
+// no Core Go package.
 package main
 
 import (
@@ -6,16 +12,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/core/packages/auth"
-	"github.com/matjeroapps/core/packages/config"
-	"github.com/matjeroapps/core/packages/database"
-	"github.com/matjeroapps/core/packages/httpx"
-	"github.com/matjeroapps/core/packages/logging"
-	"github.com/matjeroapps/core/packages/observability"
-	"github.com/matjeroapps/core/pkg/actorapi"
-	"github.com/matjeroapps/core/pkg/commerce"
-	"github.com/matjeroapps/core/pkg/markets"
-	"github.com/matjeroapps/core/pkg/themes"
+	"github.com/matjeroapps/seller/internal/actorapi"
+	"github.com/matjeroapps/seller/internal/auth"
+	"github.com/matjeroapps/seller/internal/config"
+	"github.com/matjeroapps/seller/internal/coreclient"
+	"github.com/matjeroapps/seller/internal/httpx"
+	"github.com/matjeroapps/seller/internal/logging"
+	"github.com/matjeroapps/seller/internal/observability"
 	"github.com/matjeroapps/seller/internal/openapi"
 	"github.com/matjeroapps/seller/internal/sellerapi"
 )
@@ -31,6 +34,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	logger := logging.New(cfg)
 	shutdown, err := observability.Init(ctx, cfg)
 	if err != nil {
@@ -38,11 +42,15 @@ func run(ctx context.Context) error {
 	}
 	defer func() { _ = shutdown(context.Background()) }()
 
-	db, err := database.Connect(ctx, cfg)
+	core, err := coreclient.New(coreclient.Config{
+		BaseURL: cfg.CoreAPIBaseURL,
+		Token:   cfg.CoreAPIToken,
+		Service: "seller",
+		Timeout: cfg.CoreAPITimeout,
+	})
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	verifier, err := auth.NewOIDCVerifier(ctx, auth.Config{
 		IssuerURL:  cfg.ZitadelIssuer,
@@ -53,45 +61,42 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	repo := commerce.NewRepository(db.Pool)
-	service := commerce.NewService(repo)
-	service.PlatformDomain = cfg.PlatformDomain
-	service.ReservedSubdomains = cfg.ReservedSubdomains
-	marketService := markets.NewService(markets.NewRepository(db.Pool))
-	themeService := themes.NewService(themes.NewRepository(db.Pool), repo, themes.Options{
-		PreviewSecret: []byte(cfg.ThemePreviewSecret),
-	})
 	appCfg := httpx.ConfigFrom(cfg)
 	router := httpx.NewRouter(httpx.App{
 		Config: appCfg,
 		Logger: logger,
-		Ready: func(ctx context.Context) error {
-			return db.Ping(ctx)
-		},
+		// Readiness reflects the dependencies this service actually has. It has
+		// no database; Core reachability is a separate concern that a liveness
+		// probe must not depend on, or a Core blip would restart every seller
+		// replica.
+		Ready: func(context.Context) error { return nil },
 	})
-	if spec, err := openapi.BuildSellerSpec(); err == nil {
-		if specBytes, err := openapi.MarshalDocument(spec); err == nil {
-			router.Mount("/", openapi.NewRouter(openapi.RouterConfig{
-				Enabled:   cfg.OpenAPIDocsEnabled,
-				SpecPath:  "/openapi.json",
-				DocsPath:  "/docs",
-				SpecBytes: specBytes,
-			}))
-		} else {
-			return err
-		}
-	} else {
+
+	spec, err := openapi.BuildSellerSpec()
+	if err != nil {
 		return err
 	}
+	specBytes, err := openapi.MarshalDocument(spec)
+	if err != nil {
+		return err
+	}
+	router.Mount("/", openapi.NewRouter(openapi.RouterConfig{
+		Enabled:   cfg.OpenAPIDocsEnabled,
+		SpecPath:  "/openapi.json",
+		DocsPath:  "/docs",
+		SpecBytes: specBytes,
+	}))
+
 	router.Mount("/", actorapi.NewRouter(actorapi.Config{
 		AppName:      "Seller API",
 		Actor:        "seller",
 		RequireAuth:  true,
 		AllowedRoles: []string{auth.RoleSellerOwner, auth.RoleSellerManager, auth.RoleSellerStaff},
 		Register: func(r chi.Router) {
-			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{Commerce: service, Repo: repo})(r)
-			sellerapi.RegisterSellerThemeRoutes(sellerapi.ThemeDependencies{Themes: themeService, Commerce: service})(r)
+			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{Core: core})(r)
+			sellerapi.RegisterSellerThemeRoutes(sellerapi.ThemeDependencies{Themes: core})(r)
 		},
-	}, marketService, verifier))
+	}, core, verifier))
+
 	return httpx.Run(ctx, appCfg, logger, router)
 }
