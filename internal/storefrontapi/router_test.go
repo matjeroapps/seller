@@ -49,34 +49,34 @@ type stubCatalog struct {
 	product    coreclient.ProductDetail
 }
 
-func (s *stubCatalog) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, error) {
+func (s *stubCatalog) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, int64, error) {
 	s.host, s.locale = host, locale
-	return s.store, s.err
+	return s.store, 1, s.err
 }
 
-func (s *stubCatalog) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, error) {
+func (s *stubCatalog) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, int64, error) {
 	s.host, s.locale = host, locale
-	return s.categories, s.err
+	return s.categories, 1, s.err
 }
 
-func (s *stubCatalog) StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, error) {
+func (s *stubCatalog) StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, int64, error) {
 	s.host, s.locale = host, locale
-	return s.category, s.err
+	return s.category, 1, s.err
 }
 
-func (s *stubCatalog) StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error) {
+func (s *stubCatalog) StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, int64, error) {
 	s.host, s.locale, s.query = host, locale, query
-	return s.page, s.err
+	return s.page, 1, s.err
 }
 
-func (s *stubCatalog) StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.ProductDetail, error) {
+func (s *stubCatalog) StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.ProductDetail, int64, error) {
 	s.host, s.locale = host, locale
-	return s.product, s.err
+	return s.product, 1, s.err
 }
 
-func (s *stubCatalog) StorefrontSearch(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error) {
+func (s *stubCatalog) StorefrontSearch(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, int64, error) {
 	s.host, s.locale, s.query = host, locale, query
-	return s.page, s.err
+	return s.page, 1, s.err
 }
 
 func newHandler(catalog CatalogReader, platform config.Config) http.Handler {

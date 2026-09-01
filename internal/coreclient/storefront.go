@@ -157,65 +157,69 @@ type storefrontCategoryCollection struct {
 //
 // The host is the tenant authority. It is computed by the Seller API from its own
 // trusted-proxy policy and forwarded to Core, which resolves the store itself.
-func (c *Client) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (StoreBootstrap, error) {
+//
+// The returned revision is the cache generation Core labelled this payload with,
+// and is 0 when the response carried no label. A caller that caches the payload
+// must store it under this value, never under a revision it probed earlier.
+func (c *Client) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (StoreBootstrap, int64, error) {
 	var payload storefrontStoreResponse
-	err := c.get(ctx, "/internal/v1/storefront/store", nil, requestOptions{
+	header, err := c.getWithHeader(ctx, "/internal/v1/storefront/store", nil, requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return payload.Store, err
+	return payload.Store, revisionFrom(header), err
 }
 
 // StorefrontCategories lists the public category tree for a host.
-func (c *Client) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]CategoryNode, error) {
+func (c *Client) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]CategoryNode, int64, error) {
 	var payload storefrontCategoryCollection
-	err := c.get(ctx, "/internal/v1/storefront/categories", nil, requestOptions{
+	header, err := c.getWithHeader(ctx, "/internal/v1/storefront/categories", nil, requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return payload.Items, err
+	return payload.Items, revisionFrom(header), err
 }
 
 // StorefrontCategory resolves a single public category by slug.
-func (c *Client) StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (CategoryNode, error) {
+func (c *Client) StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (CategoryNode, int64, error) {
 	var payload storefrontCategoryResponse
 	path := "/internal/v1/storefront/categories/" + url.PathEscape(slug)
-	err := c.get(ctx, path, nil, requestOptions{
+	header, err := c.getWithHeader(ctx, path, nil, requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return payload.Category, err
+	return payload.Category, revisionFrom(header), err
 }
 
 // StorefrontProducts browses the public catalog for a host.
-func (c *Client) StorefrontProducts(ctx context.Context, host string, query ProductQuery, locale i18n.Locale) (ProductPage, error) {
+func (c *Client) StorefrontProducts(ctx context.Context, host string, query ProductQuery, locale i18n.Locale) (ProductPage, int64, error) {
 	var payload storefrontProductPageResponse
-	err := c.get(ctx, "/internal/v1/storefront/products", productQueryValues(query), requestOptions{
+	header, err := c.getWithHeader(ctx, "/internal/v1/storefront/products", productQueryValues(query), requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return productPageFrom(payload), err
+	return productPageFrom(payload), revisionFrom(header), err
 }
 
 // StorefrontProduct resolves a single public product by slug.
-func (c *Client) StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (ProductDetail, error) {
+func (c *Client) StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (ProductDetail, int64, error) {
 	var payload storefrontProductResponse
 	path := "/internal/v1/storefront/products/" + url.PathEscape(slug)
-	err := c.get(ctx, path, nil, requestOptions{
+	header, err := c.getWithHeader(ctx, path, nil, requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return payload.Product, err
+	return payload.Product, revisionFrom(header), err
 }
 
 // StorefrontSearch searches the public catalog for a host.
-func (c *Client) StorefrontSearch(ctx context.Context, host string, query ProductQuery, locale i18n.Locale) (ProductPage, error) {
+func (c *Client) StorefrontSearch(ctx context.Context, host string, query ProductQuery, locale i18n.Locale) (ProductPage, int64, error) {
 	var payload storefrontProductPageResponse
-	err := c.get(ctx, "/internal/v1/storefront/search", productQueryValues(query), requestOptions{
+	header, err := c.getWithHeader(ctx, "/internal/v1/storefront/search", productQueryValues(query), requestOptions{
 		StorefrontHost: host,
 		Locale:         string(locale),
 	}, &payload)
-	return productPageFrom(payload), err
+	return productPageFrom(payload), revisionFrom(header), err
 }
 
 func productPageFrom(payload storefrontProductPageResponse) ProductPage {

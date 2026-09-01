@@ -19,6 +19,31 @@ type Config struct {
 	OpenAPIDocsEnabled bool
 	ShutdownTimeout    time.Duration
 
+	// RedisPassword authenticates against a protected Redis. It is a secret:
+	// never commit it, log it, or bake it into an image layer.
+	RedisPassword string
+	// RedisDB selects the logical Redis database.
+	RedisDB int
+	// RedisConnectTimeout bounds establishing a Redis connection.
+	RedisConnectTimeout time.Duration
+	// RedisOperationTimeout bounds a single Redis command. It is deliberately
+	// short: the cache is an optimization, and a slow Redis must degrade to a
+	// normal Core call instead of delaying a customer response.
+	RedisOperationTimeout time.Duration
+
+	// StorefrontCacheEnabled turns on the public storefront payload cache. It is
+	// off by default, so storefront-api never requires Redis to start.
+	StorefrontCacheEnabled bool
+	// StorefrontCacheTTL bounds how long a cached payload may live. It is only a
+	// safety net: correctness comes from the Core revision in the cache key, and
+	// the TTL is what lets entries of an abandoned revision expire without any
+	// wildcard deletion.
+	StorefrontCacheTTL time.Duration
+	// StorefrontCacheMaxPayloadBytes bounds the size of a single cached payload.
+	// A larger successful response is served normally and simply not cached, so
+	// one unusually large store cannot dominate the cache.
+	StorefrontCacheMaxPayloadBytes int
+
 	// PlatformDomain is the base domain under which platform-generated store
 	// subdomains are allocated (e.g. "<store-code>.matjero.com"). It is
 	// configuration-driven and never hardcoded in application code.
@@ -57,6 +82,27 @@ func Load(serviceName string) (Config, error) {
 		return Config{}, err
 	}
 
+	redisDB, err := nonNegativeIntEnv("REDIS_DB", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	redisConnectMS, err := intEnv("REDIS_CONNECT_TIMEOUT_MS", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	redisOperationMS, err := intEnv("REDIS_OPERATION_TIMEOUT_MS", 150)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheTTLSeconds, err := intEnv("STOREFRONT_CACHE_TTL_SECONDS", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheMaxPayloadBytes, err := intEnv("STOREFRONT_CACHE_MAX_PAYLOAD_BYTES", 256<<10)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		ServiceName:          serviceName,
 		Environment:          stringEnv("APP_ENV", "development"),
@@ -74,6 +120,15 @@ func Load(serviceName string) (Config, error) {
 		CoreAPIBaseURL: stringEnv("CORE_API_BASE_URL", "http://localhost:8080"),
 		CoreAPIToken:   stringEnv("CORE_API_TOKEN", ""),
 		CoreAPITimeout: time.Duration(coreTimeoutSeconds) * time.Second,
+
+		RedisPassword:         stringEnv("REDIS_PASSWORD", ""),
+		RedisDB:               redisDB,
+		RedisConnectTimeout:   time.Duration(redisConnectMS) * time.Millisecond,
+		RedisOperationTimeout: time.Duration(redisOperationMS) * time.Millisecond,
+
+		StorefrontCacheEnabled:         boolEnv("STOREFRONT_CACHE_ENABLED", false),
+		StorefrontCacheTTL:             time.Duration(cacheTTLSeconds) * time.Second,
+		StorefrontCacheMaxPayloadBytes: cacheMaxPayloadBytes,
 	}, nil
 }
 
@@ -119,6 +174,25 @@ func intEnv(key string, fallback int) (int, error) {
 	}
 	if parsed <= 0 {
 		return 0, fmt.Errorf("%s must be greater than zero", key)
+	}
+
+	return parsed, nil
+}
+
+// nonNegativeIntEnv reads an integer that may legitimately be zero, such as a
+// Redis database index.
+func nonNegativeIntEnv(key string, fallback int) (int, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer: %w", key, err)
+	}
+	if parsed < 0 {
+		return 0, fmt.Errorf("%s must not be negative", key)
 	}
 
 	return parsed, nil

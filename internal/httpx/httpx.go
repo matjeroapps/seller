@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -174,6 +175,27 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// EncodeJSON encodes a payload exactly as WriteJSON writes it.
+//
+// It exists so a response body can be produced once, stored, and replayed later
+// byte-for-byte: a cached response must be indistinguishable from the response
+// that produced it. It shares WriteJSON's encoder rather than reimplementing its
+// escaping and trailing newline, so the two cannot drift.
+func EncodeJSON(payload any) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(payload); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// WriteEncodedJSON writes a body already produced by EncodeJSON.
+func WriteEncodedJSON(w http.ResponseWriter, status int, encoded []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(encoded)
 }
 
 func WriteError(w http.ResponseWriter, status int, code, message string) {
