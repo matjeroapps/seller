@@ -9,578 +9,459 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/matjeroapps/core/packages/config"
-	"github.com/matjeroapps/core/packages/money"
-	"github.com/matjeroapps/core/pkg/actorapi"
-	"github.com/matjeroapps/core/pkg/commerce"
-	"github.com/matjeroapps/core/pkg/markets"
-	"github.com/matjeroapps/core/pkg/storefront"
+	"github.com/matjeroapps/seller/internal/config"
+	"github.com/matjeroapps/seller/internal/coreclient"
+	"github.com/matjeroapps/seller/internal/i18n"
+	"github.com/matjeroapps/seller/internal/money"
 )
 
-// Fixture prices: the supplier wholesale cost is shared, while each store sets its
-// own listing price. The public payload must always carry the listing price.
-const (
-	supplierWholesaleMinor = 10000 // 100.00
-	storeAPriceMinor       = 15000 // 150.00
-	storeACheapPriceMinor  = 5000  // 50.00
-	storeBPriceMinor       = 19900 // 199.00
-)
+// These tests prove the Seller storefront's transport and BFF behaviour against a
+// local stub Core server. They need no PostgreSQL, no Core migrations and no Core
+// module: business correctness is Core's own responsibility and is tested there.
 
 const (
 	domainA = "store-a.matjero.test"
 	domainB = "store-b.matjero.test"
+
+	// The supplier wholesale cost is internal. No public payload may contain it.
+	wholesaleMinor = 10000
+	// Each store sets its own public listing price.
+	storeAPrice = 15000
+	storeBPrice = 19900
 )
 
-type apiEnv struct {
-	ctx     context.Context
-	pool    *pgxpool.Pool
-	repo    commerce.Repository
-	handler http.Handler
+// stubCatalog is a local stand-in for the Core catalog read model.
+type stubCatalog struct {
+	// host records the host the handler forwarded, which is the tenant authority.
+	host string
+	// locale records the negotiated locale the handler forwarded.
+	locale i18n.Locale
+	// query records the forwarded browse query.
+	query coreclient.ProductQuery
+
+	err error
+
+	store      coreclient.StoreBootstrap
+	categories []coreclient.CategoryNode
+	category   coreclient.CategoryNode
+	page       coreclient.ProductPage
+	product    coreclient.ProductDetail
 }
 
-// setupAPITest builds the real public router over a real database with two stores
-// that differ in domain, category, product, translation, and price.
-func setupAPITest(t *testing.T) apiEnv {
-	t.Helper()
-	pool := openTestDB(t)
-	ctx := context.Background()
-	repo := commerce.NewRepository(pool)
-
-	env := apiEnv{ctx: ctx, pool: pool, repo: repo}
-	env.seed(t)
-
-	deps := Dependencies{
-		Catalog:  storefront.NewCatalogRepository(pool),
-		Stores:   storefront.NewStoreResolver(repo),
-		Platform: config.Config{PlatformDomain: "matjero.test"},
-	}
-	env.handler = actorapi.NewRouter(actorapi.Config{
-		AppName:     "Storefront API",
-		Actor:       "storefront",
-		RequireAuth: false,
-		Register: func(r chi.Router) {
-			RegisterStorefrontRoutes(deps)(r)
-		},
-	}, markets.NewService(markets.NewRepository(pool)), nil)
-
-	return env
+func (s *stubCatalog) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, error) {
+	s.host, s.locale = host, locale
+	return s.store, s.err
 }
 
-func (e apiEnv) seed(t *testing.T) {
-	t.Helper()
-
-	sellerA, err := e.repo.CreateSeller(e.ctx, "seller-a", "Seller A", "active", nil)
-	if err != nil {
-		t.Fatalf("create seller A: %v", err)
-	}
-	sellerB, err := e.repo.CreateSeller(e.ctx, "seller-b", "Seller B", "active", nil)
-	if err != nil {
-		t.Fatalf("create seller B: %v", err)
-	}
-
-	settingsA := map[string]any{
-		"public":   map[string]any{"tagline": "Store A tagline"},
-		"internal": map[string]any{"supplier_margin_target": 0.35},
-	}
-	storeA, _, err := e.repo.CreateStoreWithDomain(e.ctx, sellerA.ID, "EG", "store-a", "Store A", "active", settingsA, domainA, "platform", "active", true, nil, nil)
-	if err != nil {
-		t.Fatalf("create store A: %v", err)
-	}
-	storeB, _, err := e.repo.CreateStoreWithDomain(e.ctx, sellerB.ID, "EG", "store-b", "Store B", "active", nil, domainB, "platform", "active", true, nil, nil)
-	if err != nil {
-		t.Fatalf("create store B: %v", err)
-	}
-	// An inactive store with an active domain must fail closed like an unknown host.
-	if _, _, err := e.repo.CreateStoreWithDomain(e.ctx, sellerA.ID, "EG", "store-c", "Store C", "inactive", nil, "store-c.matjero.test", "platform", "active", true, nil, nil); err != nil {
-		t.Fatalf("create inactive store: %v", err)
-	}
-
-	supplier, err := e.repo.CreateSupplier(e.ctx, "supplier-1", "Supplier One", "active", map[string]any{"contact_email": "ops@supplier.test"})
-	if err != nil {
-		t.Fatalf("create supplier: %v", err)
-	}
-	supplierMarket, err := e.repo.CreateSupplierMarket(e.ctx, supplier.ID, "EG", "active", nil)
-	if err != nil {
-		t.Fatalf("create supplier market: %v", err)
-	}
-	location, err := e.repo.CreateFulfillmentLocation(e.ctx, supplier.ID, supplierMarket.ID, "EG", "cairo-hub", "Cairo Hub", "warehouse", "active")
-	if err != nil {
-		t.Fatalf("create fulfillment location: %v", err)
-	}
-
-	lighting := e.category(t, "store-a-lighting", nil, "Lighting", "الإضاءة")
-	kitchen := e.category(t, "store-b-kitchen", nil, "Kitchen", "المطبخ")
-
-	lamp := e.product(t, "store-a-desk-lamp", "active", "Desk Lamp", "مصباح مكتبي", "A bright desk lamp", "مصباح مكتبي ساطع")
-	e.assignCategory(t, lamp, lighting)
-	e.stock(t, lamp, location.ID, 5)
-	lampOffer := e.offer(t, supplier.ID, lamp, supplierMarket.ID)
-	e.listing(t, storeA.ID, lamp, lampOffer, "active", storeAPriceMinor)
-
-	shade := e.product(t, "store-a-lamp-shade", "active", "Lamp Shade", "غطاء مصباح", "", "")
-	e.assignCategory(t, shade, lighting)
-	e.stock(t, shade, location.ID, 0)
-	shadeOffer := e.offer(t, supplier.ID, shade, supplierMarket.ID)
-	e.listing(t, storeA.ID, shade, shadeOffer, "active", storeACheapPriceMinor)
-
-	hidden := e.product(t, "store-a-hidden", "active", "Hidden Item", "عنصر مخفي", "", "")
-	e.assignCategory(t, hidden, lighting)
-	e.stock(t, hidden, location.ID, 3)
-	hiddenOffer := e.offer(t, supplier.ID, hidden, supplierMarket.ID)
-	e.listing(t, storeA.ID, hidden, hiddenOffer, "draft", storeAPriceMinor)
-
-	pan := e.product(t, "store-b-frying-pan", "active", "Frying Pan", "مقلاة", "A non-stick pan", "مقلاة غير لاصقة")
-	e.assignCategory(t, pan, kitchen)
-	e.stock(t, pan, location.ID, 7)
-	panOffer := e.offer(t, supplier.ID, pan, supplierMarket.ID)
-	e.listing(t, storeB.ID, pan, panOffer, "active", storeBPriceMinor)
+func (s *stubCatalog) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, error) {
+	s.host, s.locale = host, locale
+	return s.categories, s.err
 }
 
-func (e apiEnv) category(t *testing.T, slug string, parent *string, nameEN, nameAR string) commerce.Category {
-	t.Helper()
-	category, err := e.repo.CreateCategory(e.ctx, slug, parent, "active")
-	if err != nil {
-		t.Fatalf("create category %s: %v", slug, err)
-	}
-	for locale, name := range map[string]string{"en": nameEN, "ar": nameAR} {
-		if err := e.repo.UpsertCategoryTranslation(e.ctx, commerce.CategoryTranslation{
-			CategoryID: category.ID, Locale: locale, Name: name,
-		}); err != nil {
-			t.Fatalf("translate category %s/%s: %v", slug, locale, err)
-		}
-	}
-	return category
+func (s *stubCatalog) StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, error) {
+	s.host, s.locale = host, locale
+	return s.category, s.err
 }
 
-func (e apiEnv) product(t *testing.T, slug, status, nameEN, nameAR, descEN, descAR string) commerce.Product {
-	t.Helper()
-	product, err := e.repo.CreateProduct(e.ctx, slug, status)
-	if err != nil {
-		t.Fatalf("create product %s: %v", slug, err)
-	}
-	for _, translation := range []commerce.ProductTranslation{
-		{ProductID: product.ID, Locale: "en", Name: nameEN, Description: descEN},
-		{ProductID: product.ID, Locale: "ar", Name: nameAR, Description: descAR},
-	} {
-		if translation.Name == "" {
-			continue
-		}
-		if err := e.repo.UpsertProductTranslation(e.ctx, translation); err != nil {
-			t.Fatalf("translate product %s/%s: %v", slug, translation.Locale, err)
-		}
-	}
-	return product
+func (s *stubCatalog) StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error) {
+	s.host, s.locale, s.query = host, locale, query
+	return s.page, s.err
 }
 
-func (e apiEnv) assignCategory(t *testing.T, product commerce.Product, category commerce.Category) {
-	t.Helper()
-	if err := e.repo.SetProductCategories(e.ctx, product.ID, []string{category.ID}); err != nil {
-		t.Fatalf("assign category: %v", err)
-	}
+func (s *stubCatalog) StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.ProductDetail, error) {
+	s.host, s.locale = host, locale
+	return s.product, s.err
 }
 
-func (e apiEnv) stock(t *testing.T, product commerce.Product, locationID string, onHand int64) {
-	t.Helper()
-	variant, err := e.repo.CreateVariant(e.ctx, product.ID, "default", "active")
-	if err != nil {
-		t.Fatalf("create variant: %v", err)
-	}
-	sku, err := e.repo.CreateSKU(e.ctx, variant.ID, "SKU-"+product.Slug, "", "active")
-	if err != nil {
-		t.Fatalf("create sku: %v", err)
-	}
-	if _, err := e.repo.CreateInventorySnapshot(e.ctx, locationID, sku.ID, onHand); err != nil {
-		t.Fatalf("create inventory snapshot: %v", err)
-	}
+func (s *stubCatalog) StorefrontSearch(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error) {
+	s.host, s.locale, s.query = host, locale, query
+	return s.page, s.err
 }
 
-func (e apiEnv) offer(t *testing.T, supplierID string, product commerce.Product, supplierMarketID string) string {
-	t.Helper()
-	supplierProduct, err := e.repo.CreateSupplierProduct(e.ctx, supplierID, product.ID, "SUP-"+product.Slug, "active")
-	if err != nil {
-		t.Fatalf("create supplier product: %v", err)
-	}
-	offer, err := e.repo.CreateSupplierOffer(e.ctx, supplierID, supplierProduct.ID, supplierMarketID, "EG", "active")
-	if err != nil {
-		t.Fatalf("create supplier offer: %v", err)
-	}
-	if _, err := e.repo.SetSupplierOfferPrice(e.ctx, offer.ID, money.MustNew(supplierWholesaleMinor, "EGP")); err != nil {
-		t.Fatalf("set supplier offer price: %v", err)
-	}
-	if _, err := e.repo.SetSupplierOfferAvailability(e.ctx, offer.ID, true, nil); err != nil {
-		t.Fatalf("set supplier offer availability: %v", err)
-	}
-	return offer.ID
+func newHandler(catalog CatalogReader, platform config.Config) http.Handler {
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{Catalog: catalog, Platform: platform})(r)
+	})
+	return router
 }
 
-func (e apiEnv) listing(t *testing.T, storeID string, product commerce.Product, offerID, status string, priceMinor int64) {
+func doGet(t *testing.T, handler http.Handler, path, host string) *httptest.ResponseRecorder {
 	t.Helper()
-	listing, err := e.repo.CreateSellerListing(e.ctx, storeID, product.ID, &offerID, "EG", status)
-	if err != nil {
-		t.Fatalf("create seller listing: %v", err)
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if host != "" {
+		req.Host = host
 	}
-	if _, err := e.repo.SetSellerListingPrice(e.ctx, listing.ID, money.MustNew(priceMinor, "EGP")); err != nil {
-		t.Fatalf("set seller listing price: %v", err)
-	}
-}
-
-// get issues a public request as a customer would: the tenant comes from Host.
-func (e apiEnv) get(t *testing.T, host, target string) (*httptest.ResponseRecorder, string) {
-	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req.Host = host
 	rec := httptest.NewRecorder()
-	e.handler.ServeHTTP(rec, req)
-	return rec, rec.Body.String()
+	handler.ServeHTTP(rec, req)
+	return rec
 }
 
-func (e apiEnv) getJSON(t *testing.T, host, target string, dst any) string {
+func decodeError(t *testing.T, rec *httptest.ResponseRecorder) string {
 	t.Helper()
-	rec, body := e.get(t, host, target)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("GET %s (host %s): expected 200, got %d: %s", target, host, rec.Code, body)
+	var payload struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 	}
-	if err := json.Unmarshal([]byte(body), dst); err != nil {
-		t.Fatalf("decode %s: %v (%s)", target, err, body)
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode error envelope: %v (body %q)", err, rec.Body.String())
 	}
-	return body
+	return payload.Error.Code
 }
 
-func slugsOf(page ProductCollectionResponse) []string {
-	slugs := make([]string, 0, len(page.Items))
-	for _, item := range page.Items {
-		slugs = append(slugs, item.Slug)
-	}
-	return slugs
-}
+// --- host forwarding ---
 
-func containsSlug(slugs []string, want string) bool {
-	for _, slug := range slugs {
-		if slug == want {
-			return true
-		}
-	}
-	return false
-}
+func TestStorefrontForwardsTrustedHost(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
 
-func TestStorefrontStoreResolvesFromHost(t *testing.T) {
-	env := setupAPITest(t)
+	doGet(t, handler, "/v1/storefront/store", domainA)
 
-	var response StoreResponse
-	env.getJSON(t, domainA, "/v1/storefront/store", &response)
-	if response.Store.StoreCode != "store-a" || response.Store.StoreName != "Store A" {
-		t.Fatalf("unexpected store: %+v", response.Store)
-	}
-	if response.Store.Market != "EG" || response.Store.Currency.Code != "EGP" {
-		t.Fatalf("unexpected market context: %+v", response.Store)
-	}
-	if response.Store.Settings["tagline"] != "Store A tagline" {
-		t.Fatalf("expected public settings, got %+v", response.Store.Settings)
-	}
-
-	var responseB StoreResponse
-	env.getJSON(t, domainB, "/v1/storefront/store", &responseB)
-	if responseB.Store.StoreCode != "store-b" {
-		t.Fatalf("expected store B for host B, got %+v", responseB.Store)
+	if catalog.host != domainA {
+		t.Fatalf("forwarded host = %q, want %q", catalog.host, domainA)
 	}
 }
 
-// A client-supplied store or seller identifier must never override the host tenant.
-func TestStorefrontIgnoresClientSuppliedTenantHints(t *testing.T) {
-	env := setupAPITest(t)
+func TestStorefrontNormalizesHost(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
 
-	var baseline StoreResponse
-	env.getJSON(t, domainA, "/v1/storefront/store", &baseline)
+	doGet(t, handler, "/v1/storefront/store", "Store-A.Matjero.TEST:8443")
 
-	var storeBID string
-	if err := env.pool.QueryRow(env.ctx, `SELECT id FROM stores WHERE code = 'store-b'`).Scan(&storeBID); err != nil {
-		t.Fatalf("look up store B: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store?store_id="+storeBID+"&seller_id="+storeBID, nil)
-	req.Host = domainA
-	req.Header.Set("X-Store-ID", storeBID)
-	rec := httptest.NewRecorder()
-	env.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	var spoofed StoreResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &spoofed); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if spoofed.Store.StoreCode != baseline.Store.StoreCode {
-		t.Fatalf("client-supplied tenant hint overrode the host: %+v", spoofed.Store)
+	if catalog.host != "store-a.matjero.test" {
+		t.Fatalf("forwarded host = %q, want the normalized host", catalog.host)
 	}
 }
 
-// A forwarded host must be ignored unless the deployment explicitly trusts a proxy.
-func TestStorefrontIgnoresUntrustedForwardedHost(t *testing.T) {
-	env := setupAPITest(t)
+// X-Forwarded-Host must be ignored unless the deployment explicitly trusts a
+// reverse proxy, otherwise any client could impersonate another tenant.
+func TestStorefrontIgnoresForwardedHostByDefault(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
 	req.Host = domainA
 	req.Header.Set("X-Forwarded-Host", domainB)
 	rec := httptest.NewRecorder()
-	env.handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	handler.ServeHTTP(rec, req)
+
+	if catalog.host != domainA {
+		t.Fatalf("forwarded host = %q, want the request Host %q", catalog.host, domainA)
 	}
-	var response StoreResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+}
+
+func TestStorefrontHonoursForwardedHostWhenTrusted(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{TrustedForwardedHost: true})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req.Host = domainA
+	req.Header.Set("X-Forwarded-Host", domainB+", evil.example.com")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if catalog.host != domainB {
+		t.Fatalf("forwarded host = %q, want the first forwarded host %q", catalog.host, domainB)
+	}
+}
+
+// A client-supplied store or seller identifier must never influence the tenant.
+func TestStorefrontIgnoresClientSuppliedTenantIdentifiers(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	doGet(t, handler, "/v1/storefront/store?store_id=other&seller_id=other", domainA)
+
+	if catalog.host != domainA {
+		t.Fatalf("forwarded host = %q, want %q; query parameters must not select a tenant", catalog.host, domainA)
+	}
+}
+
+// --- locale mapping ---
+
+func TestStorefrontForwardsNegotiatedLocale(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req.Host = domainA
+	req.Header.Set("Accept-Language", "ar")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if catalog.locale != i18n.LocaleArabic {
+		t.Fatalf("forwarded locale = %q, want %q", catalog.locale, i18n.LocaleArabic)
+	}
+}
+
+func TestStorefrontDefaultsToEnglish(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	doGet(t, handler, "/v1/storefront/store", domainA)
+
+	if catalog.locale != i18n.LocaleEnglish {
+		t.Fatalf("forwarded locale = %q, want %q", catalog.locale, i18n.LocaleEnglish)
+	}
+}
+
+// --- query forwarding ---
+
+func TestStorefrontForwardsBrowseQuery(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	doGet(t, handler, "/v1/storefront/products?category=lighting&availability=in_stock&sort=price_asc&min_price=1000&max_price=9000&limit=12&offset=24", domainA)
+
+	query := catalog.query
+	if query.CategorySlug != "lighting" {
+		t.Errorf("category = %q, want lighting", query.CategorySlug)
+	}
+	if query.Availability != "in_stock" {
+		t.Errorf("availability = %q, want in_stock", query.Availability)
+	}
+	if query.Sort != "price_asc" {
+		t.Errorf("sort = %q, want price_asc", query.Sort)
+	}
+	if query.MinPriceMinor == nil || *query.MinPriceMinor != 1000 {
+		t.Errorf("min_price = %v, want 1000", query.MinPriceMinor)
+	}
+	if query.MaxPriceMinor == nil || *query.MaxPriceMinor != 9000 {
+		t.Errorf("max_price = %v, want 9000", query.MaxPriceMinor)
+	}
+	if query.Limit == nil || *query.Limit != 12 {
+		t.Errorf("limit = %v, want 12", query.Limit)
+	}
+	if query.Offset == nil || *query.Offset != 24 {
+		t.Errorf("offset = %v, want 24", query.Offset)
+	}
+}
+
+func TestStorefrontOmitsAbsentQueryValues(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	doGet(t, handler, "/v1/storefront/products", domainA)
+
+	query := catalog.query
+	if query.Limit != nil || query.Offset != nil {
+		t.Errorf("absent limit/offset must be omitted, got %v/%v", query.Limit, query.Offset)
+	}
+	if query.MinPriceMinor != nil || query.MaxPriceMinor != nil {
+		t.Errorf("absent prices must be omitted, got %v/%v", query.MinPriceMinor, query.MaxPriceMinor)
+	}
+}
+
+func TestStorefrontForwardsSearchKeyword(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	doGet(t, handler, "/v1/storefront/search?q=lamp", domainA)
+
+	if catalog.query.Keyword != "lamp" {
+		t.Fatalf("keyword = %q, want lamp", catalog.query.Keyword)
+	}
+}
+
+func TestStorefrontRejectsMalformedQuery(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	for _, path := range []string{
+		"/v1/storefront/products?limit=abc",
+		"/v1/storefront/products?offset=xyz",
+		"/v1/storefront/products?min_price=nope",
+		"/v1/storefront/products?max_price=nope",
+		"/v1/storefront/search?limit=abc",
+	} {
+		rec := doGet(t, handler, path, domainA)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400 (body %q)", path, rec.Code, rec.Body.String())
+		}
+		if got := decodeError(t, rec); got != "validation_error" {
+			t.Errorf("%s: error code = %q, want validation_error", path, got)
+		}
+	}
+}
+
+// --- response mapping ---
+
+func TestStorefrontMapsProductPage(t *testing.T) {
+	catalog := &stubCatalog{page: coreclient.ProductPage{
+		Items:  []coreclient.ProductListItem{{Slug: "lamp", Name: "Desk Lamp"}},
+		Total:  1,
+		Limit:  24,
+		Offset: 0,
+	}}
+	handler := newHandler(catalog, config.Config{})
+
+	rec := doGet(t, handler, "/v1/storefront/products", domainA)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d (body %q)", rec.Code, rec.Body.String())
+	}
+
+	var payload ProductCollectionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if response.Store.StoreCode != "store-a" {
-		t.Fatalf("spoofed forwarded host changed the tenant: %+v", response.Store)
+	if len(payload.Items) != 1 || payload.Items[0].Slug != "lamp" {
+		t.Errorf("items = %+v, want one lamp", payload.Items)
+	}
+	if payload.Pagination.Total != 1 || payload.Pagination.Limit != 24 {
+		t.Errorf("pagination = %+v, want total 1 limit 24", payload.Pagination)
 	}
 }
 
-func TestStorefrontUnavailableHostsFailGenerically(t *testing.T) {
-	env := setupAPITest(t)
+// An empty page must serialize as an empty array, not null, so clients can
+// iterate without a null check.
+func TestStorefrontEmptyPageSerializesAsArray(t *testing.T) {
+	catalog := &stubCatalog{page: coreclient.ProductPage{}}
+	handler := newHandler(catalog, config.Config{})
 
-	for _, host := range []string{"unknown.matjero.test", "store-c.matjero.test"} {
-		rec, body := env.get(t, host, "/v1/storefront/store")
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("host %s: expected 404, got %d: %s", host, rec.Code, body)
-		}
-		lower := strings.ToLower(body)
-		for _, leak := range []string{"suspend", "inactive", "disabled", "seller", "moderation", "verification"} {
-			if strings.Contains(lower, leak) {
-				t.Fatalf("host %s: response leaked %q: %s", host, leak, body)
+	rec := doGet(t, handler, "/v1/storefront/products", domainA)
+	body := rec.Body.String()
+
+	if strings.Contains(body, `"items":null`) {
+		t.Fatalf("empty page serialized items as null: %s", body)
+	}
+	if !strings.Contains(body, `"items":[]`) {
+		t.Fatalf("expected an empty items array, got %s", body)
+	}
+}
+
+// --- public error mapping ---
+
+func TestStorefrontMapsCoreErrorsToPublicResponses(t *testing.T) {
+	cases := []struct {
+		name       string
+		code       string
+		wantStatus int
+		wantCode   string
+	}{
+		{"unknown host", coreclient.CodeStorefrontUnavailable, http.StatusNotFound, "storefront_unavailable"},
+		{"missing record", coreclient.CodeNotFound, http.StatusNotFound, "not_found"},
+		{"invalid query", coreclient.CodeValidationError, http.StatusBadRequest, "validation_error"},
+		{"invalid argument", coreclient.CodeInvalidArgument, http.StatusBadRequest, "validation_error"},
+		{"core internal", coreclient.CodeInternalError, http.StatusInternalServerError, "internal_error"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			catalog := &stubCatalog{err: &coreclient.Error{Status: tc.wantStatus, Code: tc.code}}
+			handler := newHandler(catalog, config.Config{})
+
+			rec := doGet(t, handler, "/v1/storefront/store", domainA)
+
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d (body %q)", rec.Code, tc.wantStatus, rec.Body.String())
 			}
-		}
-	}
-}
-
-func TestStorefrontTwoStoreIsolation(t *testing.T) {
-	env := setupAPITest(t)
-
-	var pageA ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/products", &pageA)
-	slugsA := slugsOf(pageA)
-	if !containsSlug(slugsA, "store-a-desk-lamp") || containsSlug(slugsA, "store-b-frying-pan") {
-		t.Fatalf("store A products wrong: %v", slugsA)
-	}
-
-	var pageB ProductCollectionResponse
-	env.getJSON(t, domainB, "/v1/storefront/products", &pageB)
-	slugsB := slugsOf(pageB)
-	if !containsSlug(slugsB, "store-b-frying-pan") {
-		t.Fatalf("store B products wrong: %v", slugsB)
-	}
-	for _, slug := range slugsB {
-		if strings.HasPrefix(slug, "store-a-") {
-			t.Fatalf("store A product leaked into store B: %v", slugsB)
-		}
-	}
-
-	// Cross-store slug detail must 404 in both directions.
-	if rec, body := env.get(t, domainA, "/v1/storefront/products/store-b-frying-pan"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for cross-store product, got %d: %s", rec.Code, body)
-	}
-	if rec, body := env.get(t, domainB, "/v1/storefront/products/store-a-desk-lamp"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for cross-store product, got %d: %s", rec.Code, body)
-	}
-	if rec, body := env.get(t, domainA, "/v1/storefront/categories/store-b-kitchen"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for cross-store category, got %d: %s", rec.Code, body)
-	}
-	if rec, body := env.get(t, domainB, "/v1/storefront/categories/store-a-lighting"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for cross-store category, got %d: %s", rec.Code, body)
-	}
-
-	// Search must not cross tenants either.
-	var searchA ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/search?q=frying", &searchA)
-	if len(searchA.Items) != 0 {
-		t.Fatalf("store B content matched a store A search: %v", slugsOf(searchA))
-	}
-	var searchB ProductCollectionResponse
-	env.getJSON(t, domainB, "/v1/storefront/search?q=desk", &searchB)
-	if len(searchB.Items) != 0 {
-		t.Fatalf("store A content matched a store B search: %v", slugsOf(searchB))
-	}
-}
-
-func TestStorefrontCategories(t *testing.T) {
-	env := setupAPITest(t)
-
-	var collection CategoryCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/categories", &collection)
-	if len(collection.Items) != 1 || collection.Items[0].Slug != "store-a-lighting" {
-		t.Fatalf("unexpected categories: %+v", collection.Items)
-	}
-
-	var single CategoryResponse
-	env.getJSON(t, domainA, "/v1/storefront/categories/store-a-lighting", &single)
-	if single.Category.Name != "Lighting" || single.Category.ProductCount != 2 {
-		t.Fatalf("unexpected category: %+v", single.Category)
-	}
-}
-
-func TestStorefrontLocalizedResponses(t *testing.T) {
-	env := setupAPITest(t)
-
-	var en ProductResponse
-	env.getJSON(t, domainA, "/v1/storefront/products/store-a-desk-lamp?locale=en", &en)
-	if en.Product.Name != "Desk Lamp" || en.Product.Description != "A bright desk lamp" {
-		t.Fatalf("unexpected English payload: %+v", en.Product)
-	}
-
-	var ar ProductResponse
-	env.getJSON(t, domainA, "/v1/storefront/products/store-a-desk-lamp?locale=ar", &ar)
-	if ar.Product.Name != "مصباح مكتبي" || ar.Product.Description != "مصباح مكتبي ساطع" {
-		t.Fatalf("unexpected Arabic payload: %+v", ar.Product)
-	}
-	if ar.Product.Slug != en.Product.Slug {
-		t.Fatalf("slug must be locale-stable: %q vs %q", ar.Product.Slug, en.Product.Slug)
-	}
-
-	// An unsupported locale must not change the tenant or fail the request; the
-	// locale middleware negotiates a supported value.
-	rec, body := env.get(t, domainA, "/v1/storefront/products/store-a-desk-lamp?locale=fr")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 for an unsupported locale, got %d: %s", rec.Code, body)
-	}
-}
-
-func TestStorefrontPublicPriceIsSellerListingPrice(t *testing.T) {
-	env := setupAPITest(t)
-
-	var detail ProductResponse
-	body := env.getJSON(t, domainA, "/v1/storefront/products/store-a-desk-lamp", &detail)
-	if detail.Product.Price.AmountMinor != storeAPriceMinor || detail.Product.Price.Currency != "EGP" {
-		t.Fatalf("expected the seller listing price, got %+v", detail.Product.Price)
-	}
-	if strings.Contains(body, "10000") {
-		t.Fatalf("supplier wholesale amount leaked into the HTTP response: %s", body)
-	}
-
-	var detailB ProductResponse
-	env.getJSON(t, domainB, "/v1/storefront/products/store-b-frying-pan", &detailB)
-	if detailB.Product.Price.AmountMinor != storeBPriceMinor {
-		t.Fatalf("expected store B price %d, got %+v", storeBPriceMinor, detailB.Product.Price)
-	}
-}
-
-func TestStorefrontExcludesNonPublicListings(t *testing.T) {
-	env := setupAPITest(t)
-
-	var page ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/products", &page)
-	if containsSlug(slugsOf(page), "store-a-hidden") {
-		t.Fatalf("draft listing appeared publicly: %v", slugsOf(page))
-	}
-	if rec, body := env.get(t, domainA, "/v1/storefront/products/store-a-hidden"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for a draft listing, got %d: %s", rec.Code, body)
-	}
-}
-
-func TestStorefrontFiltersSortAndPagination(t *testing.T) {
-	env := setupAPITest(t)
-
-	cases := map[string][]string{
-		"/v1/storefront/products?min_price=5001":                          {"store-a-desk-lamp"},
-		"/v1/storefront/products?max_price=5000":                          {"store-a-lamp-shade"},
-		"/v1/storefront/products?availability=in_stock":                   {"store-a-desk-lamp"},
-		"/v1/storefront/products?availability=out_of_stock":               {"store-a-lamp-shade"},
-		"/v1/storefront/products?sort=price_asc":                          {"store-a-lamp-shade", "store-a-desk-lamp"},
-		"/v1/storefront/products?sort=price_desc":                         {"store-a-desk-lamp", "store-a-lamp-shade"},
-		"/v1/storefront/products?category=store-a-lighting&sort=name_asc": {"store-a-desk-lamp", "store-a-lamp-shade"},
-	}
-	for target, want := range cases {
-		var page ProductCollectionResponse
-		env.getJSON(t, domainA, target, &page)
-		got := slugsOf(page)
-		if len(got) != len(want) {
-			t.Fatalf("%s: expected %v, got %v", target, want, got)
-		}
-		for i := range want {
-			if got[i] != want[i] {
-				t.Fatalf("%s: expected %v, got %v", target, want, got)
+			if got := decodeError(t, rec); got != tc.wantCode {
+				t.Errorf("error code = %q, want %q", got, tc.wantCode)
 			}
+		})
+	}
+}
+
+// Unknown host, inactive domain and inactive store must be indistinguishable:
+// all three arrive as the same Core code and collapse to one generic 404.
+func TestStorefrontHostFailuresAreIndistinguishable(t *testing.T) {
+	var bodies []string
+	for range []int{1, 2, 3} {
+		catalog := &stubCatalog{err: &coreclient.Error{Status: 404, Code: coreclient.CodeStorefrontUnavailable}}
+		handler := newHandler(catalog, config.Config{})
+		rec := doGet(t, handler, "/v1/storefront/store", "anything.matjero.test")
+		bodies = append(bodies, rec.Body.String())
+	}
+	for i, body := range bodies {
+		if body != bodies[0] {
+			t.Errorf("response %d differs: %q vs %q", i, body, bodies[0])
 		}
 	}
-
-	var first, second ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/products?sort=price_asc&limit=1", &first)
-	env.getJSON(t, domainA, "/v1/storefront/products?sort=price_asc&limit=1&offset=1", &second)
-	if first.Pagination.Total != 2 || second.Pagination.Total != 2 {
-		t.Fatalf("unexpected totals: %d and %d", first.Pagination.Total, second.Pagination.Total)
-	}
-	if first.Pagination.Limit != 1 || second.Pagination.Offset != 1 {
-		t.Fatalf("pagination envelope wrong: %+v %+v", first.Pagination, second.Pagination)
-	}
-	if len(first.Items) != 1 || len(second.Items) != 1 || first.Items[0].Slug == second.Items[0].Slug {
-		t.Fatalf("unstable pagination: %v then %v", slugsOf(first), slugsOf(second))
-	}
-
-	// Default page size is applied when the caller omits limit.
-	var defaults ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/products", &defaults)
-	if defaults.Pagination.Limit != storefront.DefaultPageLimit {
-		t.Fatalf("expected the default limit %d, got %d", storefront.DefaultPageLimit, defaults.Pagination.Limit)
-	}
 }
 
-func TestStorefrontRejectsInvalidFilters(t *testing.T) {
-	env := setupAPITest(t)
+// --- Core unavailable ---
 
-	for _, target := range []string{
-		"/v1/storefront/products?limit=1000000",
-		"/v1/storefront/products?limit=-1",
-		"/v1/storefront/products?offset=-1",
-		"/v1/storefront/products?limit=many",
-		"/v1/storefront/products?min_price=-5",
-		"/v1/storefront/products?min_price=900&max_price=100",
-		"/v1/storefront/products?min_price=cheap",
-		"/v1/storefront/products?sort=random",
-		"/v1/storefront/products?availability=maybe",
-		"/v1/storefront/search?q=lamp&sort=random",
-	} {
-		rec, body := env.get(t, domainA, target)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("%s: expected 400, got %d: %s", target, rec.Code, body)
+func TestStorefrontReturns503WhenCoreUnavailable(t *testing.T) {
+	catalog := &stubCatalog{err: coreclient.ErrUnavailable}
+	handler := newHandler(catalog, config.Config{})
+
+	rec := doGet(t, handler, "/v1/storefront/store", domainA)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+	}
+	if got := decodeError(t, rec); got != "service_unavailable" {
+		t.Errorf("error code = %q, want service_unavailable", got)
+	}
+	// The response must not leak the internal Core host or a transport detail.
+	body := rec.Body.String()
+	for _, leak := range []string{"connection refused", "core-api", "dial tcp", "no such host"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("response leaked transport detail %q: %s", leak, body)
 		}
 	}
+}
 
-	// An unknown filter is ignored rather than rejected, matching the platform's
-	// tolerant query handling elsewhere.
-	if rec, body := env.get(t, domainA, "/v1/storefront/products?unknown=1"); rec.Code != http.StatusOK {
-		t.Fatalf("expected an unknown filter to be ignored, got %d: %s", rec.Code, body)
+func TestStorefrontReturns503OnCoreTimeout(t *testing.T) {
+	catalog := &stubCatalog{err: context.DeadlineExceeded}
+	handler := newHandler(catalog, config.Config{})
+
+	rec := doGet(t, handler, "/v1/storefront/store", domainA)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
 	}
 }
 
-func TestStorefrontSearch(t *testing.T) {
-	env := setupAPITest(t)
+// --- public privacy contract ---
 
-	var en ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/search?q=desk", &en)
-	if len(en.Items) != 1 || en.Items[0].Slug != "store-a-desk-lamp" {
-		t.Fatalf("unexpected English search results: %v", slugsOf(en))
+// The public payload must carry the seller's listing price and never the
+// supplier's wholesale cost.
+func TestStorefrontDisclosesListingPriceOnly(t *testing.T) {
+	catalog := &stubCatalog{page: coreclient.ProductPage{
+		Items: []coreclient.ProductListItem{{
+			Slug:  "lamp",
+			Name:  "Desk Lamp",
+			Price: moneyOf(storeAPrice, "EGP"),
+		}},
+		Total: 1,
+	}}
+	handler := newHandler(catalog, config.Config{})
+
+	rec := doGet(t, handler, "/v1/storefront/products", domainA)
+	body := rec.Body.String()
+
+	if !strings.Contains(body, `"amount_minor":15000`) {
+		t.Errorf("public payload must carry the listing price: %s", body)
 	}
-
-	var ar ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/search?locale=ar&q=%D9%85%D8%B5%D8%A8%D8%A7%D8%AD%20%D9%85%D9%83%D8%AA%D8%A8%D9%8A", &ar)
-	if len(ar.Items) != 1 || ar.Items[0].Slug != "store-a-desk-lamp" {
-		t.Fatalf("unexpected Arabic search results: %v", slugsOf(ar))
-	}
-
-	var empty ProductCollectionResponse
-	env.getJSON(t, domainA, "/v1/storefront/search?q=nothing-matches-this", &empty)
-	if len(empty.Items) != 0 || empty.Pagination.Total != 0 {
-		t.Fatalf("expected an empty result set, got %+v", empty)
+	if strings.Contains(body, `"amount_minor":10000`) {
+		t.Errorf("public payload leaked the supplier wholesale cost: %s", body)
 	}
 }
 
-func TestStorefrontUnknownSlugsReturnNotFound(t *testing.T) {
-	env := setupAPITest(t)
+// Supplier identity must never appear in a public storefront payload.
+func TestStorefrontHidesSupplierIdentity(t *testing.T) {
+	catalog := &stubCatalog{product: coreclient.ProductDetail{
+		Slug:  "lamp",
+		Name:  "Desk Lamp",
+		Price: moneyOf(storeAPrice, "EGP"),
+	}}
+	handler := newHandler(catalog, config.Config{})
 
-	if rec, body := env.get(t, domainA, "/v1/storefront/products/nope"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rec.Code, body)
+	rec := doGet(t, handler, "/v1/storefront/products/lamp", domainA)
+	body := rec.Body.String()
+
+	for _, secret := range []string{"supplier", "wholesale", "cost"} {
+		if strings.Contains(strings.ToLower(body), secret) {
+			t.Errorf("public product payload leaked %q: %s", secret, body)
+		}
 	}
-	if rec, body := env.get(t, domainA, "/v1/storefront/categories/nope"); rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rec.Code, body)
-	}
+}
+
+func moneyOf(minor int64, currency string) money.Money {
+	return money.MustNew(minor, currency)
 }

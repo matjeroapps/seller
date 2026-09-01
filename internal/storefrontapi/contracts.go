@@ -1,7 +1,7 @@
 package storefrontapi
 
 import (
-	"github.com/matjeroapps/core/pkg/storefront"
+	"github.com/matjeroapps/seller/internal/coreclient"
 )
 
 // Public API response contracts. They are declared here rather than reusing Core
@@ -11,17 +11,17 @@ import (
 
 // StoreResponse is the storefront bootstrap payload.
 type StoreResponse struct {
-	Store storefront.StoreBootstrap `json:"store"`
+	Store coreclient.StoreBootstrap `json:"store"`
 }
 
 // CategoryCollectionResponse is the public category tree.
 type CategoryCollectionResponse struct {
-	Items []storefront.CategoryNode `json:"items"`
+	Items []coreclient.CategoryNode `json:"items"`
 }
 
 // CategoryResponse is a single public category.
 type CategoryResponse struct {
-	Category storefront.CategoryNode `json:"category"`
+	Category coreclient.CategoryNode `json:"category"`
 }
 
 // Pagination is the public paging envelope for browse and search collections.
@@ -33,19 +33,19 @@ type Pagination struct {
 
 // ProductCollectionResponse is a bounded page of browse or search results.
 type ProductCollectionResponse struct {
-	Items      []storefront.ProductListItem `json:"items"`
+	Items      []coreclient.ProductListItem `json:"items"`
 	Pagination Pagination                   `json:"pagination"`
 }
 
 // ProductResponse is the product detail payload.
 type ProductResponse struct {
-	Product storefront.ProductDetail `json:"product"`
+	Product coreclient.ProductDetail `json:"product"`
 }
 
-func newProductCollectionResponse(page storefront.ProductPage) ProductCollectionResponse {
+func newProductCollectionResponse(page coreclient.ProductPage) ProductCollectionResponse {
 	items := page.Items
 	if items == nil {
-		items = []storefront.ProductListItem{}
+		items = []coreclient.ProductListItem{}
 	}
 	return ProductCollectionResponse{
 		Items: items,

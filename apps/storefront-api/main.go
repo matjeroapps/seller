@@ -1,3 +1,9 @@
+// Command storefront-api serves the public, anonymous storefront HTTP surface.
+//
+// Tenant identity comes from the trusted request host and is forwarded to Core,
+// which resolves the store and applies the catalog scope. The catalog read model
+// is a Core-owned business capability reached over the internal API (ADR-017);
+// this service holds no database connection and imports no Core Go package.
 package main
 
 import (
@@ -6,15 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/core/packages/config"
-	"github.com/matjeroapps/core/packages/database"
-	"github.com/matjeroapps/core/packages/httpx"
-	"github.com/matjeroapps/core/packages/logging"
-	"github.com/matjeroapps/core/packages/observability"
-	"github.com/matjeroapps/core/pkg/actorapi"
-	"github.com/matjeroapps/core/pkg/commerce"
-	"github.com/matjeroapps/core/pkg/markets"
-	"github.com/matjeroapps/core/pkg/storefront"
+	"github.com/matjeroapps/seller/internal/actorapi"
+	"github.com/matjeroapps/seller/internal/config"
+	"github.com/matjeroapps/seller/internal/coreclient"
+	"github.com/matjeroapps/seller/internal/httpx"
+	"github.com/matjeroapps/seller/internal/logging"
+	"github.com/matjeroapps/seller/internal/observability"
 	"github.com/matjeroapps/seller/internal/openapi"
 	"github.com/matjeroapps/seller/internal/storefrontapi"
 )
@@ -30,6 +33,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	logger := logging.New(cfg)
 	shutdown, err := observability.Init(ctx, cfg)
 	if err != nil {
@@ -37,48 +41,54 @@ func run(ctx context.Context) error {
 	}
 	defer func() { _ = shutdown(context.Background()) }()
 
-	db, err := database.Connect(ctx, cfg)
+	core, err := coreclient.New(coreclient.Config{
+		BaseURL: cfg.CoreAPIBaseURL,
+		Token:   cfg.CoreAPIToken,
+		Service: "seller",
+		Timeout: cfg.CoreAPITimeout,
+	})
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
-	marketService := markets.NewService(markets.NewRepository(db.Pool))
-	commerceRepo := commerce.NewRepository(db.Pool)
-	storefrontDeps := storefrontapi.Dependencies{
-		Catalog:  storefront.NewCatalogRepository(db.Pool),
-		Stores:   storefront.NewStoreResolver(commerceRepo),
-		Platform: cfg,
-	}
 	appCfg := httpx.ConfigFrom(cfg)
 	router := httpx.NewRouter(httpx.App{
 		Config: appCfg,
 		Logger: logger,
-		Ready: func(ctx context.Context) error {
-			return db.Ping(ctx)
-		},
+		// No database and no local dependency to probe; Core reachability is
+		// surfaced per request as a 503 rather than failing readiness, so a Core
+		// blip does not take every storefront replica out of rotation.
+		Ready: func(context.Context) error { return nil },
 	})
-	if spec, err := openapi.BuildStorefrontSpec(); err == nil {
-		if specBytes, err := openapi.MarshalDocument(spec); err == nil {
-			router.Mount("/", openapi.NewRouter(openapi.RouterConfig{
-				Enabled:   cfg.OpenAPIDocsEnabled,
-				SpecPath:  "/openapi.json",
-				DocsPath:  "/docs",
-				SpecBytes: specBytes,
-			}))
-		} else {
-			return err
-		}
-	} else {
+
+	spec, err := openapi.BuildStorefrontSpec()
+	if err != nil {
 		return err
 	}
+	specBytes, err := openapi.MarshalDocument(spec)
+	if err != nil {
+		return err
+	}
+	router.Mount("/", openapi.NewRouter(openapi.RouterConfig{
+		Enabled:   cfg.OpenAPIDocsEnabled,
+		SpecPath:  "/openapi.json",
+		DocsPath:  "/docs",
+		SpecBytes: specBytes,
+	}))
+
+	// The storefront is anonymous: no OIDC verifier is mounted. Tenant authority
+	// is the trusted host, never a client-supplied identifier.
 	router.Mount("/", actorapi.NewRouter(actorapi.Config{
 		AppName:     "Storefront API",
 		Actor:       "storefront",
 		RequireAuth: false,
 		Register: func(r chi.Router) {
-			storefrontapi.RegisterStorefrontRoutes(storefrontDeps)(r)
+			storefrontapi.RegisterStorefrontRoutes(storefrontapi.Dependencies{
+				Catalog:  core,
+				Platform: cfg,
+			})(r)
 		},
-	}, marketService, nil))
+	}, core, nil))
+
 	return httpx.Run(ctx, appCfg, logger, router)
 }

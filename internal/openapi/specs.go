@@ -5,8 +5,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/matjeroapps/core/pkg/commerce"
-	"github.com/matjeroapps/core/pkg/contracts"
+	"github.com/matjeroapps/seller/internal/contracts"
+	"github.com/matjeroapps/seller/internal/coreclient"
 	"github.com/matjeroapps/seller/internal/sellerapi"
 	"github.com/matjeroapps/seller/internal/storefrontapi"
 )
@@ -16,8 +16,8 @@ func BuildSellerSpec() (*openapi3.T, error) {
 		Title:         "Matjero Seller API",
 		Description:   "OpenAPI contract for the Matjero Seller API.",
 		Authenticated: true,
-		Tags:          openAPITags(),
-		Routes:        append(actorRoutes(true), sellerRoutes()...),
+		Tags:          CommonTags(),
+		Routes:        append(ActorRoutes(true), sellerRoutes()...),
 	})
 }
 
@@ -27,7 +27,7 @@ func BuildStorefrontSpec() (*openapi3.T, error) {
 		Description:   "OpenAPI contract for the public Matjero Storefront API.",
 		Authenticated: false,
 		Tags:          storefrontTags(),
-		Routes:        append(actorRoutes(false), storefrontRoutes()...),
+		Routes:        append(ActorRoutes(false), storefrontRoutes()...),
 	})
 }
 
@@ -43,7 +43,7 @@ func storefrontTags() []openapi3.Tag {
 		"Categories":        true,
 	}
 	tags := make([]openapi3.Tag, 0, 8)
-	for _, tag := range openAPITags() {
+	for _, tag := range CommonTags() {
 		if public[tag.Name] {
 			tags = append(tags, tag)
 		}
@@ -85,7 +85,7 @@ func storefrontRoutes() []RouteSpec {
 			Summary:     "Get a public category by slug",
 			Description: "Resolves a category slug within the store resolved from the request host. A slug belonging to another store returns 404.",
 			Tags:        []string{"Storefront", "Categories"},
-			Parameters:  []ParameterSpec{pathStringParam("slug", "Public category slug")},
+			Parameters:  []ParameterSpec{PathStringParam("slug", "Public category slug")},
 			Responses:   storefrontResponses("Public category", storefrontapi.CategoryResponse{}),
 		},
 		{
@@ -105,7 +105,7 @@ func storefrontRoutes() []RouteSpec {
 			Summary:     "Get a public product by slug",
 			Description: "Resolves a product slug within the store resolved from the request host. A slug not publicly listed by this store returns 404.",
 			Tags:        []string{"Storefront", "Products"},
-			Parameters:  []ParameterSpec{pathStringParam("slug", "Public product slug")},
+			Parameters:  []ParameterSpec{PathStringParam("slug", "Public product slug")},
 			Responses:   storefrontResponses("Public product detail", storefrontapi.ProductResponse{}),
 		},
 		{
@@ -126,14 +126,14 @@ func storefrontRoutes() []RouteSpec {
 // not storage-specific expressions.
 func catalogBrowseParams() []ParameterSpec {
 	return []ParameterSpec{
-		stringParam("q", "Keyword matched against localized product name, description and slug", false),
-		stringParam("category", "Filter by public category slug", false),
+		StringParam("q", "Keyword matched against localized product name, description and slug", false),
+		StringParam("category", "Filter by public category slug", false),
 		{Name: "min_price", In: "query", Description: "Minimum price in currency minor units", Schema: int64(0)},
 		{Name: "max_price", In: "query", Description: "Maximum price in currency minor units", Schema: int64(0)},
-		stringParam("availability", "Filter by derived availability: in_stock or out_of_stock", false),
-		stringParam("sort", "Sort order: newest, price_asc, price_desc or name_asc", false),
+		StringParam("availability", "Filter by derived availability: in_stock or out_of_stock", false),
+		StringParam("sort", "Sort order: newest, price_asc, price_desc or name_asc", false),
 		{Name: "limit", In: "query", Description: "Page size, default 24, maximum 60", Schema: int64(0)},
-		offsetParam(),
+		OffsetParam(),
 	}
 }
 
@@ -142,10 +142,10 @@ func catalogBrowseParams() []ParameterSpec {
 // cross-store slugs with one generic body.
 func storefrontResponses(description string, body any) []ResponseSpec {
 	return []ResponseSpec{
-		okResponse(description, body),
-		errorResponse(http.StatusBadRequest, "Invalid query parameters"),
-		errorResponse(http.StatusNotFound, "Storefront or resource not available"),
-		errorResponse(http.StatusInternalServerError, "Internal error"),
+		OKResponse(description, body),
+		ErrorResponse(http.StatusBadRequest, "Invalid query parameters"),
+		ErrorResponse(http.StatusNotFound, "Storefront or resource not available"),
+		ErrorResponse(http.StatusInternalServerError, "Internal error"),
 	}
 }
 
@@ -158,7 +158,7 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Get the seller profile",
 			Tags:        []string{"Sellers"},
 			Auth:        true,
-			Responses:   authReadResponses("Seller profile", sellerapi.SellerProfileResponse{}),
+			Responses:   AuthReadResponses("Seller profile", sellerapi.SellerProfileResponse{}),
 		},
 		{
 			Method:      http.MethodPut,
@@ -168,7 +168,7 @@ func sellerRoutes() []RouteSpec {
 			Tags:        []string{"Sellers"},
 			Auth:        true,
 			RequestBody: sellerapi.SellerProfileUpdateRequest{},
-			Responses:   authOKResponses("Seller profile updated", contracts.StatusResponse{}),
+			Responses:   AuthOKResponses("Seller profile updated", contracts.StatusResponse{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -177,8 +177,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "List seller stores",
 			Tags:        []string{"Stores"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{limitParam(), offsetParam()},
-			Responses:   listResponses[commerce.Store]("Store collection"),
+			Parameters:  []ParameterSpec{LimitParam(), OffsetParam()},
+			Responses:   ListResponses[coreclient.Store]("Store collection"),
 		},
 		{
 			Method:      http.MethodPost,
@@ -188,7 +188,7 @@ func sellerRoutes() []RouteSpec {
 			Tags:        []string{"Stores"},
 			Auth:        true,
 			RequestBody: sellerapi.SellerStoreCreateRequest{},
-			Responses:   authCreatedResponses("Store created", commerce.Store{}),
+			Responses:   AuthCreatedResponses("Store created", coreclient.Store{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -198,13 +198,13 @@ func sellerRoutes() []RouteSpec {
 			Tags:        []string{"Catalog", "Supplier Offers"},
 			Auth:        true,
 			Parameters: []ParameterSpec{
-				stringParam("store_id", "Store identifier", true),
-				stringParam("supplier_id", "Filter by supplier identifier", false),
-				stringParam("category_id", "Filter by category identifier", false),
-				limitParam(),
-				offsetParam(),
+				StringParam("store_id", "Store identifier", true),
+				StringParam("supplier_id", "Filter by supplier identifier", false),
+				StringParam("category_id", "Filter by category identifier", false),
+				LimitParam(),
+				OffsetParam(),
 			},
-			Responses: listResponses[commerce.SupplierCatalogItem]("Supplier catalog collection"),
+			Responses: ListResponses[coreclient.SupplierCatalogItem]("Supplier catalog collection"),
 		},
 		{
 			Method:      http.MethodGet,
@@ -214,11 +214,11 @@ func sellerRoutes() []RouteSpec {
 			Tags:        []string{"Seller Listings"},
 			Auth:        true,
 			Parameters: []ParameterSpec{
-				stringParam("store_id", "Store identifier", true),
-				limitParam(),
-				offsetParam(),
+				StringParam("store_id", "Store identifier", true),
+				LimitParam(),
+				OffsetParam(),
 			},
-			Responses: listResponses[commerce.SellerListing]("Seller listing collection"),
+			Responses: ListResponses[coreclient.SellerListing]("Seller listing collection"),
 		},
 		{
 			Method:      http.MethodPost,
@@ -228,7 +228,7 @@ func sellerRoutes() []RouteSpec {
 			Tags:        []string{"Seller Listings"},
 			Auth:        true,
 			RequestBody: sellerapi.SellerListingImportRequest{},
-			Responses:   authCreatedResponses("Seller listing imported", commerce.SellerListing{}),
+			Responses:   AuthCreatedResponses("Seller listing imported", coreclient.SellerListing{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -237,9 +237,9 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Update seller listing price",
 			Tags:        []string{"Seller Listings"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("id", "Seller listing identifier")},
+			Parameters:  []ParameterSpec{PathStringParam("id", "Seller listing identifier")},
 			RequestBody: sellerapi.SellerListingPriceRequest{},
-			Responses:   authOKResponses("Seller listing price updated", contracts.StatusResponse{}),
+			Responses:   AuthOKResponses("Seller listing price updated", contracts.StatusResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -248,9 +248,9 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Update seller listing status",
 			Tags:        []string{"Seller Listings", "Audit"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("id", "Seller listing identifier")},
+			Parameters:  []ParameterSpec{PathStringParam("id", "Seller listing identifier")},
 			RequestBody: contracts.StatusUpdateRequest{},
-			Responses:   authOKResponses("Seller listing status updated", contracts.StatusResponse{}),
+			Responses:   AuthOKResponses("Seller listing status updated", contracts.StatusResponse{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -259,7 +259,7 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "List available themes",
 			Tags:        []string{"Themes"},
 			Auth:        true,
-			Responses:   authReadResponses("Theme collection", sellerapi.ThemeCollectionResponse{}),
+			Responses:   AuthReadResponses("Theme collection", sellerapi.ThemeCollectionResponse{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -268,8 +268,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "List versions for a theme",
 			Tags:        []string{"Themes"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("key", "Theme key")},
-			Responses:   authReadResponses("Theme version collection", sellerapi.ThemeVersionCollectionResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("key", "Theme key")},
+			Responses:   AuthReadResponses("Theme version collection", sellerapi.ThemeVersionCollectionResponse{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -278,8 +278,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Get the active theme installation and configuration for a store",
 			Tags:        []string{"Themes", "Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
-			Responses:   authReadResponses("Theme installation", sellerapi.ThemeInstallationResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthReadResponses("Theme installation", sellerapi.ThemeInstallationResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -288,9 +288,9 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Install or select a theme for a store",
 			Tags:        []string{"Themes"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
 			RequestBody: sellerapi.ThemeInstallRequest{},
-			Responses:   authCreatedResponses("Theme installed", sellerapi.ThemeInstallationResponse{}),
+			Responses:   AuthCreatedResponses("Theme installed", sellerapi.ThemeInstallationResponse{}),
 		},
 		{
 			Method:      http.MethodGet,
@@ -299,8 +299,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Get the draft theme configuration for a store",
 			Tags:        []string{"Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
-			Responses:   authReadResponses("Draft configuration", sellerapi.ThemeDraftResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthReadResponses("Draft configuration", sellerapi.ThemeDraftResponse{}),
 		},
 		{
 			Method:      http.MethodPut,
@@ -309,9 +309,9 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Update the draft theme configuration for a store",
 			Tags:        []string{"Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
 			RequestBody: sellerapi.ThemeConfigRequest{},
-			Responses:   authOKResponses("Draft configuration updated", sellerapi.ThemeDraftResponse{}),
+			Responses:   AuthOKResponses("Draft configuration updated", sellerapi.ThemeDraftResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -320,8 +320,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Publish the draft theme configuration for a store",
 			Tags:        []string{"Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
-			Responses:   authOKResponses("Theme published", sellerapi.ThemePublishResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthOKResponses("Theme published", sellerapi.ThemePublishResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -330,8 +330,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Discard the draft and reset it to the published configuration",
 			Tags:        []string{"Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
-			Responses:   authOKResponses("Draft discarded", sellerapi.ThemeDraftResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthOKResponses("Draft discarded", sellerapi.ThemeDraftResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -340,9 +340,9 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Upgrade a store's theme installation to a newer published version",
 			Tags:        []string{"Themes"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
 			RequestBody: sellerapi.ThemeUpgradeRequest{},
-			Responses:   authOKResponses("Theme upgraded", contracts.StatusResponse{}),
+			Responses:   AuthOKResponses("Theme upgraded", contracts.StatusResponse{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -351,8 +351,8 @@ func sellerRoutes() []RouteSpec {
 			Summary:     "Issue a short-lived, signed, store-scoped preview token for the draft",
 			Tags:        []string{"Theme Configuration"},
 			Auth:        true,
-			Parameters:  []ParameterSpec{pathStringParam("store_id", "Store identifier")},
-			Responses:   authOKResponses("Preview token issued", sellerapi.ThemePreviewResponse{}),
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthOKResponses("Preview token issued", sellerapi.ThemePreviewResponse{}),
 		},
 	}
 }

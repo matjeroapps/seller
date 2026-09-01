@@ -1,12 +1,18 @@
 package sellerapi
 
 import (
-	"github.com/matjeroapps/core/pkg/commerce"
+	"github.com/matjeroapps/seller/internal/coreclient"
 )
 
+// Public request and response contracts for the Seller API.
+//
+// These are owned by this repository. They are deliberately not the Core wire
+// shapes: the public contract is governed here, so a Core change cannot silently
+// alter what a seller-facing client sees.
+
 type SellerProfileResponse struct {
-	Seller   commerce.Seller `json:"seller"`
-	Settings map[string]any  `json:"settings"`
+	Seller   coreclient.Seller `json:"seller"`
+	Settings map[string]any    `json:"settings"`
 }
 
 type SellerProfileUpdateRequest struct {
