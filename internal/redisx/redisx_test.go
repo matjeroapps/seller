@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
 )
 
 // TestNewValidConfig validates that New accepts a valid configuration.
@@ -84,8 +86,13 @@ func TestSetInvalidTTL(t *testing.T) {
 }
 
 // TestGetMissingKey validates that Get returns found=false for a missing key.
+//
+// It runs against an in-process Redis: the suite must pass on a machine and in a
+// CI runner that has no Redis, because Seller never requires one to be present.
 func TestGetMissingKey(t *testing.T) {
-	client, err := New(Config{Addr: "localhost:6379"})
+	server := miniredis.RunT(t)
+
+	client, err := New(Config{Addr: server.Addr()})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
