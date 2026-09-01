@@ -32,11 +32,16 @@ var coreMigrations = []string{
 var nonIdentifier = regexp.MustCompile(`[^a-z0-9_]+`)
 
 // openTestDB provisions an isolated schema on the test database and applies the
-// Core migrations to it, so parallel packages cannot collide. It skips the test
-// when PostgreSQL or the Core module directory is unavailable.
+// Core migrations to it, so parallel packages cannot collide.
+//
+// When TEST_DATABASE_URL is set the database is treated as required and an
+// unreachable server fails the test: CI configures it deliberately, and a silent
+// skip there would let cross-store isolation regressions pass unnoticed. Local
+// runs without it fall back to the compose default and skip when absent.
 func openTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
+	required := dsn != ""
 	if dsn == "" {
 		dsn = "postgres://commerce:commerce@localhost:5432/commerce?sslmode=disable"
 	}
@@ -44,11 +49,11 @@ func openTestDB(t *testing.T) *pgxpool.Pool {
 
 	adminPool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		t.Skipf("postgres unavailable: %v", err)
+		unavailable(t, required, err)
 	}
 	if err := adminPool.Ping(ctx); err != nil {
 		adminPool.Close()
-		t.Skipf("postgres unavailable: %v", err)
+		unavailable(t, required, err)
 	}
 
 	schema := schemaName(t.Name())
@@ -107,13 +112,21 @@ func coreMigrationDir(t *testing.T) string {
 	t.Helper()
 	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", coreModule).Output()
 	if err != nil {
-		t.Skipf("core module directory unavailable: %v", err)
+		t.Fatalf("resolve core module directory: %v", err)
 	}
 	dir := strings.TrimSpace(string(out))
 	if dir == "" {
-		t.Skip("core module directory unavailable")
+		t.Fatal("core module directory is empty")
 	}
 	return filepath.Join(dir, "migrations")
+}
+
+func unavailable(t *testing.T, required bool, err error) {
+	t.Helper()
+	if required {
+		t.Fatalf("postgres unavailable but TEST_DATABASE_URL is set: %v", err)
+	}
+	t.Skipf("postgres unavailable: %v", err)
 }
 
 func schemaName(name string) string {
