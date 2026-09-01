@@ -117,37 +117,46 @@ type requestOptions struct {
 
 // get performs a GET against a Core path and decodes the response into dst.
 func (c *Client) get(ctx context.Context, path string, query url.Values, opts requestOptions, dst any) error {
+	_, err := c.do(ctx, http.MethodGet, path, query, nil, opts, dst)
+	return err
+}
+
+// getWithHeader is get for callers that also need the response headers, such as
+// a storefront read that must be stored under the revision Core labelled it with.
+func (c *Client) getWithHeader(ctx context.Context, path string, query url.Values, opts requestOptions, dst any) (http.Header, error) {
 	return c.do(ctx, http.MethodGet, path, query, nil, opts, dst)
 }
 
 // post performs a POST with a JSON body and decodes the response into dst.
 func (c *Client) post(ctx context.Context, path string, body any, opts requestOptions, dst any) error {
-	return c.do(ctx, http.MethodPost, path, nil, body, opts, dst)
+	_, err := c.do(ctx, http.MethodPost, path, nil, body, opts, dst)
+	return err
 }
 
 // put performs a PUT with a JSON body and decodes the response into dst.
 func (c *Client) put(ctx context.Context, path string, body any, opts requestOptions, dst any) error {
-	return c.do(ctx, http.MethodPut, path, nil, body, opts, dst)
+	_, err := c.do(ctx, http.MethodPut, path, nil, body, opts, dst)
+	return err
 }
 
-func (c *Client) do(ctx context.Context, method, path string, query url.Values, body any, opts requestOptions, dst any) error {
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, body any, opts requestOptions, dst any) (http.Header, error) {
 	endpoint, err := c.url(path, query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
-			return fmt.Errorf("coreclient: encode request body: %w", err)
+			return nil, fmt.Errorf("coreclient: encode request body: %w", err)
 		}
 		reader = bytes.NewReader(encoded)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
-		return fmt.Errorf("coreclient: build request: %w", err)
+		return nil, fmt.Errorf("coreclient: build request: %w", err)
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -181,20 +190,20 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 		// underlying error is wrapped for logging but is never surfaced to a
 		// customer, because it can contain the internal Core hostname.
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return fmt.Errorf("coreclient: %w: %w", ErrUnavailable, ctxErr)
+			return nil, fmt.Errorf("coreclient: %w: %w", ErrUnavailable, ctxErr)
 		}
-		return fmt.Errorf("coreclient: %w: %w", ErrUnavailable, err)
+		return nil, fmt.Errorf("coreclient: %w: %w", ErrUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Bounded read: a hostile or broken Core cannot exhaust memory.
 	payload, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return fmt.Errorf("coreclient: %w: read response: %w", ErrUnavailable, err)
+		return nil, fmt.Errorf("coreclient: %w: read response: %w", ErrUnavailable, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return decodeError(resp.StatusCode, payload)
+		return resp.Header, decodeError(resp.StatusCode, payload)
 	}
 
 	// Core always answers with JSON; anything else means we are talking to the
@@ -202,16 +211,16 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	// checked even when the caller does not decode the body, so a misrouted
 	// deployment fails loudly instead of silently succeeding.
 	if ct := resp.Header.Get("Content-Type"); ct != "" && !strings.Contains(ct, "application/json") {
-		return fmt.Errorf("coreclient: %w: unexpected content type %q", ErrUnavailable, ct)
+		return resp.Header, fmt.Errorf("coreclient: %w: unexpected content type %q", ErrUnavailable, ct)
 	}
 	if dst == nil {
-		return nil
+		return resp.Header, nil
 	}
 
 	if err := json.Unmarshal(payload, dst); err != nil {
-		return fmt.Errorf("coreclient: %w: decode response: %w", ErrUnavailable, err)
+		return resp.Header, fmt.Errorf("coreclient: %w: decode response: %w", ErrUnavailable, err)
 	}
-	return nil
+	return resp.Header, nil
 }
 
 // decodeError turns a non-2xx Core response into a typed *Error. An

@@ -6,6 +6,12 @@
 // catalog scope; the catalog read model itself is a Core-owned business
 // capability reached over HTTP (ADR-017). Client-supplied store or seller
 // identifiers are never read on these routes.
+//
+// Public reads may be served from a Seller-owned payload cache. The cache is an
+// optimization layered on top of that boundary, never a substitute for it: every
+// hit is validated against the authoritative cache generation Core reports for
+// the resolved host, so a store that stopped resolving publicly stops being
+// served and a payload whose generation was superseded is never returned.
 package storefrontapi
 
 import (
@@ -22,6 +28,7 @@ import (
 	"github.com/matjeroapps/seller/internal/coreclient"
 	"github.com/matjeroapps/seller/internal/httpx"
 	"github.com/matjeroapps/seller/internal/i18n"
+	"github.com/matjeroapps/seller/internal/storefrontcache"
 )
 
 // errInvalidQuery means the caller supplied an unusable filter, sort, or page.
@@ -31,13 +38,30 @@ var errInvalidQuery = errors.New("invalid catalog query")
 // CatalogReader is the public catalog read model. *coreclient.Client satisfies
 // it; the interface exists so handlers can be tested against a stub Core server
 // without any database.
+//
+// Every read returns the cache generation Core labelled its payload with. It is 0
+// when the response carried no label, which is what keeps an unlabelled response
+// out of the cache instead of being stored under a fabricated generation.
 type CatalogReader interface {
-	StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, error)
-	StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, error)
-	StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, error)
-	StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error)
-	StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.ProductDetail, error)
-	StorefrontSearch(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, error)
+	StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, int64, error)
+	StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, int64, error)
+	StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, int64, error)
+	StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, int64, error)
+	StorefrontProduct(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.ProductDetail, int64, error)
+	StorefrontSearch(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, int64, error)
+}
+
+// RevisionProbe reads the authoritative public cache generation of a trusted
+// host. *coreclient.Client satisfies it.
+type RevisionProbe interface {
+	StorefrontRevision(ctx context.Context, host string) (int64, error)
+}
+
+// PayloadCache stores encoded public payloads. *storefrontcache.Cache satisfies
+// it.
+type PayloadCache interface {
+	Lookup(ctx context.Context, id storefrontcache.Identity, revision int64) ([]byte, bool)
+	Save(ctx context.Context, id storefrontcache.Identity, revision int64, body []byte)
 }
 
 // Dependencies wires the public catalog routes. Config supplies the trusted
@@ -46,6 +70,13 @@ type CatalogReader interface {
 type Dependencies struct {
 	Catalog  CatalogReader
 	Platform config.Config
+	// Cache stores public payloads. Nil disables caching entirely, which is the
+	// default: the storefront must never require Redis to serve a request.
+	Cache PayloadCache
+	// Revisions is the authoritative generation probe. Caching is only active
+	// when it is present, because a cached payload that cannot be validated
+	// against Core must never be served.
+	Revisions RevisionProbe
 }
 
 // RegisterStorefrontRoutes registers the public catalog routes under /v1.
@@ -129,31 +160,123 @@ func writeStorefrontError(w http.ResponseWriter, err error) {
 	httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 }
 
-func (deps Dependencies) handleStore(w http.ResponseWriter, r *http.Request) {
-	bootstrap, err := deps.Catalog.StorefrontStore(r.Context(), deps.hostFor(r), i18n.FromContext(r.Context()))
+// cachingActive reports whether a request may be served from cache.
+//
+// Both a cache and a revision probe are required. Without the probe there is no
+// way to tell whether a cached payload is still current or whether the store
+// still resolves publicly, and serving it anyway would be exactly the stale-read
+// this design exists to prevent.
+func (deps Dependencies) cachingActive() bool {
+	return deps.Cache != nil && deps.Revisions != nil
+}
+
+// serve performs one public storefront read, using the cache when it is active.
+//
+// read returns the public payload and the cache generation Core labelled it with.
+// The payload is always encoded through the same encoder that writes it, so a
+// response served from cache is byte-identical to the response that produced it.
+//
+// On a hit the authoritative generation is probed first, so a store that stopped
+// resolving publicly fails here exactly as an uncached read would, and a payload
+// from a superseded generation is unreachable rather than merely unpreferred.
+//
+// On a miss the payload is stored under the generation returned with it, never
+// under the probed one. When a write commits between the probe and the read, the
+// response carries the newer generation; storing it there both keeps the older
+// namespace free of newer data and makes the entry immediately reachable to the
+// next request, which probes that same newer generation. No retry and no lock is
+// involved.
+func (deps Dependencies) serve(w http.ResponseWriter, r *http.Request, id storefrontcache.Identity, read func() (any, int64, error)) {
+	if !deps.cachingActive() {
+		payload, _, err := read()
+		if err != nil {
+			writeStorefrontError(w, err)
+			return
+		}
+		deps.writeJSON(w, payload)
+		return
+	}
+
+	probed, err := deps.Revisions.StorefrontRevision(r.Context(), id.Host)
+	if err != nil {
+		// The probe fails the same way a public read does. Core being unreachable
+		// therefore yields the existing generic 503 and an unresolvable host the
+		// existing generic 404, and neither serves cached content.
+		writeStorefrontError(w, err)
+		return
+	}
+
+	if cached, found := deps.Cache.Lookup(r.Context(), id, probed); found {
+		httpx.WriteEncodedJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	payload, revision, err := read()
 	if err != nil {
 		writeStorefrontError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, StoreResponse{Store: bootstrap})
+
+	encoded, err := httpx.EncodeJSON(payload)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	deps.Cache.Save(r.Context(), id, revision, encoded)
+	httpx.WriteEncodedJSON(w, http.StatusOK, encoded)
+}
+
+// writeJSON writes an uncached response through the same encoder a cached
+// response is replayed with, so enabling the cache cannot change a byte of the
+// public contract.
+func (deps Dependencies) writeJSON(w http.ResponseWriter, payload any) {
+	encoded, err := httpx.EncodeJSON(payload)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	httpx.WriteEncodedJSON(w, http.StatusOK, encoded)
+}
+
+// identityFor builds the cache identity of a request.
+//
+// Host is the trusted host this service derived itself, never a client-supplied
+// value, and locale is the negotiated locale. Together with the resource, the
+// slug and the validated query they are the whole of what distinguishes one
+// cached payload from another.
+func (deps Dependencies) identityFor(r *http.Request, resource, slug string, query *coreclient.ProductQuery) storefrontcache.Identity {
+	return storefrontcache.Identity{
+		Host:     deps.hostFor(r),
+		Locale:   i18n.FromContext(r.Context()),
+		Resource: resource,
+		Slug:     slug,
+		Query:    query,
+	}
+}
+
+func (deps Dependencies) handleStore(w http.ResponseWriter, r *http.Request) {
+	id := deps.identityFor(r, storefrontcache.ResourceStore, "", nil)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		bootstrap, revision, err := deps.Catalog.StorefrontStore(r.Context(), id.Host, id.Locale)
+		return StoreResponse{Store: bootstrap}, revision, err
+	})
 }
 
 func (deps Dependencies) handleCategories(w http.ResponseWriter, r *http.Request) {
-	items, err := deps.Catalog.StorefrontCategories(r.Context(), deps.hostFor(r), i18n.FromContext(r.Context()))
-	if err != nil {
-		writeStorefrontError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, CategoryCollectionResponse{Items: items})
+	id := deps.identityFor(r, storefrontcache.ResourceCategories, "", nil)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		items, revision, err := deps.Catalog.StorefrontCategories(r.Context(), id.Host, id.Locale)
+		return CategoryCollectionResponse{Items: items}, revision, err
+	})
 }
 
 func (deps Dependencies) handleCategory(w http.ResponseWriter, r *http.Request) {
-	category, err := deps.Catalog.StorefrontCategory(r.Context(), deps.hostFor(r), chi.URLParam(r, "slug"), i18n.FromContext(r.Context()))
-	if err != nil {
-		writeStorefrontError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, CategoryResponse{Category: category})
+	slug := chi.URLParam(r, "slug")
+	id := deps.identityFor(r, storefrontcache.ResourceCategory, slug, nil)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		category, revision, err := deps.Catalog.StorefrontCategory(r.Context(), id.Host, slug, id.Locale)
+		return CategoryResponse{Category: category}, revision, err
+	})
 }
 
 func (deps Dependencies) handleProducts(w http.ResponseWriter, r *http.Request) {
@@ -162,21 +285,20 @@ func (deps Dependencies) handleProducts(w http.ResponseWriter, r *http.Request) 
 		writeStorefrontError(w, err)
 		return
 	}
-	page, err := deps.Catalog.StorefrontProducts(r.Context(), deps.hostFor(r), query, i18n.FromContext(r.Context()))
-	if err != nil {
-		writeStorefrontError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, newProductCollectionResponse(page))
+	id := deps.identityFor(r, storefrontcache.ResourceProducts, "", &query)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		page, revision, err := deps.Catalog.StorefrontProducts(r.Context(), id.Host, query, id.Locale)
+		return newProductCollectionResponse(page), revision, err
+	})
 }
 
 func (deps Dependencies) handleProduct(w http.ResponseWriter, r *http.Request) {
-	product, err := deps.Catalog.StorefrontProduct(r.Context(), deps.hostFor(r), chi.URLParam(r, "slug"), i18n.FromContext(r.Context()))
-	if err != nil {
-		writeStorefrontError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, ProductResponse{Product: product})
+	slug := chi.URLParam(r, "slug")
+	id := deps.identityFor(r, storefrontcache.ResourceProduct, slug, nil)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		product, revision, err := deps.Catalog.StorefrontProduct(r.Context(), id.Host, slug, id.Locale)
+		return ProductResponse{Product: product}, revision, err
+	})
 }
 
 func (deps Dependencies) handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -185,12 +307,11 @@ func (deps Dependencies) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeStorefrontError(w, err)
 		return
 	}
-	page, err := deps.Catalog.StorefrontSearch(r.Context(), deps.hostFor(r), query, i18n.FromContext(r.Context()))
-	if err != nil {
-		writeStorefrontError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, newProductCollectionResponse(page))
+	id := deps.identityFor(r, storefrontcache.ResourceSearch, "", &query)
+	deps.serve(w, r, id, func() (any, int64, error) {
+		page, revision, err := deps.Catalog.StorefrontSearch(r.Context(), id.Host, query, id.Locale)
+		return newProductCollectionResponse(page), revision, err
+	})
 }
 
 // parseProductQuery validates public browse parameters before they are forwarded
