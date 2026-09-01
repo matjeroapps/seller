@@ -9,11 +9,11 @@ import (
 // TestNewValidConfig validates that New accepts a valid configuration.
 func TestNewValidConfig(t *testing.T) {
 	client, err := New(Config{
-		Addr:               "localhost:6379",
-		Password:           "",
-		DB:                 0,
-		ConnectTimeout:     0, // Use default
-		OperationTimeout:   0, // Use default
+		Addr:             "localhost:6379",
+		Password:         "",
+		DB:               0,
+		ConnectTimeout:   0, // Use default
+		OperationTimeout: 0, // Use default
 	})
 	if err != nil {
 		t.Fatalf("New() with valid config: %v", err)

@@ -100,10 +100,10 @@ func run(ctx context.Context) error {
 		RequireAuth: false,
 		Register: func(r chi.Router) {
 			storefrontapi.RegisterStorefrontRoutes(storefrontapi.Dependencies{
-				Catalog:    core,
-				Platform:   cfg,
-				Cache:      cache,
-				Revisions:  core,
+				Catalog:   core,
+				Platform:  cfg,
+				Cache:     cache,
+				Revisions: core,
 			})(r)
 		},
 	}, core, nil))
@@ -124,11 +124,11 @@ func buildCache(cfg config.Config, logger *slog.Logger) (storefrontapi.PayloadCa
 
 	// Redis is required when caching is enabled.
 	redisClient, err := redisx.New(redisx.Config{
-		Addr:               cfg.RedisAddr,
-		Password:           cfg.RedisPassword,
-		DB:                 cfg.RedisDB,
-		ConnectTimeout:     cfg.RedisConnectTimeout,
-		OperationTimeout:   cfg.RedisOperationTimeout,
+		Addr:             cfg.RedisAddr,
+		Password:         cfg.RedisPassword,
+		DB:               cfg.RedisDB,
+		ConnectTimeout:   cfg.RedisConnectTimeout,
+		OperationTimeout: cfg.RedisOperationTimeout,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("build storefront cache: %w", err)
