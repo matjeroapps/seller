@@ -4,14 +4,19 @@ import (
 	"context"
 	"log"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/matjeroapps/core/packages/config"
 	"github.com/matjeroapps/core/packages/database"
 	"github.com/matjeroapps/core/packages/httpx"
 	"github.com/matjeroapps/core/packages/logging"
 	"github.com/matjeroapps/core/packages/observability"
 	"github.com/matjeroapps/core/pkg/actorapi"
+	"github.com/matjeroapps/core/pkg/commerce"
 	"github.com/matjeroapps/core/pkg/markets"
+	"github.com/matjeroapps/core/pkg/storefront"
 	"github.com/matjeroapps/seller/internal/openapi"
+	"github.com/matjeroapps/seller/internal/storefrontapi"
 )
 
 func main() {
@@ -39,6 +44,12 @@ func run(ctx context.Context) error {
 	defer db.Close()
 
 	marketService := markets.NewService(markets.NewRepository(db.Pool))
+	commerceRepo := commerce.NewRepository(db.Pool)
+	storefrontDeps := storefrontapi.Dependencies{
+		Catalog:  storefront.NewCatalogRepository(db.Pool),
+		Stores:   storefront.NewStoreResolver(commerceRepo),
+		Platform: cfg,
+	}
 	appCfg := httpx.ConfigFrom(cfg)
 	router := httpx.NewRouter(httpx.App{
 		Config: appCfg,
@@ -65,6 +76,9 @@ func run(ctx context.Context) error {
 		AppName:     "Storefront API",
 		Actor:       "storefront",
 		RequireAuth: false,
+		Register: func(r chi.Router) {
+			storefrontapi.RegisterStorefrontRoutes(storefrontDeps)(r)
+		},
 	}, marketService, nil))
 	return httpx.Run(ctx, appCfg, logger, router)
 }
