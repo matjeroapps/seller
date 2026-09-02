@@ -51,6 +51,20 @@ dashboard theme screens, and storefront rendering.
 | `web/seller` | Seller dashboard (Vite/React) |
 | `web/storefront` | Native storefront (Next.js) |
 
+## Native storefront
+
+`web/storefront` is a multi-tenant Next.js application. One deployment serves every store:
+tenant identity is the customer host, which it forwards to `storefront-api` as the outgoing
+`Host` header, and every page is server-rendered per request. It consumes only the six
+public `/v1/storefront/*` routes and holds no commerce logic of its own.
+
+Presentation comes from a theme registry that maps a published theme key and version onto a
+component set, so switching themes changes no catalog, routing or tenant code. See
+[docs/implementation/storefront-rendering-report.md](docs/implementation/storefront-rendering-report.md).
+
+It requires `STOREFRONT_API_BASE_URL`, the private service address of `storefront-api`. That
+value is server-only and never reaches the browser.
+
 ## Local Development
 
 ```sh
