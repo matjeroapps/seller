@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { isStorefrontApiError } from '../../../../../lib/api';
 import { toProductDetailModel } from '../../../../../lib/view-models';
 import { loadPresentation } from '../../../../../server/presentation';
-import { storefrontClient } from '../../../../../server/store-context';
+import { currentPreviewToken, storefrontClient } from '../../../../../server/store-context';
 import { metadataForPage, productJsonLd, requestOrigin } from '../../../../../server/seo';
 
 export async function generateMetadata({
@@ -17,7 +17,7 @@ export async function generateMetadata({
   const product = await storefrontClient().product(presentation.host, presentation.locale, slug);
   const origin = await requestOrigin(presentation.host);
 
-  return metadataForPage({
+  return await metadataForPage({
     host: presentation.host,
     store: presentation.store,
     locale: presentation.locale,
@@ -51,6 +51,7 @@ export default async function ProductPage({
   const { locale, slug } = await params;
   const presentation = await loadPresentation(locale);
   const { context, host, store } = presentation;
+  const previewToken = await currentPreviewToken();
 
   let product;
   try {
@@ -62,16 +63,20 @@ export default async function ProductPage({
     throw error;
   }
 
-  const model = toProductDetailModel(product, store.currency, context.locale, context.copy);
+  const model = toProductDetailModel(product, store.currency, context.locale, context.copy, previewToken);
   const { ProductDetail } = presentation.theme.components;
   const origin = await requestOrigin(presentation.host);
+  const jsonLd = await productJsonLd(presentation, product, origin);
+
   return (
     <>
       <ProductDetail context={context} model={model} />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(presentation, product, origin)) }}
-      />
+      {jsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      ) : null}
     </>
   );
 }

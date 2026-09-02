@@ -14,6 +14,7 @@ import (
 	"github.com/matjeroapps/seller/internal/coreclient"
 	"github.com/matjeroapps/seller/internal/i18n"
 	"github.com/matjeroapps/seller/internal/money"
+	"github.com/matjeroapps/seller/internal/storefrontcache"
 )
 
 // These tests prove the Seller storefront's transport and BFF behaviour against a
@@ -39,6 +40,8 @@ type stubCatalog struct {
 	locale i18n.Locale
 	// query records the forwarded browse query.
 	query coreclient.ProductQuery
+	// previewToken records the preview token forwarded.
+	previewToken string
 
 	err error
 
@@ -52,6 +55,11 @@ type stubCatalog struct {
 func (s *stubCatalog) StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, int64, error) {
 	s.host, s.locale = host, locale
 	return s.store, 1, s.err
+}
+
+func (s *stubCatalog) StorefrontStorePreview(ctx context.Context, host, previewToken string, locale i18n.Locale) (coreclient.StoreBootstrap, error) {
+	s.host, s.previewToken, s.locale = host, previewToken, locale
+	return s.store, s.err
 }
 
 func (s *stubCatalog) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, int64, error) {
@@ -464,4 +472,219 @@ func TestStorefrontHidesSupplierIdentity(t *testing.T) {
 
 func moneyOf(minor int64, currency string) money.Money {
 	return money.MustNew(minor, currency)
+}
+
+// --- Preview tests ---
+
+type stubRevisionProbe struct {
+	calls int
+	rev   int64
+	err   error
+}
+
+func (s *stubRevisionProbe) StorefrontRevision(ctx context.Context, host string) (int64, error) {
+	s.calls++
+	return s.rev, s.err
+}
+
+type stubCache struct {
+	lookupCalls int
+	saveCalls   int
+	data        map[string][]byte
+}
+
+func (c *stubCache) Lookup(ctx context.Context, id storefrontcache.Identity, revision int64) ([]byte, bool) {
+	c.lookupCalls++
+	if c.data == nil {
+		return nil, false
+	}
+	return nil, false
+}
+
+func (c *stubCache) Save(ctx context.Context, id storefrontcache.Identity, revision int64, body []byte) {
+	c.saveCalls++
+}
+
+func TestStorefrontPreviewHandling(t *testing.T) {
+	catalog := &stubCatalog{store: coreclient.StoreBootstrap{
+		StoreCode: "store-a",
+		StoreName: "Store A Draft",
+		Theme: &coreclient.StoreTheme{
+			Key:           "theme-a",
+			Version:       "1.0.0",
+			Configuration: map[string]any{"color": "red"},
+		},
+	}}
+	handler := newHandler(catalog, config.Config{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req.Host = domainA
+	req.Header.Set("X-Matjero-Storefront-Preview", "valid-preview-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	if catalog.previewToken != "valid-preview-token" {
+		t.Fatalf("catalog previewToken = %q, want valid-preview-token", catalog.previewToken)
+	}
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "private") || !strings.Contains(cc, "no-store") {
+		t.Errorf("Cache-Control = %q, want private, no-store", cc)
+	}
+	if pragma := rec.Header().Get("Pragma"); pragma != "no-cache" {
+		t.Errorf("Pragma = %q, want no-cache", pragma)
+	}
+}
+
+func TestStorefrontPreviewCacheBypass(t *testing.T) {
+	catalog := &stubCatalog{store: coreclient.StoreBootstrap{StoreCode: "store-a"}}
+	revisions := &stubRevisionProbe{rev: 5}
+	cache := &stubCache{}
+
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Catalog:   catalog,
+			Revisions: revisions,
+			Cache:     cache,
+			Platform:  config.Config{},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req.Host = domainA
+	req.Header.Set("X-Matjero-Storefront-Preview", "valid-preview-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if revisions.calls != 0 {
+		t.Errorf("revisions.calls = %d, want 0 (preview must bypass revision probe)", revisions.calls)
+	}
+	if cache.lookupCalls != 0 || cache.saveCalls != 0 {
+		t.Errorf("cache calls = %d lookup / %d save, want 0 (preview must bypass cache)", cache.lookupCalls, cache.saveCalls)
+	}
+}
+
+func TestStorefrontPreviewCacheContamination(t *testing.T) {
+	publishedStore := coreclient.StoreBootstrap{StoreCode: "store-a", StoreName: "Published"}
+	draftStore := coreclient.StoreBootstrap{StoreCode: "store-a", StoreName: "Draft"}
+
+	catalog := &stubCatalog{store: publishedStore}
+	revisions := &stubRevisionProbe{rev: 10}
+	cache := &stubCache{}
+
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Catalog:   catalog,
+			Revisions: revisions,
+			Cache:     cache,
+			Platform:  config.Config{},
+		})(r)
+	})
+
+	// 1. Normal request -> published
+	req1 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req1.Host = domainA
+	rec1 := httptest.NewRecorder()
+	router.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusOK || !strings.Contains(rec1.Body.String(), "Published") {
+		t.Fatalf("req 1 failed: %s", rec1.Body.String())
+	}
+	if cache.saveCalls != 1 {
+		t.Fatalf("normal request should save to cache, got %d save calls", cache.saveCalls)
+	}
+
+	// 2. Preview request -> draft
+	catalog.store = draftStore
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req2.Host = domainA
+	req2.Header.Set("X-Matjero-Storefront-Preview", "token-123")
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK || !strings.Contains(rec2.Body.String(), "Draft") {
+		t.Fatalf("req 2 failed: %s", rec2.Body.String())
+	}
+	if cache.saveCalls != 1 {
+		t.Fatalf("preview request must NOT save to cache, save calls still = %d", cache.saveCalls)
+	}
+
+	// 3. Normal request again -> published
+	catalog.store = publishedStore
+	req3 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req3.Host = domainA
+	rec3 := httptest.NewRecorder()
+	router.ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusOK {
+		t.Fatalf("req 3 failed: %s", rec3.Body.String())
+	}
+}
+
+func TestStorefrontPreviewOversizedToken(t *testing.T) {
+	catalog := &stubCatalog{}
+	handler := newHandler(catalog, config.Config{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req.Host = domainA
+	req.Header.Set("X-Matjero-Storefront-Preview", strings.Repeat("A", 4097))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 for oversized preview token", rec.Code)
+	}
+}
+
+func TestStorefrontPreviewErrorMapping(t *testing.T) {
+	cases := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "preview unavailable",
+			err:        &coreclient.Error{Status: 503, Code: coreclient.CodePreviewUnavailable},
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "preview_unavailable",
+		},
+		{
+			name:       "stale/invalid preview token",
+			err:        &coreclient.Error{Status: 404, Code: coreclient.CodeStorefrontUnavailable},
+			wantStatus: http.StatusNotFound,
+			wantCode:   "storefront_unavailable",
+		},
+		{
+			name:       "schema mismatch",
+			err:        &coreclient.Error{Status: 422, Code: coreclient.CodeSchemaMismatch},
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "validation_error",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			catalog := &stubCatalog{err: tc.err}
+			handler := newHandler(catalog, config.Config{})
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+			req.Host = domainA
+			req.Header.Set("X-Matjero-Storefront-Preview", "some-token")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d (body %q)", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+			if got := decodeError(t, rec); got != tc.wantCode {
+				t.Errorf("code = %q, want %q", got, tc.wantCode)
+			}
+		})
+	}
 }

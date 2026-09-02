@@ -16,3 +16,12 @@ export const LOCALE_HEADER = 'x-matjero-locale';
 
 /** The path within the locale, e.g. `/products`. Empty for a locale home page. */
 export const PATH_HEADER = 'x-matjero-path';
+
+/** The single centralized URL parameter carrying the draft theme preview token. */
+export const PREVIEW_PARAM = 'theme_preview';
+
+/** Internal header carrying a validated draft theme preview token from proxy to render. */
+export const PREVIEW_TOKEN_HEADER = 'x-matjero-preview-token';
+
+/** Internal header indicating an invalid or malformed preview token was presented. */
+export const PREVIEW_INVALID_HEADER = 'x-matjero-preview-invalid';

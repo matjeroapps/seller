@@ -13,6 +13,7 @@ import type {
   StoreBootstrap
 } from './contracts';
 import { normalizeThemeSettings, safeUrl } from '../themes/settings';
+import { previewAwareHref } from './preview';
 import type {
   AvailabilityOption,
   CategoryCardModel,
@@ -98,19 +99,20 @@ function availabilityLabel(availability: Availability | string, copy: Dictionary
 }
 
 /** Path helpers. Every segment is percent-encoded so a slug cannot alter the route. */
-export function productHref(locale: Locale, slug: string): string {
-  return `/${locale}/products/${encodeURIComponent(slug)}`;
+export function productHref(locale: Locale, slug: string, previewToken?: string | null): string {
+  return previewAwareHref(`/${locale}/products/${encodeURIComponent(slug)}`, previewToken);
 }
 
-export function categoryHref(locale: Locale, slug: string): string {
-  return `/${locale}/categories/${encodeURIComponent(slug)}`;
+export function categoryHref(locale: Locale, slug: string, previewToken?: string | null): string {
+  return previewAwareHref(`/${locale}/categories/${encodeURIComponent(slug)}`, previewToken);
 }
 
 export function toProductCard(
   item: ProductListItem,
   currency: PublicCurrency,
   locale: Locale,
-  copy: Dictionary
+  copy: Dictionary,
+  previewToken?: string | null
 ): ProductCardModel {
   const imageUri = safeUrl(item.image?.uri, 2048);
   const name = plainText(item.name, 256);
@@ -128,32 +130,38 @@ export function toProductCard(
     category: item.category ? { slug: item.category.slug, name: plainText(item.category.name, 128) } : null,
     available: item.availability === 'in_stock',
     availabilityLabel: availabilityLabel(item.availability, copy),
-    href: productHref(locale, item.slug)
+    href: productHref(locale, item.slug, previewToken)
   };
 }
 
-export function toCategoryCard(node: CategoryNode, locale: Locale): CategoryCardModel {
+export function toCategoryCard(node: CategoryNode, locale: Locale, previewToken?: string | null): CategoryCardModel {
   return {
     slug: node.slug,
     name: plainText(node.name, 128),
     description: plainText(node.description, 480),
     productCount: Number.isFinite(node.product_count) ? node.product_count : 0,
-    href: categoryHref(locale, node.slug)
+    href: categoryHref(locale, node.slug, previewToken)
   };
 }
 
 /** Top-level categories, in payload order. Core sorts by localized name. */
-export function topLevelCategories(nodes: CategoryNode[], locale: Locale, limit = 12): CategoryCardModel[] {
+export function topLevelCategories(
+  nodes: CategoryNode[],
+  locale: Locale,
+  limit = 12,
+  previewToken?: string | null
+): CategoryCardModel[] {
   return nodes
     .filter((node) => !node.parent_slug)
     .slice(0, limit)
-    .map((node) => toCategoryCard(node, locale));
+    .map((node) => toCategoryCard(node, locale, previewToken));
 }
 
 function paginationModel(
   pagination: Pagination,
   params: CatalogParams,
-  basePath: string
+  basePath: string,
+  previewToken?: string | null
 ): PaginationModel {
   const limit = pagination.limit > 0 ? pagination.limit : params.limit;
   const pages = Math.max(1, Math.ceil((pagination.total || 0) / limit));
@@ -163,8 +171,8 @@ function paginationModel(
     page,
     pages,
     total: pagination.total || 0,
-    previousHref: page > 1 ? `${basePath}${buildQueryString(params, { page: page - 1 })}` : null,
-    nextHref: page < pages ? `${basePath}${buildQueryString(params, { page: page + 1 })}` : null
+    previousHref: page > 1 ? previewAwareHref(`${basePath}${buildQueryString(params, { page: page - 1 })}`, previewToken) : null,
+    nextHref: page < pages ? previewAwareHref(`${basePath}${buildQueryString(params, { page: page + 1 })}`, previewToken) : null
   };
 }
 
@@ -197,16 +205,17 @@ export function toProductListModel(input: {
   currency: PublicCurrency;
   locale: Locale;
   copy: Dictionary;
+  previewToken?: string | null;
 }): ProductListViewModel {
-  const { heading, items, pagination, params, basePath, currency, locale, copy } = input;
+  const { heading, items, pagination, params, basePath, currency, locale, copy, previewToken } = input;
 
   return {
     heading,
-    products: items.map((item) => toProductCard(item, currency, locale, copy)),
-    pagination: paginationModel(pagination, params, basePath),
+    products: items.map((item) => toProductCard(item, currency, locale, copy, previewToken)),
+    pagination: paginationModel(pagination, params, basePath, previewToken),
     sortOptions: sortOptions(params, copy),
     availabilityOptions: availabilityOptions(params, copy),
-    formAction: basePath,
+    formAction: previewAwareHref(basePath, previewToken),
     keyword: params.keyword
   };
 }
@@ -216,9 +225,10 @@ export function toCategoryModel(input: {
   parent: CategoryNode | null;
   list: ProductListViewModel;
   locale: Locale;
+  previewToken?: string | null;
 }): CategoryViewModel {
   return {
-    category: toCategoryCard(input.category, input.locale),
+    category: toCategoryCard(input.category, input.locale, input.previewToken),
     parentName: input.parent ? plainText(input.parent.name, 128) : '',
     list: input.list
   };
@@ -228,7 +238,8 @@ export function toProductDetailModel(
   product: ProductDetail,
   currency: PublicCurrency,
   locale: Locale,
-  copy: Dictionary
+  copy: Dictionary,
+  previewToken?: string | null
 ): ProductDetailViewModel {
   const name = plainText(product.name, 256);
 
@@ -243,7 +254,7 @@ export function toProductDetailModel(
       .map((image) => ({ uri: safeUrl(image.uri, 2048), alt: plainText(image.alt_text, 256) || name }))
       .filter((image) => image.uri !== ''),
     categories: (product.categories ?? []).map((category) => ({
-      href: categoryHref(locale, category.slug),
+      href: categoryHref(locale, category.slug, previewToken),
       label: plainText(category.name, 128)
     })),
     variants: (product.variants ?? []).slice(0, MAX_VARIANTS).map((variant) => ({
@@ -275,8 +286,9 @@ export function toThemeContext(input: {
   categories: CategoryNode[];
   currentPath: string;
   settings?: ThemeSettings;
+  previewToken?: string | null;
 }): ThemeContext {
-  const { store, locale, availableLocales, categories, currentPath } = input;
+  const { store, locale, availableLocales, categories, currentPath, previewToken } = input;
   const copy = dictionaryFor(locale);
   const settings = input.settings ?? normalizeThemeSettings(store.theme, PLATFORM_DEFAULT_THEME);
 
@@ -291,17 +303,17 @@ export function toThemeContext(input: {
       logoUrl: settings.logoUrl
     },
     currency: store.currency,
-    navigationCategories: topLevelCategories(categories, locale),
+    navigationCategories: topLevelCategories(categories, locale, 12, previewToken),
     links: {
-      home: `/${locale}`,
-      products: `/${locale}/products`,
-      categories: `/${locale}/categories`,
-      search: `/${locale}/search`
+      home: previewAwareHref(`/${locale}`, previewToken),
+      products: previewAwareHref(`/${locale}/products`, previewToken),
+      categories: previewAwareHref(`/${locale}/categories`, previewToken),
+      search: previewAwareHref(`/${locale}/search`, previewToken)
     },
     localeLinks: availableLocales.map((candidate) => ({
       locale: candidate,
       label: copy.navigation.localeNames[candidate],
-      href: `/${candidate}${currentPath}`,
+      href: previewAwareHref(`/${candidate}${currentPath}`, previewToken),
       current: candidate === locale
     }))
   };
@@ -311,10 +323,11 @@ export function toHomeModel(input: {
   sections: HomeViewModel['sections'];
   settings: ThemeSettings;
   locale: Locale;
+  previewToken?: string | null;
 }): HomeViewModel {
   return {
     hero: input.settings.hero,
     sections: input.sections,
-    browseAllHref: `/${input.locale}/products`
+    browseAllHref: previewAwareHref(`/${input.locale}/products`, input.previewToken)
   };
 }

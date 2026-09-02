@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { loadPresentation } from '../../../server/presentation';
-import { storefrontClient } from '../../../server/store-context';
+import { currentPreviewToken, storefrontClient } from '../../../server/store-context';
 import { metadataForPage, requestOrigin } from '../../../server/seo';
 import { toHomeModel, toProductCard, topLevelCategories } from '../../../lib/view-models';
 import type { HomeViewModel } from '../../../themes/contract';
@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const tagline = presentation.store.settings.tagline;
   const origin = await requestOrigin(presentation.host);
 
-  return metadataForPage({
+  return await metadataForPage({
     host: presentation.host,
     store: presentation.store,
     locale: presentation.locale,
@@ -43,6 +43,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const presentation = await loadPresentation(locale);
   const { context, host, settings, store } = presentation;
+  const previewToken = await currentPreviewToken();
   const client = storefrontClient();
 
   const sections = await Promise.all(
@@ -52,7 +53,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           kind: section.kind,
           title: section.title,
           products: [],
-          categories: topLevelCategories(presentation.categories, context.locale, 8)
+          categories: topLevelCategories(presentation.categories, context.locale, 8, previewToken)
         };
       }
 
@@ -68,14 +69,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         kind: section.kind,
         title: section.title,
         products: page.items.map((item) =>
-          toProductCard(item, store.currency, context.locale, context.copy)
+          toProductCard(item, store.currency, context.locale, context.copy, previewToken)
         ),
         categories: []
       };
     })
   );
 
-  const model: HomeViewModel = toHomeModel({ sections, settings, locale: context.locale });
+  const model: HomeViewModel = toHomeModel({ sections, settings, locale: context.locale, previewToken });
   const { Home } = presentation.theme.components;
   return <Home context={context} model={model} />;
 }

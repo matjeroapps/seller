@@ -35,6 +35,8 @@ import (
 // It is raised locally during request parsing; Core enforces the rest.
 var errInvalidQuery = errors.New("invalid catalog query")
 
+const maxPreviewTokenBytes = 4096
+
 // CatalogReader is the public catalog read model. *coreclient.Client satisfies
 // it; the interface exists so handlers can be tested against a stub Core server
 // without any database.
@@ -44,6 +46,7 @@ var errInvalidQuery = errors.New("invalid catalog query")
 // out of the cache instead of being stored under a fabricated generation.
 type CatalogReader interface {
 	StorefrontStore(ctx context.Context, host string, locale i18n.Locale) (coreclient.StoreBootstrap, int64, error)
+	StorefrontStorePreview(ctx context.Context, host, previewToken string, locale i18n.Locale) (coreclient.StoreBootstrap, error)
 	StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]coreclient.CategoryNode, int64, error)
 	StorefrontCategory(ctx context.Context, host, slug string, locale i18n.Locale) (coreclient.CategoryNode, int64, error)
 	StorefrontProducts(ctx context.Context, host string, query coreclient.ProductQuery, locale i18n.Locale) (coreclient.ProductPage, int64, error)
@@ -142,9 +145,11 @@ func writeStorefrontError(w http.ResponseWriter, err error) {
 		switch coreErr.Code {
 		case coreclient.CodeStorefrontUnavailable:
 			httpx.WriteError(w, http.StatusNotFound, "storefront_unavailable", "storefront not available")
+		case coreclient.CodePreviewUnavailable:
+			httpx.WriteError(w, http.StatusServiceUnavailable, "preview_unavailable", "preview unavailable")
 		case coreclient.CodeNotFound:
 			httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
-		case coreclient.CodeValidationError, coreclient.CodeInvalidArgument:
+		case coreclient.CodeValidationError, coreclient.CodeInvalidArgument, coreclient.CodeSchemaMismatch, coreclient.CodeUnsafeContent:
 			httpx.WriteError(w, http.StatusBadRequest, "validation_error", "invalid request parameters")
 		default:
 			httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
@@ -255,6 +260,25 @@ func (deps Dependencies) identityFor(r *http.Request, resource, slug string, que
 }
 
 func (deps Dependencies) handleStore(w http.ResponseWriter, r *http.Request) {
+	previewToken := strings.TrimSpace(r.Header.Get(coreclient.HeaderStorefrontPreview))
+	if previewToken != "" {
+		if len(previewToken) > maxPreviewTokenBytes {
+			httpx.WriteError(w, http.StatusBadRequest, "validation_error", "preview token exceeds maximum allowed size")
+			return
+		}
+		host := deps.hostFor(r)
+		locale := i18n.FromContext(r.Context())
+		bootstrap, err := deps.Catalog.StorefrontStorePreview(r.Context(), host, previewToken, locale)
+		if err != nil {
+			writeStorefrontError(w, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "private, no-store")
+		w.Header().Set("Pragma", "no-cache")
+		deps.writeJSON(w, StoreResponse{Store: bootstrap})
+		return
+	}
+
 	id := deps.identityFor(r, storefrontcache.ResourceStore, "", nil)
 	deps.serve(w, r, id, func() (any, int64, error) {
 		bootstrap, revision, err := deps.Catalog.StorefrontStore(r.Context(), id.Host, id.Locale)

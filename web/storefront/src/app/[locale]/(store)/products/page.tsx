@@ -5,7 +5,7 @@ import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../.
 import { toProductListModel } from '../../../../lib/view-models';
 import { isStorefrontApiError } from '../../../../lib/api';
 import { loadPresentation } from '../../../../server/presentation';
-import { storefrontClient } from '../../../../server/store-context';
+import { currentPreviewToken, storefrontClient } from '../../../../server/store-context';
 import { metadataForPage, requestOrigin } from '../../../../server/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const presentation = await loadPresentation(locale);
   const origin = await requestOrigin(presentation.host);
 
-  return metadataForPage({
+  return await metadataForPage({
     host: presentation.host,
     store: presentation.store,
     locale: presentation.locale,
@@ -46,6 +46,7 @@ export default async function ProductsPage({
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   const presentation = await loadPresentation(locale);
   const { context, host, store } = presentation;
+  const previewToken = await currentPreviewToken();
 
   const catalogParams = parseCatalogParams(rawSearchParams);
   const query = toCatalogQuery(catalogParams);
@@ -72,7 +73,8 @@ export default async function ProductsPage({
     basePath: context.links.products,
     currency: store.currency,
     locale: context.locale,
-    copy: context.copy
+    copy: context.copy,
+    previewToken
   });
 
   const { ProductList } = presentation.theme.components;

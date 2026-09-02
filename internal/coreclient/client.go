@@ -32,6 +32,8 @@ const (
 	HeaderSubject = "X-Matjero-Subject"
 	// HeaderStorefrontHost carries the trusted, normalized storefront host.
 	HeaderStorefrontHost = "X-Matjero-Storefront-Host"
+	// HeaderStorefrontPreview carries the signed draft theme preview token.
+	HeaderStorefrontPreview = "X-Matjero-Storefront-Preview"
 	// HeaderRequestID and HeaderCorrelationID propagate request correlation.
 	HeaderRequestID     = "X-Request-Id"
 	HeaderCorrelationID = "X-Correlation-Id"
@@ -111,6 +113,8 @@ type requestOptions struct {
 	Subject string
 	// StorefrontHost is the trusted storefront host for tenant resolution.
 	StorefrontHost string
+	// StorefrontPreview is the signed draft theme preview token.
+	StorefrontPreview string
 	// Locale overrides locale negotiation when set.
 	Locale string
 }
@@ -173,6 +177,9 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 	if opts.StorefrontHost != "" {
 		req.Header.Set(HeaderStorefrontHost, opts.StorefrontHost)
+	}
+	if opts.StorefrontPreview != "" {
+		req.Header.Set(HeaderStorefrontPreview, opts.StorefrontPreview)
 	}
 	if opts.Locale != "" {
 		// query is nil when the caller passed no values; Set on a nil map panics.

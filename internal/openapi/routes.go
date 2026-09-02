@@ -171,3 +171,8 @@ func PathStringParam(name, description string) ParameterSpec {
 func StringParam(name, description string, required bool) ParameterSpec {
 	return ParameterSpec{Name: name, In: "query", Required: required, Description: description, Schema: ""}
 }
+
+// HeaderStringParam describes a string header parameter.
+func HeaderStringParam(name, description string, required bool) ParameterSpec {
+	return ParameterSpec{Name: name, In: "header", Required: required, Description: description, Schema: ""}
+}

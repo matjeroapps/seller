@@ -85,4 +85,31 @@ describe('proxy', () => {
     expect(pattern.test('/_next/static/chunk.js')).toBe(false);
     expect(pattern.test('/favicon.ico')).toBe(false);
   });
+
+  it('extracts theme_preview parameter into internal token header and sets response headers', () => {
+    const res = proxy(request('/en?theme_preview=valid-token-abc'));
+    const headers = forwarded(res);
+
+    expect(headers.get('x-matjero-preview-token')).toBe('valid-token-abc');
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(res.headers.get('Pragma')).toBe('no-cache');
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
+  });
+
+  it('rejects duplicate theme_preview parameters', () => {
+    const res = proxy(request('/en?theme_preview=token1&theme_preview=token2'));
+    const headers = forwarded(res);
+
+    expect(headers.get('x-matjero-preview-invalid')).toBe('duplicate_token_param');
+    expect(headers.get('x-matjero-preview-token')).toBeNull();
+  });
+
+  it('rejects oversized theme_preview parameter', () => {
+    const oversized = 'A'.repeat(4097);
+    const res = proxy(request(`/en?theme_preview=${oversized}`));
+    const headers = forwarded(res);
+
+    expect(headers.get('x-matjero-preview-invalid')).toBe('invalid_token_size');
+    expect(headers.get('x-matjero-preview-token')).toBeNull();
+  });
 });

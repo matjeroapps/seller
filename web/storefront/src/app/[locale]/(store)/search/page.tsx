@@ -5,7 +5,7 @@ import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../.
 import type { ProductPage } from '../../../../lib/contracts';
 import { toProductListModel, toSearchModel } from '../../../../lib/view-models';
 import { loadPresentation } from '../../../../server/presentation';
-import { storefrontClient } from '../../../../server/store-context';
+import { currentPreviewToken, storefrontClient } from '../../../../server/store-context';
 import { metadataForPage, requestOrigin } from '../../../../server/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const presentation = await loadPresentation(locale);
   const origin = await requestOrigin(presentation.host);
 
-  return metadataForPage({
+  return await metadataForPage({
     host: presentation.host,
     store: presentation.store,
     locale: presentation.locale,
@@ -44,6 +44,7 @@ export default async function SearchPage({
   const [{ locale }, rawSearchParams] = await Promise.all([params, searchParams]);
   const presentation = await loadPresentation(locale);
   const { context, host, store } = presentation;
+  const previewToken = await currentPreviewToken();
 
   const catalogParams = parseCatalogParams(rawSearchParams);
   const emptyPage: ProductPage = {
@@ -72,7 +73,8 @@ export default async function SearchPage({
     basePath: context.links.search,
     currency: store.currency,
     locale: context.locale,
-    copy: context.copy
+    copy: context.copy,
+    previewToken
   });
 
   const { SearchResults } = presentation.theme.components;
