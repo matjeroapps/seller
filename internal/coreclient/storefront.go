@@ -170,6 +170,20 @@ func (c *Client) StorefrontStore(ctx context.Context, host string, locale i18n.L
 	return payload.Store, revisionFrom(header), err
 }
 
+// StorefrontStorePreview resolves the storefront bootstrap using a draft theme preview token.
+//
+// The preview token is forwarded to Core in X-Matjero-Storefront-Preview. The returned
+// response carries the validated draft theme configuration and must not be stored in cache.
+func (c *Client) StorefrontStorePreview(ctx context.Context, host, previewToken string, locale i18n.Locale) (StoreBootstrap, error) {
+	var payload storefrontStoreResponse
+	_, err := c.getWithHeader(ctx, "/internal/v1/storefront/store", nil, requestOptions{
+		StorefrontHost:    host,
+		StorefrontPreview: previewToken,
+		Locale:            string(locale),
+	}, &payload)
+	return payload.Store, err
+}
+
 // StorefrontCategories lists the public category tree for a host.
 func (c *Client) StorefrontCategories(ctx context.Context, host string, locale i18n.Locale) ([]CategoryNode, int64, error) {
 	var payload storefrontCategoryCollection

@@ -463,3 +463,23 @@ func TestClientForwardsLocale(t *testing.T) {
 		t.Errorf("locale = %q, want ar", got)
 	}
 }
+
+func TestClientForwardsStorefrontPreviewToken(t *testing.T) {
+	stub := newStubCore(t, jsonHandler(200, `{"store":{"store_code":"store-a"}}`))
+	client := stub.client(t)
+
+	_, err := client.StorefrontStorePreview(context.Background(), "store-a.example.com", "preview-token-xyz", "en")
+	if err != nil {
+		t.Fatalf("StorefrontStorePreview: %v", err)
+	}
+
+	if got := stub.last.Header.Get(HeaderStorefrontPreview); got != "preview-token-xyz" {
+		t.Errorf("%s = %q, want preview-token-xyz", HeaderStorefrontPreview, got)
+	}
+	if got := stub.last.Header.Get(HeaderStorefrontHost); got != "store-a.example.com" {
+		t.Errorf("%s = %q, want store-a.example.com", HeaderStorefrontHost, got)
+	}
+	if got := stub.last.Header.Get("Authorization"); got != "Bearer "+testToken {
+		t.Errorf("Authorization header missing or invalid: %q", got)
+	}
+}

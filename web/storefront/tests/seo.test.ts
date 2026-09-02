@@ -22,8 +22,8 @@ describe('storefront SEO', () => {
     expect(alternates.fr).toBeUndefined();
   });
 
-  it('canonicalizes listings and noindexes search pages', () => {
-    const metadata = metadataForPage({
+  it('canonicalizes listings and noindexes search pages', async () => {
+    const metadata = await metadataForPage({
       host: 'store-a.example',
       store: storeA,
       locale: 'en',
@@ -37,8 +37,8 @@ describe('storefront SEO', () => {
     expect(metadata.openGraph?.url).toBe('https://store-a.example/en/search');
   });
 
-  it('creates Product JSON-LD from public fields only', () => {
-    const jsonLd = productJsonLd(
+  it('creates Product JSON-LD from public fields only', async () => {
+    const jsonLd = await productJsonLd(
       { host: 'store-a.example', store: storeA, locale: 'en' },
       productDetailA
     );
@@ -59,5 +59,32 @@ describe('storefront SEO', () => {
   it('uses a truthful category fallback description', () => {
     expect(categoryDescription(categoriesA[0], storeA)).toBe('Lamps and fixtures');
     expect(categoryDescription({ ...categoriesA[0], description: undefined }, storeA)).toBe('Lighting at Store A');
+  });
+
+  it('sets noindex, nofollow and keeps clean canonical url during preview mode', async () => {
+    const metadata = await metadataForPage({
+      host: 'store-a.example',
+      store: storeA,
+      locale: 'en',
+      page: 'product',
+      slug: 'aurora-desk-lamp',
+      title: 'Aurora desk lamp | Store A',
+      previewToken: 'preview-token-123'
+    });
+
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.alternates?.canonical).toBe('https://store-a.example/en/products/aurora-desk-lamp');
+    expect(metadata.alternates?.canonical).not.toContain('preview-token-123');
+  });
+
+  it('omits Product JSON-LD during preview mode', async () => {
+    const jsonLd = await productJsonLd(
+      { host: 'store-a.example', store: storeA, locale: 'en' },
+      productDetailA,
+      undefined,
+      'preview-token-123'
+    );
+
+    expect(jsonLd).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { isStorefrontApiError } from '../../../../../lib/api';
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../../lib/catalog-query';
 import { categoryHref, toCategoryModel, toProductListModel } from '../../../../../lib/view-models';
 import { loadPresentation } from '../../../../../server/presentation';
-import { storefrontClient } from '../../../../../server/store-context';
+import { currentPreviewToken, storefrontClient } from '../../../../../server/store-context';
 import { metadataForPage, categoryDescription, requestOrigin } from '../../../../../server/seo';
 
 export async function generateMetadata({
@@ -18,7 +18,7 @@ export async function generateMetadata({
   const category = await storefrontClient().category(presentation.host, presentation.locale, slug);
   const origin = await requestOrigin(presentation.host);
 
-  return metadataForPage({
+  return await metadataForPage({
     host: presentation.host,
     store: presentation.store,
     locale: presentation.locale,
@@ -51,6 +51,7 @@ export default async function CategoryPage({
   const [{ locale, slug }, rawSearchParams] = await Promise.all([params, searchParams]);
   const presentation = await loadPresentation(locale);
   const { categories, context, host, store } = presentation;
+  const previewToken = await currentPreviewToken();
 
   const catalogParams = parseCatalogParams(rawSearchParams);
   const client = storefrontClient();
@@ -77,10 +78,11 @@ export default async function CategoryPage({
     items: page.items,
     pagination: page.pagination,
     params: catalogParams,
-    basePath: categoryHref(context.locale, slug),
+    basePath: categoryHref(context.locale, slug, previewToken),
     currency: store.currency,
     locale: context.locale,
-    copy: context.copy
+    copy: context.copy,
+    previewToken
   });
 
   const model = toCategoryModel({
@@ -89,7 +91,8 @@ export default async function CategoryPage({
     // the breadcrumb costs no extra request.
     parent: categories.find((node) => node.slug === category.parent_slug) ?? null,
     list,
-    locale: context.locale
+    locale: context.locale,
+    previewToken
   });
 
   const { Category } = presentation.theme.components;

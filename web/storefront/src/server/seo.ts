@@ -82,7 +82,9 @@ export function languageAlternates(
   return alternates;
 }
 
-export function metadataForPage({
+import { currentPreviewToken } from './store-context';
+
+export async function metadataForPage({
   host,
   store,
   locale,
@@ -92,7 +94,8 @@ export function metadataForPage({
   description,
   images = [],
   indexable = true,
-  origin
+  origin,
+  previewToken
 }: SeoContext & {
   page: SeoPage;
   slug?: string;
@@ -101,12 +104,15 @@ export function metadataForPage({
   images?: string[];
   indexable?: boolean;
   origin?: URL;
-}): Metadata {
+  previewToken?: string | null;
+}): Promise<Metadata> {
   const resolvedOrigin = origin ?? publicOrigin(host);
   const path = seoPath(page, slug);
   const canonical = localizedUrl(resolvedOrigin, locale, path);
   const safeDescription = cleanText(description, store.store_name);
   const safeImages = images.filter((image) => /^https?:\/\//i.test(image));
+  const token = previewToken !== undefined ? previewToken : await currentPreviewToken();
+  const isPreview = token !== undefined && token !== null && token !== '';
 
   return {
     metadataBase: resolvedOrigin,
@@ -116,7 +122,11 @@ export function metadataForPage({
       canonical,
       languages: languageAlternates(resolvedOrigin, store, path)
     },
-    robots: indexable ? undefined : { index: false, follow: true },
+    robots: isPreview
+      ? { index: false, follow: false }
+      : indexable
+        ? undefined
+        : { index: false, follow: true },
     openGraph: {
       type: 'website',
       url: canonical,
@@ -135,11 +145,17 @@ export function metadataForPage({
   };
 }
 
-export function productJsonLd(
+export async function productJsonLd(
   context: SeoContext,
   product: ProductDetail,
-  requestUrl: URL = publicOrigin(context.host)
-): Record<string, unknown> {
+  requestUrl: URL = publicOrigin(context.host),
+  previewToken?: string | null
+): Promise<Record<string, unknown> | null> {
+  const token = previewToken !== undefined ? previewToken : await currentPreviewToken();
+  if (token !== undefined && token !== null && token !== '') {
+    return null;
+  }
+
   const origin = requestUrl;
   const url = localizedUrl(origin, context.locale, seoPath('product', product.slug));
   const images = product.images

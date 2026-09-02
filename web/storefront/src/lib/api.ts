@@ -85,10 +85,20 @@ async function send(
   url: URL,
   host: string,
   locale: Locale,
-  config: StorefrontRuntimeConfig
+  config: StorefrontRuntimeConfig,
+  previewToken?: string
 ): Promise<RawResponse> {
   const secure = url.protocol === 'https:';
   const perform = secure ? httpsRequest : httpRequest;
+  const requestHeaders: Record<string, string> = {
+    // The tenant. storefront-api normalizes it again on arrival.
+    Host: host,
+    Accept: 'application/json',
+    'Accept-Language': locale
+  };
+  if (previewToken) {
+    requestHeaders['X-Matjero-Storefront-Preview'] = previewToken;
+  }
 
   return new Promise<RawResponse>((resolve, reject) => {
     const request = perform(
@@ -99,12 +109,7 @@ async function send(
         path: `${url.pathname}${url.search}`,
         method: 'GET',
         agent: secure ? httpsAgent : httpAgent,
-        headers: {
-          // The tenant. storefront-api normalizes it again on arrival.
-          Host: host,
-          Accept: 'application/json',
-          'Accept-Language': locale
-        }
+        headers: requestHeaders
       },
       (response: IncomingMessage) => {
         const chunks: Buffer[] = [];
@@ -223,7 +228,7 @@ function queryFor(locale: Locale, catalog?: CatalogQuery): URLSearchParams {
 }
 
 export type StorefrontClient = {
-  store(host: string, locale: Locale): Promise<StoreBootstrap>;
+  store(host: string, locale: Locale, previewToken?: string): Promise<StoreBootstrap>;
   categories(host: string, locale: Locale): Promise<CategoryNode[]>;
   category(host: string, locale: Locale, slug: string): Promise<CategoryNode>;
   products(host: string, locale: Locale, query?: CatalogQuery): Promise<ProductPage>;
@@ -238,7 +243,8 @@ export function createStorefrontClient(
     host: string,
     locale: Locale,
     segments: string[],
-    catalog?: CatalogQuery
+    catalog?: CatalogQuery,
+    previewToken?: string
   ): Promise<unknown> {
     if (!host) {
       // No trusted host means no tenant. Treated exactly as an unresolvable store
@@ -247,7 +253,7 @@ export function createStorefrontClient(
     }
 
     const url = buildUrl(config.apiBaseUrl, segments, queryFor(locale, catalog));
-    const response = await send(url, host, locale, config);
+    const response = await send(url, host, locale, config, previewToken);
 
     if (response.status !== 200) {
       throw new StorefrontApiError(
@@ -287,8 +293,8 @@ export function createStorefrontClient(
   }
 
   return {
-    async store(host, locale) {
-      return requireRecord(await read(host, locale, ['store']), 'store') as unknown as StoreBootstrap;
+    async store(host, locale, previewToken) {
+      return requireRecord(await read(host, locale, ['store'], undefined, previewToken), 'store') as unknown as StoreBootstrap;
     },
     async categories(host, locale) {
       return requireArray(

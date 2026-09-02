@@ -65,8 +65,9 @@ func storefrontRoutes() []RouteSpec {
 			Path:        "/v1/storefront/store",
 			OperationID: "getStorefrontStore",
 			Summary:     "Load public storefront context",
-			Description: "Returns the public store identity, market, currency, locales, public settings, and the published theme for the store resolved from the request host. Draft theme configuration is never returned.",
+			Description: "Returns the public store identity, market, currency, locales, public settings, and published theme configuration for the store resolved from the request host. Accepts optional X-Matjero-Storefront-Preview header for draft preview configuration, which bypasses cache and returns a non-cacheable private response.",
 			Tags:        []string{"Storefront"},
+			Parameters:  []ParameterSpec{HeaderStringParam("X-Matjero-Storefront-Preview", "Optional signed, short-lived preview token to view draft theme configuration", false)},
 			Responses:   storefrontResponses("Public storefront context", storefrontapi.StoreResponse{}),
 		},
 		{
