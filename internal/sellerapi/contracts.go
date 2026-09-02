@@ -41,3 +41,7 @@ type SellerListingPriceRequest struct {
 	AmountMinor int64  `json:"amount_minor"`
 	Currency    string `json:"currency"`
 }
+
+type StorefrontHostResponse struct {
+	Host string `json:"host"`
+}

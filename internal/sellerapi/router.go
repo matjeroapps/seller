@@ -27,6 +27,7 @@ type CoreCapabilities interface {
 	ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) ([]coreclient.Store, error)
 	CreateSellerStore(ctx context.Context, sellerID, subject string, create coreclient.StoreCreate) (coreclient.Store, error)
 	GetStore(ctx context.Context, storeID, subject string) (coreclient.Store, error)
+	GetStorefrontHost(ctx context.Context, storeID, subject string) (string, error)
 	ListSupplierCatalog(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error)
 	ListStoreListings(ctx context.Context, storeID, subject string, page coreclient.Page) ([]coreclient.SellerListing, error)
 	ImportListing(ctx context.Context, storeID, subject string, importReq coreclient.ListingImport) (coreclient.SellerListing, error)
@@ -45,6 +46,7 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Put("/seller/profile", deps.handleSellerProfileUpdate)
 		r.Get("/seller/stores", deps.handleSellerStores)
 		r.Post("/seller/stores", deps.handleSellerStoreCreate)
+		r.Get("/seller/stores/{store_id}/storefront-host", deps.handleGetStorefrontHost)
 		r.Get("/seller/catalog/offers", deps.handleSellerCatalogOffers)
 		r.Get("/seller/listings", deps.handleSellerListings)
 		r.Post("/seller/listings/import", deps.handleSellerListingImport)
@@ -253,6 +255,21 @@ func (deps Dependencies) handleSellerListingStatus(w http.ResponseWriter, r *htt
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": body.Status})
+}
+
+func (deps Dependencies) handleGetStorefrontHost(w http.ResponseWriter, r *http.Request) {
+	subject, err := actorhttp.SubjectFrom(r)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	host, err := deps.Core.GetStorefrontHost(r.Context(), storeID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, StorefrontHostResponse{Host: host})
 }
 
 // pageFrom converts the shared pagination window into the Core client's shape.

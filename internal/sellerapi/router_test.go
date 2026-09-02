@@ -47,6 +47,12 @@ type stubCore struct {
 	draft     coreclient.ThemeDraft
 	published coreclient.ThemePublish
 	preview   coreclient.ThemePreview
+	host      string
+}
+
+func (s *stubCore) GetStorefrontHost(ctx context.Context, storeID, subject string) (string, error) {
+	s.storeID, s.subject = storeID, subject
+	return s.host, s.err
 }
 
 func (s *stubCore) ResolveSeller(ctx context.Context, subject string) (string, error) {
@@ -471,4 +477,53 @@ func TestSellerThemePublishMapsRevision(t *testing.T) {
 	if payload.PublishedRevision != 7 {
 		t.Errorf("published revision = %d, want 7", payload.PublishedRevision)
 	}
+}
+
+func TestGetSellerStorefrontHost(t *testing.T) {
+	t.Run("returns storefront host for authorized owner", func(t *testing.T) {
+		core := &stubCore{host: "custom.example.com"}
+		handler := newHandler(core, core)
+
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-99/storefront-host", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+		if core.storeID != "store-99" {
+			t.Errorf("storeID = %q, want store-99", core.storeID)
+		}
+		if core.subject != testSubject {
+			t.Errorf("subject = %q, want %q", core.subject, testSubject)
+		}
+
+		var payload StorefrontHostResponse
+		if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if payload.Host != "custom.example.com" {
+			t.Errorf("host = %q, want custom.example.com", payload.Host)
+		}
+	})
+
+	t.Run("maps core 404 to public not_found", func(t *testing.T) {
+		core := &stubCore{err: &coreclient.Error{Status: http.StatusNotFound, Code: coreclient.CodeNotFound}}
+		handler := newHandler(core, core)
+
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-99/storefront-host", "")
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404 (body %q)", rec.Code, rec.Body.String())
+		}
+		if got := decodeError(t, rec); got != "not_found" {
+			t.Errorf("error code = %q, want not_found", got)
+		}
+	})
+
+	t.Run("maps core unavailable to 503", func(t *testing.T) {
+		core := &stubCore{err: coreclient.ErrUnavailable}
+		handler := newHandler(core, core)
+
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-99/storefront-host", "")
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
 }
