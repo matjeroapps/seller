@@ -10,7 +10,7 @@ import { themeRegistry } from '../themes';
 import type { ThemeContext, ThemeDefinition, ThemeSettings } from '../themes/contract';
 import { normalizeThemeSettings } from '../themes/settings';
 import { currentLocalePath } from './request-path';
-import { currentHost, loadStore, storefrontClient } from './store-context';
+import { currentHost, currentPreviewToken, isPreviewInvalid, loadStore, storefrontClient } from './store-context';
 
 /**
  * Page loading.
@@ -91,7 +91,12 @@ const loadCategories = cache(async (host: string, locale: Locale): Promise<Categ
  * must not be presented to a customer as a closed store.
  */
 export const loadPresentation = cache(async (requestedLocale: string): Promise<StorePresentation> => {
+  if (await isPreviewInvalid()) {
+    throw new StoreUnavailableError('store_unresolved', 'invalid preview request');
+  }
+
   const host = await currentHost();
+  const previewToken = await currentPreviewToken();
 
   if (!isLocale(requestedLocale)) {
     throw new StoreUnavailableError('store_unresolved', 'unsupported locale segment');
@@ -99,7 +104,7 @@ export const loadPresentation = cache(async (requestedLocale: string): Promise<S
 
   let store: StoreBootstrap;
   try {
-    store = await loadStore(host, requestedLocale);
+    store = await loadStore(host, requestedLocale, previewToken);
   } catch (error) {
     if (isStorefrontApiError(error) && error.kind === 'not_found') {
       throw new StoreUnavailableError('store_unresolved', 'store did not resolve for host');
@@ -137,7 +142,8 @@ export const loadPresentation = cache(async (requestedLocale: string): Promise<S
       availableLocales: available,
       categories,
       currentPath: await currentLocalePath(),
-      settings
+      settings,
+      previewToken
     })
   };
 });
