@@ -1,7 +1,27 @@
+import type { Metadata } from 'next';
+
 import { loadPresentation } from '../../../server/presentation';
 import { storefrontClient } from '../../../server/store-context';
+import { metadataForPage, requestOrigin } from '../../../server/seo';
 import { toHomeModel, toProductCard, topLevelCategories } from '../../../lib/view-models';
 import type { HomeViewModel } from '../../../themes/contract';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const presentation = await loadPresentation(locale);
+  const tagline = presentation.store.settings.tagline;
+  const origin = await requestOrigin(presentation.host);
+
+  return metadataForPage({
+    host: presentation.host,
+    store: presentation.store,
+    locale: presentation.locale,
+    page: 'home',
+    title: presentation.store.store_name,
+    description: typeof tagline === 'string' ? tagline : undefined,
+    origin
+  });
+}
 
 /**
  * The store home page.

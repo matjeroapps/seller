@@ -25,6 +25,8 @@ export type StorefrontRuntimeConfig = {
    * development against a single seeded store; empty in production.
    */
   fallbackHost: string;
+  /** Public protocol used when the request does not carry a trusted proxy value. */
+  publicProtocol?: 'http' | 'https';
 };
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -38,10 +40,13 @@ function readTimeout(raw: string | undefined): number {
 }
 
 export function runtimeConfig(env: NodeJS.ProcessEnv = process.env): StorefrontRuntimeConfig {
+  const publicProtocol = env.STOREFRONT_PUBLIC_PROTOCOL === 'http' ? 'http' : 'https';
+
   return {
     apiBaseUrl: (env.STOREFRONT_API_BASE_URL ?? 'http://localhost:8080').trim(),
     trustForwardedHost: env.TRUSTED_FORWARDED_HOST === 'true',
     requestTimeoutMs: readTimeout(env.STOREFRONT_API_TIMEOUT_MS),
-    fallbackHost: (env.STOREFRONT_FALLBACK_HOST ?? '').trim()
+    fallbackHost: (env.STOREFRONT_FALLBACK_HOST ?? '').trim(),
+    publicProtocol
   };
 }

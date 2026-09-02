@@ -1,10 +1,34 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 
 import { isStorefrontApiError } from '../../../../../lib/api';
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../../lib/catalog-query';
 import { categoryHref, toCategoryModel, toProductListModel } from '../../../../../lib/view-models';
 import { loadPresentation } from '../../../../../server/presentation';
 import { storefrontClient } from '../../../../../server/store-context';
+import { metadataForPage, categoryDescription, requestOrigin } from '../../../../../server/seo';
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const presentation = await loadPresentation(locale);
+  const category = await storefrontClient().category(presentation.host, presentation.locale, slug);
+  const origin = await requestOrigin(presentation.host);
+
+  return metadataForPage({
+    host: presentation.host,
+    store: presentation.store,
+    locale: presentation.locale,
+    page: 'category',
+    slug,
+    title: `${category.name} | ${presentation.store.store_name}`,
+    description: categoryDescription(category, presentation.store),
+    origin
+  });
+}
 
 /**
  * The category page.

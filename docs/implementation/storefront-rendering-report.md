@@ -42,6 +42,8 @@ the accepted cost.
 | `/{locale}/products/{slug}` | dynamic | Product detail |
 | `/{locale}/categories/{slug}` | dynamic | Category |
 | `/{locale}/search` | dynamic | Search |
+| `/robots.txt` | dynamic | Tenant-scoped crawler directives and sitemap link |
+| `/sitemap.xml` | dynamic | Tenant-scoped locale, category and product URLs |
 | `_not-found` | dynamic | Storefront 404 and the store-unavailable state |
 
 Every route is server-rendered per request. Nothing is statically generated per tenant and
@@ -62,6 +64,8 @@ src/app/
       products/[slug]/page.tsx
       categories/[slug]/page.tsx
       search/page.tsx
+  robots.ts                     tenant-scoped robots response
+  sitemap.ts                    tenant-scoped sitemap response
 ```
 
 `(store)` is a route group, so it adds no URL segment. Its layout is where the tenant is
@@ -78,6 +82,9 @@ store id, seller id, query parameter, cookie or client-side value participates.
 `X-Forwarded-Host` is honored only when `TRUSTED_FORWARDED_HOST=true`, mirroring the
 setting of the same name on `storefront-api`, so the web app never establishes a weaker
 trust boundary than the service behind it.
+
+SEO absolute URLs use `X-Forwarded-Proto` only under that same trust setting. Otherwise
+`STOREFRONT_PUBLIC_PROTOCOL` selects `http` for local development or defaults to `https`.
 
 Two properties keep tenants isolated:
 
@@ -156,8 +163,9 @@ Configuration is data. `src/themes/settings.ts` normalizes it before a theme see
 - Every field has a default, because Core's schema makes all of them optional.
 
 Tokens reach the page as CSS custom properties through React's `style` prop, never as a
-stylesheet string. There is no `eval`, no `new Function`, no `dangerouslySetInnerHTML`, and
-no seller JavaScript, CSS or React anywhere in the rendering path.
+stylesheet string. There is no `eval`, no `new Function`, and no seller JavaScript, CSS or
+React anywhere in the rendering path. Product JSON-LD is emitted by the server from the
+public product contract using JSON serialization; it is not seller-authored markup.
 
 The homepage is composed from `homepage_sections`, which carries no data selectors — no
 category slugs, no product lists. Each section kind therefore maps to a fixed query:
@@ -312,6 +320,7 @@ both.
 | `privacy.test.tsx` | No wholesale price, supplier, fee, margin, fulfillment or SKU id in output |
 | `accessibility.test.tsx` | Landmarks, headings, labels, alt text, keyboard operability |
 | `landmarks.test.tsx` | Unique accessible names per landmark, both locales |
+| `seo.test.ts` | Canonicals, locale alternates, `x-default`, search `noindex`, product JSON-LD and safe descriptions |
 
 The privacy fixtures deliberately carry internal-looking fields the public API does not
 return, proving the rendering path cannot surface one even if a payload contained it.
@@ -371,9 +380,6 @@ Dedicated performance hardening is later work.
 - No automated accessibility audit; the tests assert structure, not conformance.
 
 ## Out of scope
-
-SEO — canonical URLs, `hreflang`, Open Graph, Twitter cards, JSON-LD, sitemap, robots — is
-the next unit and is deliberately absent. Page titles stay minimal.
 
 Seller theme management — editor, browser, install, publish, preview, seller auth — is a
 later unit. This layer only consumes published theme data.
