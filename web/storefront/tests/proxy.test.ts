@@ -96,20 +96,26 @@ describe('proxy', () => {
     expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
   });
 
-  it('rejects duplicate theme_preview parameters', () => {
+  it('rejects duplicate theme_preview parameters and sets security headers', () => {
     const res = proxy(request('/en?theme_preview=token1&theme_preview=token2'));
     const headers = forwarded(res);
 
     expect(headers.get('x-matjero-preview-invalid')).toBe('duplicate_token_param');
     expect(headers.get('x-matjero-preview-token')).toBeNull();
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(res.headers.get('Pragma')).toBe('no-cache');
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
   });
 
-  it('rejects oversized theme_preview parameter', () => {
+  it('rejects oversized theme_preview parameter and sets security headers', () => {
     const oversized = 'A'.repeat(4097);
     const res = proxy(request(`/en?theme_preview=${oversized}`));
     const headers = forwarded(res);
 
     expect(headers.get('x-matjero-preview-invalid')).toBe('invalid_token_size');
     expect(headers.get('x-matjero-preview-token')).toBeNull();
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(res.headers.get('Pragma')).toBe('no-cache');
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer');
   });
 });

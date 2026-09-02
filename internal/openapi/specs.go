@@ -193,6 +193,17 @@ func sellerRoutes() []RouteSpec {
 		},
 		{
 			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/storefront-host",
+			OperationID: "getSellerStorefrontHost",
+			Summary:     "Get authoritative storefront host for a store",
+			Description: "Returns the active primary normalized bare storefront host for the store. Requires store ownership.",
+			Tags:        []string{"Stores"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthReadResponses("Storefront host", sellerapi.StorefrontHostResponse{}),
+		},
+		{
+			Method:      http.MethodGet,
 			Path:        "/v1/seller/catalog/offers",
 			OperationID: "listSellerCatalogOffers",
 			Summary:     "List supplier catalog offers",

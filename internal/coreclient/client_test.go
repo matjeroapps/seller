@@ -483,3 +483,65 @@ func TestClientForwardsStorefrontPreviewToken(t *testing.T) {
 		t.Errorf("Authorization header missing or invalid: %q", got)
 	}
 }
+
+func TestGetStorefrontHost(t *testing.T) {
+	t.Run("valid host response", func(t *testing.T) {
+		stub := newStubCore(t, jsonHandler(http.StatusOK, `{"host":"store.example.com"}`))
+		client := stub.client(t)
+
+		host, err := client.GetStorefrontHost(context.Background(), "store-123", "sub-456")
+		if err != nil {
+			t.Fatalf("GetStorefrontHost: %v", err)
+		}
+		if host != "store.example.com" {
+			t.Errorf("host = %q, want store.example.com", host)
+		}
+		if got := stub.last.URL.Path; got != "/internal/v1/stores/store-123/storefront-host" {
+			t.Errorf("path = %q, want /internal/v1/stores/store-123/storefront-host", got)
+		}
+		if got := stub.last.Header.Get(HeaderSubject); got != "sub-456" {
+			t.Errorf("HeaderSubject = %q, want sub-456", got)
+		}
+		if got := stub.last.Header.Get(HeaderService); got != testService {
+			t.Errorf("HeaderService = %q, want %q", got, testService)
+		}
+	})
+
+	t.Run("defensive rejection of malformed host strings", func(t *testing.T) {
+		invalidHosts := []string{
+			"",
+			"   ",
+			"https://store.example.com",
+			"http://store.example.com",
+			"store.example.com/path",
+			"user:pass@store.example.com",
+			"store.example.com:8080",
+		}
+		for _, invalid := range invalidHosts {
+			stub := newStubCore(t, jsonHandler(http.StatusOK, `{"host":"`+invalid+`"}`))
+			client := stub.client(t)
+
+			_, err := client.GetStorefrontHost(context.Background(), "store-123", "sub-456")
+			if err == nil {
+				t.Errorf("expected rejection for host %q, got nil error", invalid)
+			}
+			if !isUnavailable(err) {
+				t.Errorf("expected ErrUnavailable for malformed host %q, got %v", invalid, err)
+			}
+		}
+	})
+
+	t.Run("error codes forwarded cleanly", func(t *testing.T) {
+		stub := newStubCore(t, jsonHandler(http.StatusNotFound, `{"error":{"code":"not_found","message":"store not found"}}`))
+		client := stub.client(t)
+
+		_, err := client.GetStorefrontHost(context.Background(), "store-123", "sub-456")
+		var coreErr *Error
+		if !asError(err, &coreErr) {
+			t.Fatalf("expected *coreclient.Error, got %v", err)
+		}
+		if coreErr.Code != CodeNotFound {
+			t.Errorf("code = %q, want not_found", coreErr.Code)
+		}
+	})
+}

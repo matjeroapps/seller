@@ -65,7 +65,7 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const response = NextResponse.next({ request: { headers } });
-  if (headers.has(PREVIEW_TOKEN_HEADER)) {
+  if (headers.has(PREVIEW_TOKEN_HEADER) || headers.has(PREVIEW_INVALID_HEADER)) {
     response.headers.set('Cache-Control', 'private, no-store');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Referrer-Policy', 'no-referrer');
