@@ -1,10 +1,28 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../lib/catalog-query';
 import { toProductListModel } from '../../../../lib/view-models';
 import { isStorefrontApiError } from '../../../../lib/api';
 import { loadPresentation } from '../../../../server/presentation';
 import { storefrontClient } from '../../../../server/store-context';
+import { metadataForPage, requestOrigin } from '../../../../server/seo';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const presentation = await loadPresentation(locale);
+  const origin = await requestOrigin(presentation.host);
+
+  return metadataForPage({
+    host: presentation.host,
+    store: presentation.store,
+    locale: presentation.locale,
+    page: 'products',
+    title: `${presentation.context.copy.products.title} | ${presentation.store.store_name}`,
+    description: presentation.context.copy.products.title,
+    origin
+  });
+}
 
 /**
  * The product listing.

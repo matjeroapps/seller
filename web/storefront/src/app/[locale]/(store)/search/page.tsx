@@ -1,9 +1,29 @@
+import type { Metadata } from 'next';
+
 import { isStorefrontApiError } from '../../../../lib/api';
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../lib/catalog-query';
 import type { ProductPage } from '../../../../lib/contracts';
 import { toProductListModel, toSearchModel } from '../../../../lib/view-models';
 import { loadPresentation } from '../../../../server/presentation';
 import { storefrontClient } from '../../../../server/store-context';
+import { metadataForPage, requestOrigin } from '../../../../server/seo';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const presentation = await loadPresentation(locale);
+  const origin = await requestOrigin(presentation.host);
+
+  return metadataForPage({
+    host: presentation.host,
+    store: presentation.store,
+    locale: presentation.locale,
+    page: 'search',
+    title: `${presentation.context.copy.search.heading} | ${presentation.store.store_name}`,
+    description: presentation.context.copy.search.heading,
+    indexable: false,
+    origin
+  });
+}
 
 /**
  * Search.
