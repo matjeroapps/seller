@@ -95,6 +95,7 @@ func run(ctx context.Context) error {
 		Register: func(r chi.Router) {
 			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{Core: core})(r)
 			sellerapi.RegisterSellerThemeRoutes(sellerapi.ThemeDependencies{Themes: core})(r)
+			sellerapi.RegisterSellerDomainRoutes(sellerapi.DomainDependencies{Domains: core})(r)
 		},
 	}, core, verifier))
 

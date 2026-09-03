@@ -3,11 +3,13 @@ import type { AuthClient, AuthState } from '../auth/oidc';
 import type { ApiClient } from '../lib/api';
 import { ThemeCatalog } from '../components/ThemeCatalog';
 import { ThemeEditorPanel } from '../components/ThemeEditorPanel';
+import { DomainManagementPanel } from '../components/DomainManagementPanel';
 
 type RouteLocation =
   | { path: '/'; params: {} }
   | { path: '/themes'; params: {} }
   | { path: '/stores/theme'; params: { storeId: string } }
+  | { path: '/stores/domains'; params: { storeId: string } }
   | { path: '/auth/callback'; params: {} };
 
 type RouterProps = {
@@ -157,6 +159,13 @@ export function Router({
           >
             {copy.storeThemeManagement || 'Store Theme'}
           </button>
+          <button
+            type="button"
+            className={`nav-tab ${currentRoute.path === '/stores/domains' ? 'active' : ''}`}
+            onClick={() => navigate(`#/stores/${selectedStoreId || 'select'}/domains`)}
+          >
+            {copy.domainsNav || 'Store Domains'}
+          </button>
         </div>
 
         <div className="subnav-actions">
@@ -171,6 +180,8 @@ export function Router({
                   setSelectedStoreId(newStoreId);
                   if (currentRoute.path === '/stores/theme') {
                     navigate(`#/stores/${newStoreId}/theme`);
+                  } else if (currentRoute.path === '/stores/domains') {
+                    navigate(`#/stores/${newStoreId}/domains`);
                   }
                 }}
                 className="form-control form-control-sm"
@@ -205,6 +216,13 @@ export function Router({
             copy={copy}
             onNavigateCatalog={() => navigate('#/themes')}
           />
+        ) : currentRoute.path === '/stores/domains' ? (
+          <DomainManagementPanel
+            api={api}
+            storeId={currentRoute.params.storeId || selectedStoreId}
+            locale={locale}
+            copy={copy}
+          />
         ) : null}
       </main>
     </div>
@@ -226,6 +244,10 @@ export function parseLocation(hash: string = window.location.hash, pathname: str
   const storeThemeMatch = cleanHash.match(/^\/stores\/([^/]+)\/theme$/);
   if (storeThemeMatch) {
     return { path: '/stores/theme', params: { storeId: storeThemeMatch[1] } };
+  }
+  const storeDomainMatch = cleanHash.match(/^\/stores\/([^/]+)\/domains$/);
+  if (storeDomainMatch) {
+    return { path: '/stores/domains', params: { storeId: storeDomainMatch[1] } };
   }
   return { path: '/', params: {} };
 }
