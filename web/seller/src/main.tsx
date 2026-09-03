@@ -29,8 +29,9 @@ const authClient = createOidcAuthClient();
 const api = createApiClient({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? window.location.origin,
   getAccessToken: () => authClient.getAccessToken(),
+  renewToken: () => authClient.renewToken(),
   onUnauthorized: () => {
-    // Return safely to login on 401 without infinite loop
+    void authClient.clearSession();
   }
 });
 

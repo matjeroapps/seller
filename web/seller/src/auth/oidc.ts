@@ -14,17 +14,33 @@ export type AuthState = {
   error: string | null;
 };
 
+export interface UserManagerLike {
+  getUser(): Promise<User | null>;
+  signinRedirect(args?: unknown): Promise<void>;
+  signinRedirectCallback(url?: string): Promise<User>;
+  signinSilent(args?: unknown): Promise<User | null>;
+  signoutRedirect(args?: unknown): Promise<void>;
+  removeUser(): Promise<void>;
+  events: {
+    addUserLoaded(cb: (user: User) => void): void;
+    addUserUnloaded(cb: () => void): void;
+    addAccessTokenExpired(cb: () => void): void;
+  };
+}
+
 export interface AuthClient {
   getAccessToken(): Promise<string | null>;
+  renewToken(): Promise<string | null>;
+  clearSession(errorMsg?: string): Promise<void>;
   login(returnPath?: string): Promise<void>;
-  handleCallback(): Promise<string>;
+  handleCallback(url?: string): Promise<string>;
   logout(): Promise<void>;
   getUser(): AuthUser | null;
   subscribe(listener: (state: AuthState) => void): () => void;
   getState(): AuthState;
 }
 
-function sanitizeReturnPath(path?: string): string {
+export function sanitizeReturnPath(path?: string): string {
   if (!path || typeof path !== 'string') return '/';
   if (path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\')) {
     return path;
@@ -32,11 +48,18 @@ function sanitizeReturnPath(path?: string): string {
   return '/';
 }
 
-export function createOidcAuthClient(): AuthClient {
+export type OidcClientOptions = {
+  userManager?: UserManagerLike;
+};
+
+export function createOidcAuthClient(options?: OidcClientOptions): AuthClient {
   const issuer = import.meta.env.VITE_ZITADEL_ISSUER;
   const clientId = import.meta.env.VITE_ZITADEL_CLIENT_ID;
   const redirectUri = import.meta.env.VITE_ZITADEL_REDIRECT_URI || `${window.location.origin}/auth/callback`;
   const postLogoutRedirectUri = import.meta.env.VITE_ZITADEL_POST_LOGOUT_REDIRECT_URI || window.location.origin;
+
+  const isDevAuthEnabled = Boolean(import.meta.env.DEV && import.meta.env.VITE_SELLER_DEV_AUTH === 'true');
+  const isOidcConfigured = Boolean((issuer && clientId) || options?.userManager);
 
   const listeners = new Set<(state: AuthState) => void>();
 
@@ -54,52 +77,57 @@ export function createOidcAuthClient(): AuthClient {
     }
   }
 
-  let userManager: UserManager | null = null;
+  let userManager: UserManagerLike | null = options?.userManager ?? null;
 
-  if (issuer && clientId) {
-    userManager = new UserManager({
-      authority: issuer,
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      post_logout_redirect_uri: postLogoutRedirectUri,
-      response_type: 'code',
-      scope: 'openid profile email',
-      userStore: new WebStorageStateStore({ store: window.sessionStorage }),
-      automaticSilentRenew: true
-    });
-
-    userManager.getUser().then((user) => {
-      if (user && !user.expired) {
-        updateState({
-          isAuthenticated: true,
-          user: mapUser(user),
-          isLoading: false
-        });
-      } else {
-        updateState({ isAuthenticated: false, user: null, isLoading: false });
-      }
-    }).catch((err) => {
-      updateState({
-        isAuthenticated: false,
-        user: null,
-        isLoading: false,
-        error: err instanceof Error ? err.message : 'Auth initialization failed'
+  if (isOidcConfigured) {
+    if (!userManager && issuer && clientId) {
+      userManager = new UserManager({
+        authority: issuer,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        post_logout_redirect_uri: postLogoutRedirectUri,
+        response_type: 'code',
+        scope: 'openid profile email offline_access',
+        userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+        automaticSilentRenew: true
       });
-    });
+    }
 
-    userManager.events.addUserLoaded((user) => {
-      updateState({ isAuthenticated: true, user: mapUser(user), isLoading: false, error: null });
-    });
+    if (userManager) {
+      userManager.getUser().then((user) => {
+        if (user && !user.expired) {
+          updateState({
+            isAuthenticated: true,
+            user: mapUser(user),
+            isLoading: false,
+            error: null
+          });
+        } else {
+          updateState({ isAuthenticated: false, user: null, isLoading: false, error: null });
+        }
+      }).catch((err) => {
+        updateState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: err instanceof Error ? err.message : 'Auth initialization failed'
+        });
+      });
 
-    userManager.events.addUserUnloaded(() => {
-      updateState({ isAuthenticated: false, user: null, isLoading: false });
-    });
+      userManager.events.addUserLoaded((user) => {
+        updateState({ isAuthenticated: true, user: mapUser(user), isLoading: false, error: null });
+      });
 
-    userManager.events.addAccessTokenExpired(() => {
-      updateState({ isAuthenticated: false, user: null, isLoading: false, error: 'Session expired' });
-    });
-  } else {
-    // Development / unconfigured fallthrough: check sessionStorage for dev user state
+      userManager.events.addUserUnloaded(() => {
+        updateState({ isAuthenticated: false, user: null, isLoading: false, error: null });
+      });
+
+      userManager.events.addAccessTokenExpired(() => {
+        updateState({ isAuthenticated: false, user: null, isLoading: false, error: 'Session expired' });
+      });
+    }
+  } else if (isDevAuthEnabled) {
+    // Development explicit opt-in dev auth
     const stored = sessionStorage.getItem('matjero_dev_user');
     if (stored) {
       try {
@@ -111,6 +139,14 @@ export function createOidcAuthClient(): AuthClient {
     } else {
       currentState = { isAuthenticated: false, user: null, isLoading: false, error: null };
     }
+  } else {
+    // Production fail-closed behavior when OIDC configuration is missing
+    currentState = {
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+      error: 'Authentication configuration missing: VITE_ZITADEL_ISSUER and VITE_ZITADEL_CLIENT_ID required'
+    };
   }
 
   function mapUser(user: User): AuthUser {
@@ -123,6 +159,20 @@ export function createOidcAuthClient(): AuthClient {
     };
   }
 
+  const clearSession = async (errorMsg: string = 'Session expired'): Promise<void> => {
+    if (userManager) {
+      try {
+        await userManager.removeUser();
+      } catch {
+        // ignore
+      }
+    } else if (isDevAuthEnabled) {
+      sessionStorage.removeItem('matjero_dev_user');
+      sessionStorage.removeItem('matjero_dev_token');
+    }
+    updateState({ isAuthenticated: false, user: null, isLoading: false, error: errorMsg });
+  };
+
   return {
     async getAccessToken(): Promise<string | null> {
       if (userManager) {
@@ -133,24 +183,51 @@ export function createOidcAuthClient(): AuthClient {
         if (user && user.expired) {
           try {
             const renewed = await userManager.signinSilent();
-            return renewed?.access_token ?? null;
+            if (renewed && !renewed.expired) {
+              updateState({ isAuthenticated: true, user: mapUser(renewed), isLoading: false, error: null });
+              return renewed.access_token;
+            }
           } catch {
-            updateState({ isAuthenticated: false, user: null, error: 'Session expired' });
+            await clearSession('Session expired');
             return null;
           }
         }
         return null;
       }
-      const devToken = sessionStorage.getItem('matjero_dev_token');
-      return devToken ?? (currentState.isAuthenticated ? 'dev-access-token' : null);
+      if (isDevAuthEnabled) {
+        const devToken = sessionStorage.getItem('matjero_dev_token');
+        return devToken ?? (currentState.isAuthenticated ? 'dev-access-token' : null);
+      }
+      return null;
     },
+
+    async renewToken(): Promise<string | null> {
+      if (userManager) {
+        try {
+          const renewed = await userManager.signinSilent();
+          if (renewed && !renewed.expired) {
+            updateState({ isAuthenticated: true, user: mapUser(renewed), isLoading: false, error: null });
+            return renewed.access_token;
+          }
+        } catch {
+          await clearSession('Session expired');
+          return null;
+        }
+      }
+      if (isDevAuthEnabled) {
+        return sessionStorage.getItem('matjero_dev_token') ?? 'dev-access-token';
+      }
+      await clearSession('Authentication configuration missing');
+      return null;
+    },
+
+    clearSession,
 
     async login(returnPath?: string): Promise<void> {
       const safePath = sanitizeReturnPath(returnPath);
       if (userManager) {
         await userManager.signinRedirect({ state: { returnPath: safePath } });
-      } else {
-        // Dev login mode
+      } else if (isDevAuthEnabled) {
         const devUser: AuthUser = {
           subject: 'usr_seller_dev',
           preferred_username: 'seller_dev',
@@ -160,26 +237,34 @@ export function createOidcAuthClient(): AuthClient {
         sessionStorage.setItem('matjero_dev_token', 'dev-access-token');
         updateState({ isAuthenticated: true, user: devUser, isLoading: false, error: null });
         window.location.hash = safePath;
+      } else {
+        updateState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: 'Authentication configuration missing'
+        });
       }
     },
 
-    async handleCallback(): Promise<string> {
+    async handleCallback(url?: string): Promise<string> {
       if (userManager) {
-        const user = await userManager.signinRedirectCallback();
+        const user = await userManager.signinRedirectCallback(url);
         updateState({ isAuthenticated: true, user: mapUser(user), isLoading: false, error: null });
         const stateObj = user.state as { returnPath?: string } | undefined;
         return sanitizeReturnPath(stateObj?.returnPath);
       }
-      return '/';
+      if (isDevAuthEnabled) {
+        return '/';
+      }
+      throw new Error('Authentication configuration missing');
     },
 
     async logout(): Promise<void> {
       if (userManager) {
         await userManager.signoutRedirect();
       } else {
-        sessionStorage.removeItem('matjero_dev_user');
-        sessionStorage.removeItem('matjero_dev_token');
-        updateState({ isAuthenticated: false, user: null, isLoading: false, error: null });
+        await clearSession(null as any);
       }
     },
 
@@ -197,3 +282,4 @@ export function createOidcAuthClient(): AuthClient {
     }
   };
 }
+

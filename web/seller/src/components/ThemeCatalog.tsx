@@ -22,6 +22,7 @@ export function ThemeCatalog({
 }: ThemeCatalogProps) {
   const [themes, setThemes] = React.useState<Theme[]>([]);
   const [selectedThemeKey, setSelectedThemeKey] = React.useState<string | null>(null);
+  const [installedThemeId, setInstalledThemeId] = React.useState<string | null>(null);
   const [versions, setVersions] = React.useState<ThemeVersion[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadingVersions, setLoadingVersions] = React.useState(false);
@@ -57,6 +58,31 @@ export function ThemeCatalog({
       active = false;
     };
   }, [api, locale]);
+
+  React.useEffect(() => {
+    if (!selectedStoreId) {
+      setInstalledThemeId(null);
+      return;
+    }
+    let active = true;
+    async function loadInstalledTheme() {
+      try {
+        const res = await api.get(`/v1/seller/stores/${encodeURIComponent(selectedStoreId)}/theme?locale=${locale}`);
+        if (res.ok && active) {
+          const data = await res.json();
+          setInstalledThemeId(data.installation?.theme_id ?? null);
+        } else if (active) {
+          setInstalledThemeId(null);
+        }
+      } catch {
+        if (active) setInstalledThemeId(null);
+      }
+    }
+    void loadInstalledTheme();
+    return () => {
+      active = false;
+    };
+  }, [api, selectedStoreId, locale]);
 
   React.useEffect(() => {
     if (!selectedThemeKey) return;
@@ -119,7 +145,7 @@ export function ThemeCatalog({
           ) : (
             <div className="stack">
               {themes.map((theme) => {
-                const isCurrent = theme.key === currentInstalledThemeKey;
+                const isCurrent = installedThemeId ? theme.id === installedThemeId : theme.key === currentInstalledThemeKey;
                 const isSelected = theme.key === selectedThemeKey;
                 return (
                   <div
