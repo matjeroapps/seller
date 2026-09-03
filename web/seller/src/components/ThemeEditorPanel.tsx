@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ApiClient } from '../lib/api';
-import type { ThemeInstallationResponse, ThemeVersion } from '../types/themes';
+import type { Theme, ThemeInstallationResponse, ThemeVersion } from '../types/themes';
 import { SchemaEditor } from './SchemaEditor';
 import { ConfirmationModal } from './ConfirmationModal';
 import { buildPreviewUrl, openPreviewWindow } from '../lib/preview';
@@ -64,8 +64,19 @@ export function ThemeEditorPanel({
       setDraftConfig(currentConfig);
       setInitialDraftConfigJson(JSON.stringify(currentConfig));
 
-      // Load theme version schema and list versions
-      const versionsRes = await api.get(`/v1/seller/themes/${encodeURIComponent(data.installation.theme_id)}/versions?locale=${locale}`);
+      // Resolve theme ID to theme key via themes catalog
+      const themesRes = await api.get(`/v1/seller/themes?locale=${locale}`);
+      if (!themesRes.ok) throw new Error('Failed to load themes catalog');
+
+      const themesData = (await themesRes.json()) as { items: Theme[] };
+      const catalogTheme = (themesData.items || []).find((t) => t.id === data.installation.theme_id);
+
+      if (!catalogTheme) {
+        throw new Error(`Installed theme ID (${data.installation.theme_id}) not found in catalog`);
+      }
+
+      // Load theme version schema using theme.key
+      const versionsRes = await api.get(`/v1/seller/themes/${encodeURIComponent(catalogTheme.key)}/versions?locale=${locale}`);
       if (versionsRes.ok) {
         const vData = (await versionsRes.json()) as { items: ThemeVersion[] };
         const items = vData.items || [];

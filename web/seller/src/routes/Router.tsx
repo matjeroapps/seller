@@ -28,7 +28,7 @@ export function Router({
   stores
 }: RouterProps) {
   const [authState, setAuthState] = React.useState<AuthState>(authClient.getState());
-  const [currentRoute, setCurrentRoute] = React.useState<RouteLocation>(() => parseLocation(window.location.hash));
+  const [currentRoute, setCurrentRoute] = React.useState<RouteLocation>(() => parseLocation(window.location.hash, window.location.pathname));
   const [selectedStoreId, setSelectedStoreId] = React.useState<string>('');
   const [callbackStatus, setCallbackStatus] = React.useState<'processing' | 'success' | 'error'>('processing');
   const [callbackError, setCallbackError] = React.useState<string | null>(null);
@@ -40,11 +40,15 @@ export function Router({
   }, [authClient]);
 
   React.useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentRoute(parseLocation(window.location.hash));
+    const handleLocationChange = () => {
+      setCurrentRoute(parseLocation(window.location.hash, window.location.pathname));
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
   }, []);
 
   // Update selected store ID when stores load
@@ -60,10 +64,12 @@ export function Router({
       let active = true;
       async function processCallback() {
         try {
-          const returnPath = await authClient.handleCallback();
+          const returnPath = await authClient.handleCallback(window.location.href);
           if (active) {
             setCallbackStatus('success');
-            window.location.hash = returnPath || '#/';
+            const targetHash = returnPath ? (returnPath.startsWith('#') ? returnPath : `#${returnPath.startsWith('/') ? returnPath : '/' + returnPath}`) : '#/';
+            window.history.replaceState(null, '', `/${targetHash}`);
+            setCurrentRoute(parseLocation(window.location.hash, window.location.pathname));
           }
         } catch (err) {
           if (active) {
@@ -91,7 +97,14 @@ export function Router({
         ) : callbackStatus === 'error' ? (
           <div className="notice notice-error">
             <p>{callbackError}</p>
-            <button type="button" className="btn btn-primary" onClick={() => navigate('#/')}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                window.history.replaceState(null, '', '/#/');
+                setCurrentRoute(parseLocation('#/', '/'));
+              }}
+            >
               {copy.returnToDashboard || 'Return to Dashboard'}
             </button>
           </div>
@@ -198,9 +211,13 @@ export function Router({
   );
 }
 
-function parseLocation(hash: string): RouteLocation {
-  const cleanHash = hash.replace(/^#/, '');
-  if (cleanHash === '/auth/callback' || cleanHash.startsWith('/auth/callback')) {
+export function parseLocation(hash: string = window.location.hash, pathname: string = window.location.pathname): RouteLocation {
+  const cleanPathname = pathname.replace(/\/$/, '');
+  if (cleanPathname === '/auth/callback') {
+    return { path: '/auth/callback', params: {} };
+  }
+  const cleanHash = hash.replace(/^#/, '').replace(/\/$/, '');
+  if (cleanHash === '/auth/callback') {
     return { path: '/auth/callback', params: {} };
   }
   if (cleanHash === '/themes') {

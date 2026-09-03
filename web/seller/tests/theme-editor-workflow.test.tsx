@@ -49,8 +49,22 @@ describe('ThemeEditorPanel Workflow', () => {
         return new Response(JSON.stringify({ config: { logo: 'https://example.com/reverted.png' }, revision: 1 }), { status: 200 });
       }
 
-      if (urlStr.includes('/theme/upgrade') && method === 'POST') {
-        return new Response(JSON.stringify({ status: 'upgraded' }), { status: 200 });
+      if (urlStr.includes('/v1/seller/themes?') || urlStr.endsWith('/v1/seller/themes')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'thm_1',
+                key: 'thm_1',
+                name: 'Theme 1',
+                description: 'Test theme',
+                type: 'official',
+                status: 'published'
+              }
+            ]
+          }),
+          { status: 200 }
+        );
       }
 
       if (urlStr.includes('/themes/thm_1/versions')) {
@@ -194,4 +208,99 @@ describe('ThemeEditorPanel Workflow', () => {
       );
     });
   });
+
+  it('resolves installation theme_id to theme key before fetching versions (ID vs Key regression)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes('/v1/seller/stores/str_123/theme')) {
+        return new Response(
+          JSON.stringify({
+            installation: {
+              id: 'ins_123',
+              store_id: 'str_123',
+              theme_id: 'thm_123',
+              theme_version_id: 'ver_123',
+              status: 'active'
+            },
+            draft_config: { hero_title: 'Welcome' },
+            published_config: { hero_title: 'Welcome' },
+            draft_revision: 1,
+            published_revision: 1
+          }),
+          { status: 200 }
+        );
+      }
+
+      if (urlStr.includes('/v1/seller/themes?')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'thm_123',
+                key: 'matjero-default',
+                name: 'Matjero Default Theme',
+                description: 'Default storefront theme',
+                type: 'official',
+                status: 'published'
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+      }
+
+      if (urlStr.includes('/v1/seller/themes/matjero-default/versions')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'ver_123',
+                theme_id: 'thm_123',
+                version: '1.0.0',
+                status: 'published',
+                configuration_schema: {
+                  type: 'object',
+                  properties: {
+                    hero_title: { type: 'string', title: 'Hero Title' }
+                  }
+                },
+                default_configuration: { hero_title: '' },
+                component_registry_version: '1.0.0'
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+      }
+
+      // Strict Core contract check: if queried by database ID instead of key, return 404!
+      if (urlStr.includes('/v1/seller/themes/thm_123/versions')) {
+        return new Response(JSON.stringify({ error: { code: 'not_found', message: 'Theme not found by key: thm_123' } }), { status: 404 });
+      }
+
+      return new Response('Not found', { status: 404 });
+    });
+
+    const api = createApiClient({ baseUrl: 'https://seller.example.com' });
+
+    render(
+      <ThemeEditorPanel
+        api={api}
+        storeId="str_123"
+        locale="en"
+        copy={copy}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Hero Title')).toHaveValue('Welcome');
+    });
+
+    // Prove UI called /matjero-default/versions and did NOT call /thm_123/versions
+    const calledUrls = fetchSpy.mock.calls.map((call) => call[0].toString());
+    expect(calledUrls.some((u) => u.includes('/v1/seller/themes/matjero-default/versions'))).toBe(true);
+    expect(calledUrls.some((u) => u.includes('/v1/seller/themes/thm_123/versions'))).toBe(false);
+  });
 });
+

@@ -1,6 +1,7 @@
 export type ApiConfig = {
   baseUrl: string;
   getAccessToken?: () => Promise<string | null>;
+  renewToken?: () => Promise<string | null>;
   onUnauthorized?: () => void;
   onForbidden?: () => void;
 };
@@ -38,12 +39,14 @@ export function createApiClient(config: ApiConfig) {
 
     if (response.status === 401) {
       // Attempt renewal once
-      token = await config.getAccessToken?.();
-      if (token) {
-        response = await execute(token ?? null);
+      const renewedToken = config.renewToken ? await config.renewToken() : await config.getAccessToken?.();
+      if (renewedToken) {
+        response = await execute(renewedToken);
       }
       if (response.status === 401) {
         config.onUnauthorized?.();
+      } else if (response.status === 403) {
+        config.onForbidden?.();
       }
     } else if (response.status === 403) {
       config.onForbidden?.();
@@ -69,3 +72,4 @@ export function createApiClient(config: ApiConfig) {
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
