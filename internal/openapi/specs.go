@@ -371,7 +371,7 @@ func sellerRoutes() []RouteSpec {
 			Path:        "/v1/seller/stores/{store_id}/domains",
 			OperationID: "listStoreDomains",
 			Summary:     "List domains for a store",
-			Description: "Returns all platform and custom domains registered for the store. Requires store ownership.",
+			Description: "Returns all platform and custom domains registered for the store. Requires store ownership. The verification challenge payload is optional and returned only for custom domains requiring DNS verification (pending or failed).",
 			Tags:        []string{"Store Domains"},
 			Auth:        true,
 			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},

@@ -163,7 +163,7 @@ func toStoreDomainResponse(d coreclient.StoreDomain) StoreDomainResponse {
 		CreatedAt:     d.CreatedAt,
 		UpdatedAt:     d.UpdatedAt,
 	}
-	if d.Verification != nil {
+	if d.DomainType == "custom" && (d.Status == "pending" || d.Status == "failed") && d.Verification != nil {
 		resp.Verification = &DomainVerificationResponse{
 			RecordType:  d.Verification.RecordType,
 			RecordName:  d.Verification.RecordName,

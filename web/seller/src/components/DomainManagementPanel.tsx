@@ -36,26 +36,43 @@ export function DomainManagementPanel({
   // Copy state for TXT values
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
 
-  const loadData = React.useCallback(async () => {
-    if (!storeId) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [domainRes, hostRes] = await Promise.all([
-        api.listStoreDomains(storeId),
-        api.getStorefrontHost(storeId).catch(() => ({ host: '' }))
-      ]);
-      setDomains(domainRes.items || []);
-      setStorefrontHost(hostRes.host || '');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load domain data');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [api, storeId]);
+  // Store generation guard to prevent async response races across store switches
+  const generationRef = React.useRef<number>(0);
 
-  // Store switch isolation: reset local form, errors, modals when storeId changes
+  const loadDataForStore = React.useCallback(
+    async (targetStoreId: string, targetGen: number) => {
+      if (!targetStoreId) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [domainRes, hostRes] = await Promise.all([
+          api.listStoreDomains(targetStoreId),
+          api.getStorefrontHost(targetStoreId).catch(() => ({ host: '' }))
+        ]);
+        if (targetGen !== generationRef.current || targetStoreId !== storeId) {
+          return;
+        }
+        setDomains(domainRes.items || []);
+        setStorefrontHost(hostRes.host || '');
+      } catch (err: any) {
+        if (targetGen !== generationRef.current || targetStoreId !== storeId) {
+          return;
+        }
+        setError(err?.message || 'Failed to load domain data');
+      } finally {
+        if (targetGen === generationRef.current && targetStoreId === storeId) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [api, storeId]
+  );
+
+  // Store switch isolation: increment generation and reset all state immediately
   React.useEffect(() => {
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+
     setDomains([]);
     setStorefrontHost('');
     setNewDomain('');
@@ -65,11 +82,16 @@ export function DomainManagementPanel({
     setActivateTarget(null);
     setActionDomainId(null);
     setActionType(null);
-    void loadData();
-  }, [storeId, loadData]);
+    setCopiedKey(null);
+
+    void loadDataForStore(storeId, currentGen);
+  }, [storeId, loadDataForStore]);
 
   const handleRequestDomain = async (e: React.FormEvent) => {
     e.preventDefault();
+    const currentGen = generationRef.current;
+    const targetStoreId = storeId;
+
     setFormError(null);
     setNotice(null);
 
@@ -82,57 +104,87 @@ export function DomainManagementPanel({
 
     setIsRequesting(true);
     try {
-      await api.requestCustomDomain(storeId, clean);
+      await api.requestCustomDomain(targetStoreId, clean);
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       setNewDomain('');
       setNotice(copy.requestSuccess || 'Custom domain requested successfully.');
-      await loadData();
+      await loadDataForStore(targetStoreId, currentGen);
     } catch (err: any) {
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       setFormError(err?.message || 'Failed to request custom domain.');
     } finally {
-      setIsRequesting(false);
+      if (currentGen === generationRef.current && targetStoreId === storeId) {
+        setIsRequesting(false);
+      }
     }
   };
 
   const handleVerify = async (domainId: string) => {
+    const currentGen = generationRef.current;
+    const targetStoreId = storeId;
+
     setActionDomainId(domainId);
     setActionType('verifying');
     setError(null);
     setNotice(null);
     try {
-      const updated = await api.verifyCustomDomain(storeId, domainId);
+      const updated = await api.verifyCustomDomain(targetStoreId, domainId);
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       if (updated.status === 'verified') {
         setNotice(copy.verifiedNotice || 'Domain ownership verified successfully! You can now activate it.');
       }
-      await loadData();
+      await loadDataForStore(targetStoreId, currentGen);
     } catch (err: any) {
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       if (err?.status === 503 || err?.code === 'service_unavailable') {
         setError(copy.verificationServiceUnavailable || 'Verification service is temporarily unavailable. Try again later.');
       } else {
         setError(err?.message || 'Verification check failed.');
       }
     } finally {
-      setActionDomainId(null);
-      setActionType(null);
+      if (currentGen === generationRef.current && targetStoreId === storeId) {
+        setActionDomainId(null);
+        setActionType(null);
+      }
     }
   };
 
   const handleConfirmActivate = async () => {
     if (!activateTarget) return;
+    const currentGen = generationRef.current;
+    const targetStoreId = storeId;
     const domainId = activateTarget.id;
+
     setActivateTarget(null);
     setActionDomainId(domainId);
     setActionType('activating');
     setError(null);
     setNotice(null);
     try {
-      await api.activateCustomDomain(storeId, domainId);
+      await api.activateCustomDomain(targetStoreId, domainId);
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       setNotice(copy.activateSuccess || 'Custom primary domain activated successfully!');
-      await loadData();
+      await loadDataForStore(targetStoreId, currentGen);
     } catch (err: any) {
+      if (currentGen !== generationRef.current || targetStoreId !== storeId) {
+        return;
+      }
       setError(err?.message || 'Failed to activate custom domain.');
     } finally {
-      setActionDomainId(null);
-      setActionType(null);
+      if (currentGen === generationRef.current && targetStoreId === storeId) {
+        setActionDomainId(null);
+        setActionType(null);
+      }
     }
   };
 
@@ -141,6 +193,23 @@ export function DomainManagementPanel({
       void navigator.clipboard.writeText(text);
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return copy.statusPending || 'Pending Verification';
+      case 'verified':
+        return copy.statusVerified || 'Verified (Not Active)';
+      case 'active':
+        return copy.statusActive || 'Active';
+      case 'failed':
+        return copy.statusFailed || 'Verification Failed';
+      case 'disabled':
+        return copy.statusDisabled || 'Disabled by Admin';
+      default:
+        return status;
     }
   };
 
@@ -183,7 +252,7 @@ export function DomainManagementPanel({
             <p className="text-muted">{copy.noDomainsFound || 'No domains found.'}</p>
           ) : (
             platformDomains.map((d) => (
-              <div key={d.id} className="domain-card platform-domain-card">
+              <div key={d.id} className={`domain-card platform-domain-card domain-status-${d.status}`}>
                 <div className="domain-info">
                   <span className="domain-name mono" dir="ltr">{d.domain}</span>
                   <span className="badge badge-platform">{copy.domainTypePlatform || 'Platform Domain'}</span>
@@ -192,8 +261,13 @@ export function DomainManagementPanel({
                   ) : (
                     <span className="badge badge-secondary">{copy.secondaryDomain || 'Secondary Domain'}</span>
                   )}
-                  <span className="badge badge-status-active">{copy.statusActive || 'Active'}</span>
+                  <span className={`badge badge-status-${d.status}`}>{getStatusLabel(d.status)}</span>
                 </div>
+                {d.status === 'disabled' && (
+                  <div className="notice notice-warning disabled-notice">
+                    {copy.disabledNotice || 'This domain was disabled by platform administration and requires administrative resolution.'}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -245,19 +319,7 @@ export function DomainManagementPanel({
                     ) : (
                       <span className="badge badge-secondary">{copy.secondaryDomain || 'Secondary Domain'}</span>
                     )}
-                    <span className={`badge badge-status-${d.status}`}>
-                      {d.status === 'pending'
-                        ? (copy.statusPending || 'Pending Verification')
-                        : d.status === 'verified'
-                        ? (copy.statusVerified || 'Verified (Not Active)')
-                        : d.status === 'active'
-                        ? (copy.statusActive || 'Active')
-                        : d.status === 'failed'
-                        ? (copy.statusFailed || 'Verification Failed')
-                        : d.status === 'disabled'
-                        ? (copy.statusDisabled || 'Disabled by Admin')
-                        : d.status}
-                    </span>
+                    <span className={`badge badge-status-${d.status}`}>{getStatusLabel(d.status)}</span>
                   </div>
 
                   {/* Actions */}

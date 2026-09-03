@@ -214,3 +214,123 @@ func TestSellerDomainRoutesErrorMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestVerificationPrivacyFiltering(t *testing.T) {
+	now := time.Now().UTC()
+	verificationSecret := &coreclient.DomainVerification{
+		RecordType:  "TXT",
+		RecordName:  "_matjero-verification.shop.example.com",
+		RecordValue: "matjero-verification=secret-challenge-123",
+	}
+
+	cases := []struct {
+		name             string
+		domain           coreclient.StoreDomain
+		wantVerification bool
+	}{
+		{
+			name: "custom domain pending - verification present",
+			domain: coreclient.StoreDomain{
+				ID:           "d-1",
+				Domain:       "pending.example.com",
+				Status:       "pending",
+				DomainType:   "custom",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: true,
+		},
+		{
+			name: "custom domain failed - verification present",
+			domain: coreclient.StoreDomain{
+				ID:           "d-2",
+				Domain:       "failed.example.com",
+				Status:       "failed",
+				DomainType:   "custom",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: true,
+		},
+		{
+			name: "custom domain verified - verification ABSENT",
+			domain: coreclient.StoreDomain{
+				ID:           "d-3",
+				Domain:       "verified.example.com",
+				Status:       "verified",
+				DomainType:   "custom",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: false,
+		},
+		{
+			name: "custom domain active - verification ABSENT",
+			domain: coreclient.StoreDomain{
+				ID:           "d-4",
+				Domain:       "active.example.com",
+				Status:       "active",
+				DomainType:   "custom",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: false,
+		},
+		{
+			name: "custom domain disabled - verification ABSENT",
+			domain: coreclient.StoreDomain{
+				ID:           "d-5",
+				Domain:       "disabled.example.com",
+				Status:       "disabled",
+				DomainType:   "custom",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: false,
+		},
+		{
+			name: "platform domain - verification ABSENT",
+			domain: coreclient.StoreDomain{
+				ID:           "d-6",
+				Domain:       "platform.matjero.com",
+				Status:       "active",
+				DomainType:   "platform",
+				Verification: verificationSecret,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			wantVerification: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := &stubDomainsCore{single: tc.domain, domains: []coreclient.StoreDomain{tc.domain}}
+			handler := newDomainHandler(stub)
+
+			rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-123/domains", "")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+
+			body := rec.Body.String()
+			hasVerificationField := strings.Contains(body, `"verification"`)
+			hasRecordValueField := strings.Contains(body, `"record_value"`)
+
+			if tc.wantVerification {
+				if !hasVerificationField || !hasRecordValueField {
+					t.Errorf("expected verification and record_value in response, got: %s", body)
+				}
+			} else {
+				if hasVerificationField || hasRecordValueField {
+					t.Errorf("privacy violation: unexpected verification or record_value in response: %s", body)
+				}
+			}
+		})
+	}
+}

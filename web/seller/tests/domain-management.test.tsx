@@ -1,12 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { DomainManagementPanel } from '../src/components/DomainManagementPanel';
 import type { ApiClient } from '../src/lib/api';
 import type { StoreDomain } from '../src/types/domains';
 import { messages } from '../src/i18n/locales';
 
 const mockCopy = messages.en;
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: any) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function createMockApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return {
@@ -44,6 +54,33 @@ describe('DomainManagementPanel', () => {
       expect(screen.getAllByText('store-1.matjero.com')[0]).toBeInTheDocument();
     });
 
+    expect(screen.queryByRole('button', { name: /check verification/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /activate domain/i })).not.toBeInTheDocument();
+  });
+
+  it('renders disabled platform domain with administrative moderation notice and no actions', async () => {
+    const disabledPlatformDomain: StoreDomain = {
+      id: 'dom-plat-disabled',
+      domain: 'disabled-store.matjero.com',
+      is_primary: false,
+      status: 'disabled',
+      domain_type: 'platform',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const api = createMockApi({
+      listStoreDomains: vi.fn().mockResolvedValue({ items: [disabledPlatformDomain] })
+    });
+
+    render(<DomainManagementPanel api={api} storeId="store-1" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('disabled-store.matjero.com')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Disabled by Admin')).toBeInTheDocument();
+    expect(screen.getByText(/disabled by platform administration/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /check verification/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /activate domain/i })).not.toBeInTheDocument();
   });
@@ -205,7 +242,6 @@ describe('DomainManagementPanel', () => {
       expect(screen.getByText(/TXT record not found or not matching yet/i)).toBeInTheDocument();
     });
 
-    // Check Verification button remains available for retry
     expect(screen.getByRole('button', { name: /check verification/i })).toBeInTheDocument();
   });
 
@@ -247,7 +283,6 @@ describe('DomainManagementPanel', () => {
       expect(screen.getByText(/Verification service is temporarily unavailable/i)).toBeInTheDocument();
     });
 
-    // Pending status badge is preserved
     expect(screen.getByText('Pending Verification')).toBeInTheDocument();
   });
 
@@ -390,7 +425,6 @@ describe('DomainManagementPanel', () => {
       expect(screen.getByText('matjero-verification=challenge-a')).toBeInTheDocument();
     });
 
-    // Switch store to store-b
     rerender(<DomainManagementPanel api={api} storeId="store-b" locale="en" copy={mockCopy} />);
 
     await waitFor(() => {
@@ -400,5 +434,218 @@ describe('DomainManagementPanel', () => {
 
     expect(screen.queryByText('store-a.example.com')).not.toBeInTheDocument();
     expect(screen.queryByText('matjero-verification=challenge-a')).not.toBeInTheDocument();
+  });
+
+  // --- MANDATORY DETERMINISTIC ASYNC ISOLATION REGRESSION TESTS ---
+
+  it('guards against out-of-order list loads when switching stores before Store A finishes', async () => {
+    const storeADeferred = createDeferred<{ items: StoreDomain[] }>();
+
+    const storeBDomain: StoreDomain = {
+      id: 'dom-b',
+      domain: 'store-b.example.com',
+      is_primary: false,
+      status: 'pending',
+      domain_type: 'custom',
+      verification: {
+        record_type: 'TXT',
+        record_name: '_matjero-verification.store-b.example.com',
+        record_value: 'matjero-verification=challenge-b'
+      },
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const api = createMockApi({
+      listStoreDomains: vi.fn().mockImplementation((sId: string) => {
+        if (sId === 'store-a') return storeADeferred.promise;
+        if (sId === 'store-b') return Promise.resolve({ items: [storeBDomain] });
+        return Promise.resolve({ items: [] });
+      })
+    });
+
+    // 1. Render Store A -> load stays pending
+    const { rerender } = render(<DomainManagementPanel api={api} storeId="store-a" locale="en" copy={mockCopy} />);
+
+    // 2. Immediately switch to Store B -> Store B resolves
+    rerender(<DomainManagementPanel api={api} storeId="store-b" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+      expect(screen.getByText('matjero-verification=challenge-b')).toBeInTheDocument();
+    });
+
+    // 3. Now resolve the old Store A request with Store A challenge
+    await act(async () => {
+      storeADeferred.resolve({
+        items: [
+          {
+            id: 'dom-a',
+            domain: 'store-a.example.com',
+            is_primary: false,
+            status: 'pending',
+            domain_type: 'custom',
+            verification: {
+              record_type: 'TXT',
+              record_name: '_matjero-verification.store-a.example.com',
+              record_value: 'matjero-verification=challenge-a'
+            },
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z'
+          }
+        ]
+      });
+    });
+
+    // 4. Assert Store B is still shown and Store A data is completely ignored
+    expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+    expect(screen.getByText('matjero-verification=challenge-b')).toBeInTheDocument();
+    expect(screen.queryByText('store-a.example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('matjero-verification=challenge-a')).not.toBeInTheDocument();
+  });
+
+  it('guards against in-flight verify requests when switching stores', async () => {
+    const storeADomain: StoreDomain = {
+      id: 'dom-a',
+      domain: 'store-a.example.com',
+      is_primary: false,
+      status: 'pending',
+      domain_type: 'custom',
+      verification: {
+        record_type: 'TXT',
+        record_name: '_matjero-verification.store-a.example.com',
+        record_value: 'matjero-verification=challenge-a'
+      },
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const storeBDomain: StoreDomain = {
+      id: 'dom-b',
+      domain: 'store-b.example.com',
+      is_primary: false,
+      status: 'pending',
+      domain_type: 'custom',
+      verification: {
+        record_type: 'TXT',
+        record_name: '_matjero-verification.store-b.example.com',
+        record_value: 'matjero-verification=challenge-b'
+      },
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const verifyDeferred = createDeferred<StoreDomain>();
+
+    const api = createMockApi({
+      listStoreDomains: vi.fn().mockImplementation((sId: string) => {
+        if (sId === 'store-a') return Promise.resolve({ items: [storeADomain] });
+        if (sId === 'store-b') return Promise.resolve({ items: [storeBDomain] });
+        return Promise.resolve({ items: [] });
+      }),
+      verifyCustomDomain: vi.fn().mockReturnValue(verifyDeferred.promise)
+    });
+
+    const { rerender } = render(<DomainManagementPanel api={api} storeId="store-a" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('store-a.example.com')).toBeInTheDocument();
+    });
+
+    // Trigger verify on Store A
+    const verifyBtn = screen.getByRole('button', { name: /check verification/i });
+    fireEvent.click(verifyBtn);
+
+    // Switch to Store B while verify is in-flight
+    rerender(<DomainManagementPanel api={api} storeId="store-b" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+    });
+
+    // Resolve old Store A verify call
+    await act(async () => {
+      verifyDeferred.resolve({
+        ...storeADomain,
+        status: 'verified'
+      });
+    });
+
+    // Store B remains active and no Store A notice or challenge leaks
+    expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+    expect(screen.getByText('matjero-verification=challenge-b')).toBeInTheDocument();
+    expect(screen.queryByText('store-a.example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('matjero-verification=challenge-a')).not.toBeInTheDocument();
+  });
+
+  it('guards against in-flight activate requests when switching stores', async () => {
+    const storeADomain: StoreDomain = {
+      id: 'dom-a',
+      domain: 'store-a.example.com',
+      is_primary: false,
+      status: 'verified',
+      domain_type: 'custom',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const storeBDomain: StoreDomain = {
+      id: 'dom-b',
+      domain: 'store-b.example.com',
+      is_primary: false,
+      status: 'pending',
+      domain_type: 'custom',
+      verification: {
+        record_type: 'TXT',
+        record_name: '_matjero-verification.store-b.example.com',
+        record_value: 'matjero-verification=challenge-b'
+      },
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const activateDeferred = createDeferred<StoreDomain>();
+
+    const api = createMockApi({
+      listStoreDomains: vi.fn().mockImplementation((sId: string) => {
+        if (sId === 'store-a') return Promise.resolve({ items: [storeADomain] });
+        if (sId === 'store-b') return Promise.resolve({ items: [storeBDomain] });
+        return Promise.resolve({ items: [] });
+      }),
+      activateCustomDomain: vi.fn().mockReturnValue(activateDeferred.promise)
+    });
+
+    const { rerender } = render(<DomainManagementPanel api={api} storeId="store-a" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /activate domain/i })).toBeInTheDocument();
+    });
+
+    // Open modal and click confirm activate on Store A
+    fireEvent.click(screen.getByRole('button', { name: /activate domain/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/Activate Custom Primary Domain/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /activate primary/i }));
+
+    // Immediately switch to Store B before activate resolves
+    rerender(<DomainManagementPanel api={api} storeId="store-b" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+    });
+
+    // Resolve old Store A activation call
+    await act(async () => {
+      activateDeferred.resolve({
+        ...storeADomain,
+        status: 'active',
+        is_primary: true
+      });
+    });
+
+    // Store B remains active and no Store A success message leaks
+    expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
+    expect(screen.queryByText('store-a.example.com')).not.toBeInTheDocument();
   });
 });
