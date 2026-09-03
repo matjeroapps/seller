@@ -67,6 +67,46 @@ export function createApiClient(config: ApiConfig) {
     },
     async delete(path: string): Promise<Response> {
       return request('DELETE', path);
+    },
+    async listStoreDomains(storeId: string) {
+      const res = await request('GET', `/v1/seller/stores/${encodeURIComponent(storeId)}/domains`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: { code: 'unknown', message: 'Failed to list domains' } }));
+        throw new ApiError(res.status, payload.error?.code || 'unknown', payload.error?.message || 'Failed to list domains');
+      }
+      return res.json();
+    },
+    async requestCustomDomain(storeId: string, domain: string) {
+      const res = await request('POST', `/v1/seller/stores/${encodeURIComponent(storeId)}/domains`, { domain });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: { code: 'unknown', message: 'Failed to request domain' } }));
+        throw new ApiError(res.status, payload.error?.code || 'unknown', payload.error?.message || 'Failed to request domain');
+      }
+      return res.json();
+    },
+    async verifyCustomDomain(storeId: string, domainId: string) {
+      const res = await request('POST', `/v1/seller/stores/${encodeURIComponent(storeId)}/domains/${encodeURIComponent(domainId)}/verify`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: { code: 'unknown', message: 'Failed to verify domain' } }));
+        throw new ApiError(res.status, payload.error?.code || 'unknown', payload.error?.message || 'Failed to verify domain');
+      }
+      return res.json();
+    },
+    async activateCustomDomain(storeId: string, domainId: string) {
+      const res = await request('POST', `/v1/seller/stores/${encodeURIComponent(storeId)}/domains/${encodeURIComponent(domainId)}/activate`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: { code: 'unknown', message: 'Failed to activate domain' } }));
+        throw new ApiError(res.status, payload.error?.code || 'unknown', payload.error?.message || 'Failed to activate domain');
+      }
+      return res.json();
+    },
+    async getStorefrontHost(storeId: string) {
+      const res = await request('GET', `/v1/seller/stores/${encodeURIComponent(storeId)}/storefront-host`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: { code: 'unknown', message: 'Failed to get storefront host' } }));
+        throw new ApiError(res.status, payload.error?.code || 'unknown', payload.error?.message || 'Failed to get storefront host');
+      }
+      return res.json();
     }
   };
 }
