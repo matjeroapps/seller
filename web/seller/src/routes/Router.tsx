@@ -212,11 +212,12 @@ export function Router({
 }
 
 export function parseLocation(hash: string = window.location.hash, pathname: string = window.location.pathname): RouteLocation {
-  if (pathname === '/auth/callback' || pathname.startsWith('/auth/callback')) {
+  const cleanPathname = pathname.replace(/\/$/, '');
+  if (cleanPathname === '/auth/callback') {
     return { path: '/auth/callback', params: {} };
   }
-  const cleanHash = hash.replace(/^#/, '');
-  if (cleanHash === '/auth/callback' || cleanHash.startsWith('/auth/callback')) {
+  const cleanHash = hash.replace(/^#/, '').replace(/\/$/, '');
+  if (cleanHash === '/auth/callback') {
     return { path: '/auth/callback', params: {} };
   }
   if (cleanHash === '/themes') {

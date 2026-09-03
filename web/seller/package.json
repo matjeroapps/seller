@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5174",
     "build": "tsc --noEmit && vite build",
+    "start": "node server.js",
+    "preview": "node server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/check-locales.mjs seller && vitest run"

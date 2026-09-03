@@ -24,6 +24,26 @@ COPY scripts ./scripts
 ARG WORKSPACE=@commerce/seller-web
 RUN npm run build --workspace ${WORKSPACE}
 
+# Seller dashboard runtime.
+#
+# Serves the built Vite static SPA bundle with path-based callback SPA routing fallback (/auth/callback).
+FROM node:24-alpine AS seller
+
+ENV NODE_ENV=production \
+    PORT=5174 \
+    HOSTNAME=0.0.0.0
+
+WORKDIR /app
+
+COPY --from=build --chown=node:node /src/web/seller/dist ./dist
+COPY --from=build --chown=node:node /src/web/seller/server.js ./server.js
+
+USER node
+
+EXPOSE 5174
+
+CMD ["node", "server.js"]
+
 # Storefront runtime.
 #
 # `output: "standalone"` produces a self-contained server plus exactly the dependencies

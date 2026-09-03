@@ -105,3 +105,13 @@ go work init ./core ./seller
 `go.work` and `go.work.sum` are git-ignored so they can never be committed, and
 no repository may require one.
 
+## Authentication & ZITADEL Deployment Requirements
+
+The seller dashboard (`web/seller`) uses OIDC via ZITADEL.
+
+- **Redirect URI**: Must be configured as `https://<seller-domain>/auth/callback` (path-based entry, without URL fragments).
+- **SPA Rewrite Rule**: The static server serving `web/seller/dist` must serve `index.html` for `/auth/callback?code=...&state=...` and other SPA routes, while passing through `/v1/*` API endpoints.
+- **Refresh Token Grant / Silent Renew**: The ZITADEL SPA client configuration must allow the **Refresh Token** grant type and include the `offline_access` scope in allowed scopes for silent session renewal.
+- **Dev Auth Policy**: Missing OIDC config in production fails closed (unauthenticated error state). For local development without ZITADEL, set `VITE_SELLER_DEV_AUTH=true` explicitly in development mode.
+
+

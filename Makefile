@@ -25,6 +25,6 @@ frontend-test:
 
 docker-build:
 	docker build -f docker/go-app.Dockerfile --build-arg APP_PATH=./apps/seller-api -t matjero-seller-api:local .
-	docker build -f docker/web-app.Dockerfile --target build --build-arg WORKSPACE=@commerce/seller-web -t matjero-seller-web:local .
+	docker build -f docker/web-app.Dockerfile --target seller --build-arg WORKSPACE=@commerce/seller-web -t matjero-seller-web:local .
 	docker build -f docker/go-app.Dockerfile --build-arg APP_PATH=./apps/storefront-api -t matjero-storefront-api:local .
 	docker build -f docker/web-app.Dockerfile --target storefront --build-arg WORKSPACE=@commerce/storefront-web -t matjero-storefront-web:local .
