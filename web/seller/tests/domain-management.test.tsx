@@ -648,4 +648,90 @@ describe('DomainManagementPanel', () => {
     expect(screen.getByText('store-b.example.com')).toBeInTheDocument();
     expect(screen.queryByText('store-a.example.com')).not.toBeInTheDocument();
   });
+
+  it('in-flight custom-domain request cannot lock or mutate the next Store', async () => {
+    const storeADomain: StoreDomain = {
+      id: 'dom-plat-a',
+      domain: 'store-a.matjero.com',
+      is_primary: true,
+      status: 'active',
+      domain_type: 'platform',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const storeBDomain: StoreDomain = {
+      id: 'dom-plat-b',
+      domain: 'store-b.matjero.com',
+      is_primary: true,
+      status: 'active',
+      domain_type: 'platform',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    };
+
+    const requestDeferred = createDeferred<StoreDomain>();
+
+    const api = createMockApi({
+      listStoreDomains: vi.fn().mockImplementation((sId: string) => {
+        if (sId === 'store-a') return Promise.resolve({ items: [storeADomain] });
+        if (sId === 'store-b') return Promise.resolve({ items: [storeBDomain] });
+        return Promise.resolve({ items: [] });
+      }),
+      requestCustomDomain: vi.fn().mockReturnValue(requestDeferred.promise)
+    });
+
+    const { rerender } = render(<DomainManagementPanel api={api} storeId="store-a" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('store-a.matjero.com')[0]).toBeInTheDocument();
+    });
+
+    // Enter custom domain for Store A and submit request
+    const input = screen.getByLabelText(/custom domain hostname/i);
+    fireEvent.change(input, { target: { value: 'shop-a.example.com' } });
+
+    const submitBtn = screen.getByRole('button', { name: /request custom domain/i });
+    fireEvent.click(submitBtn);
+
+    // Verify requestCustomDomain was called with Store A
+    expect(api.requestCustomDomain).toHaveBeenCalledWith('store-a', 'shop-a.example.com');
+    expect(submitBtn).toBeDisabled();
+
+    // Switch to Store B while request is in-flight
+    rerender(<DomainManagementPanel api={api} storeId="store-b" locale="en" copy={mockCopy} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('store-b.matjero.com')[0]).toBeInTheDocument();
+    });
+
+    // Store B form input and button must NOT be stuck requesting/disabled
+    const storeBInput = screen.getByLabelText(/custom domain hostname/i) as HTMLInputElement;
+    expect(storeBInput.disabled).toBe(false);
+    expect(storeBInput.value).toBe('');
+
+    // Now resolve old Store A request
+    await act(async () => {
+      requestDeferred.resolve({
+        id: 'dom-cust-a',
+        domain: 'shop-a.example.com',
+        is_primary: false,
+        status: 'pending',
+        domain_type: 'custom',
+        verification: {
+          record_type: 'TXT',
+          record_name: '_matjero-verification.shop-a.example.com',
+          record_value: 'matjero-verification=secret-a'
+        },
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z'
+      });
+    });
+
+    // Store B UI remains authoritative and form remains usable
+    expect(screen.getAllByText('store-b.matjero.com')[0]).toBeInTheDocument();
+    expect(screen.queryByText('shop-a.example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('matjero-verification=secret-a')).not.toBeInTheDocument();
+    expect((screen.getByLabelText(/custom domain hostname/i) as HTMLInputElement).disabled).toBe(false);
+  });
 });

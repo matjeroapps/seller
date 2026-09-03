@@ -33,8 +33,9 @@ export function DomainManagementPanel({
   // Activation modal state
   const [activateTarget, setActivateTarget] = React.useState<StoreDomain | null>(null);
 
-  // Copy state for TXT values
+  // Copy state for TXT values & timer ref
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
+  const copyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Store generation guard to prevent async response races across store switches
   const generationRef = React.useRef<number>(0);
@@ -68,14 +69,20 @@ export function DomainManagementPanel({
     [api, storeId]
   );
 
-  // Store switch isolation: increment generation and reset all state immediately
+  // Store switch isolation: increment generation and reset all state immediately (including isRequesting)
   React.useEffect(() => {
     generationRef.current += 1;
     const currentGen = generationRef.current;
 
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = null;
+    }
+
     setDomains([]);
     setStorefrontHost('');
     setNewDomain('');
+    setIsRequesting(false);
     setFormError(null);
     setError(null);
     setNotice(null);
@@ -86,6 +93,15 @@ export function DomainManagementPanel({
 
     void loadDataForStore(storeId, currentGen);
   }, [storeId, loadDataForStore]);
+
+  // Clean up copy timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleRequestDomain = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,7 +208,13 @@ export function DomainManagementPanel({
     if (navigator.clipboard) {
       void navigator.clipboard.writeText(text);
       setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 2000);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopiedKey(null);
+        copyTimeoutRef.current = null;
+      }, 2000);
     }
   };
 
