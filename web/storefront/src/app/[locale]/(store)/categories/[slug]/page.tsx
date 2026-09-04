@@ -13,21 +13,25 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { locale, slug } = await params;
-  const presentation = await loadPresentation(locale);
-  const category = await storefrontClient().category(presentation.host, presentation.locale, slug);
-  const origin = await requestOrigin(presentation.host);
+  try {
+    const { locale, slug } = await params;
+    const presentation = await loadPresentation(locale);
+    const category = await storefrontClient().category(presentation.host, presentation.locale, slug);
+    const origin = await requestOrigin(presentation.host);
 
-  return await metadataForPage({
-    host: presentation.host,
-    store: presentation.store,
-    locale: presentation.locale,
-    page: 'category',
-    slug,
-    title: `${category.name} | ${presentation.store.store_name}`,
-    description: categoryDescription(category, presentation.store),
-    origin
-  });
+    return await metadataForPage({
+      host: presentation.host,
+      store: presentation.store,
+      locale: presentation.locale,
+      page: 'category',
+      slug,
+      title: `${category.name} | ${presentation.store.store_name}`,
+      description: categoryDescription(category, presentation.store),
+      origin
+    });
+  } catch {
+    return {};
+  }
 }
 
 /**

@@ -12,22 +12,26 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { locale, slug } = await params;
-  const presentation = await loadPresentation(locale);
-  const product = await storefrontClient().product(presentation.host, presentation.locale, slug);
-  const origin = await requestOrigin(presentation.host);
+  try {
+    const { locale, slug } = await params;
+    const presentation = await loadPresentation(locale);
+    const product = await storefrontClient().product(presentation.host, presentation.locale, slug);
+    const origin = await requestOrigin(presentation.host);
 
-  return await metadataForPage({
-    host: presentation.host,
-    store: presentation.store,
-    locale: presentation.locale,
-    page: 'product',
-    slug,
-    title: `${product.name} | ${presentation.store.store_name}`,
-    description: product.description,
-    images: product.images.map((image) => image.uri),
-    origin
-  });
+    return await metadataForPage({
+      host: presentation.host,
+      store: presentation.store,
+      locale: presentation.locale,
+      page: 'product',
+      slug,
+      title: `${product.name} | ${presentation.store.store_name}`,
+      description: product.description,
+      images: (product.images || []).map((image) => image.uri),
+      origin
+    });
+  } catch {
+    return {};
+  }
 }
 
 /**

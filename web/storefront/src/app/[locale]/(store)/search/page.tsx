@@ -9,20 +9,24 @@ import { currentPreviewToken, storefrontClient } from '../../../../server/store-
 import { metadataForPage, requestOrigin } from '../../../../server/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-  const { locale } = await params;
-  const presentation = await loadPresentation(locale);
-  const origin = await requestOrigin(presentation.host);
+  try {
+    const { locale } = await params;
+    const presentation = await loadPresentation(locale);
+    const origin = await requestOrigin(presentation.host);
 
-  return await metadataForPage({
-    host: presentation.host,
-    store: presentation.store,
-    locale: presentation.locale,
-    page: 'search',
-    title: `${presentation.context.copy.search.heading} | ${presentation.store.store_name}`,
-    description: presentation.context.copy.search.heading,
-    indexable: false,
-    origin
-  });
+    return await metadataForPage({
+      host: presentation.host,
+      store: presentation.store,
+      locale: presentation.locale,
+      page: 'search',
+      title: `${presentation.context.copy.search.heading} | ${presentation.store.store_name}`,
+      description: presentation.context.copy.search.heading,
+      indexable: false,
+      origin
+    });
+  } catch {
+    return {};
+  }
 }
 
 /**

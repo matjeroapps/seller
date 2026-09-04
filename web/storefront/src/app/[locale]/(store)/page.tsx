@@ -7,20 +7,24 @@ import { toHomeModel, toProductCard, topLevelCategories } from '../../../lib/vie
 import type { HomeViewModel } from '../../../themes/contract';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-  const { locale } = await params;
-  const presentation = await loadPresentation(locale);
-  const tagline = presentation.store.settings.tagline;
-  const origin = await requestOrigin(presentation.host);
+  try {
+    const { locale } = await params;
+    const presentation = await loadPresentation(locale);
+    const tagline = presentation.store.settings.tagline;
+    const origin = await requestOrigin(presentation.host);
 
-  return await metadataForPage({
-    host: presentation.host,
-    store: presentation.store,
-    locale: presentation.locale,
-    page: 'home',
-    title: presentation.store.store_name,
-    description: typeof tagline === 'string' ? tagline : undefined,
-    origin
-  });
+    return await metadataForPage({
+      host: presentation.host,
+      store: presentation.store,
+      locale: presentation.locale,
+      page: 'home',
+      title: presentation.store.store_name,
+      description: typeof tagline === 'string' ? tagline : undefined,
+      origin
+    });
+  } catch {
+    return {};
+  }
 }
 
 /**
