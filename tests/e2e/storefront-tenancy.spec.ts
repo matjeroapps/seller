@@ -61,6 +61,30 @@ test.describe('Storefront Multi-Tenant Isolation', () => {
     expect(contentB2).toContain(STORE_B_MARKER);
   });
 
+  test('Catalog and Search routes tenant isolation', async ({ page }) => {
+    // 1. Catalog route on Store A vs Store B
+    await page.goto(`${STORE_A_BASE_URL}/en/products`);
+    const catalogA = await page.content();
+    expect(catalogA).toContain('Product A');
+    expect(catalogA).not.toContain('Product B');
+
+    await page.goto(`${STORE_B_BASE_URL}/ar/products`);
+    const catalogB = await page.content();
+    expect(catalogB).toContain('Product B');
+    expect(catalogB).not.toContain('Product A');
+
+    // 2. Search route on Store A vs Store B
+    await page.goto(`${STORE_A_BASE_URL}/en/search?q=Product`);
+    const searchA = await page.content();
+    expect(searchA).toContain('Product A');
+    expect(searchA).not.toContain('Product B');
+
+    await page.goto(`${STORE_B_BASE_URL}/ar/search?q=Product`);
+    const searchB = await page.content();
+    expect(searchB).toContain('Product B');
+    expect(searchB).not.toContain('Product A');
+  });
+
   test('Same-path under two stores returns store-specific content and pricing', async ({ page }) => {
     // Store A shared product page
     await page.goto(`${STORE_A_BASE_URL}/en/products/shared-slug`);

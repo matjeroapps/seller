@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../lib/catalog-query';
 import { toProductListModel } from '../../../../lib/view-models';
 import { isStorefrontApiError } from '../../../../lib/api';
-import { loadPresentation } from '../../../../server/presentation';
+import { isExpectedMetadataError, loadPresentation } from '../../../../server/presentation';
 import { currentPreviewToken, storefrontClient } from '../../../../server/store-context';
 import { metadataForPage, requestOrigin } from '../../../../server/seo';
 
@@ -23,8 +23,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       description: presentation.context.copy.products.title,
       origin
     });
-  } catch {
-    return {};
+  } catch (error) {
+    if (isExpectedMetadataError(error)) {
+      return {};
+    }
+    throw error;
   }
 }
 

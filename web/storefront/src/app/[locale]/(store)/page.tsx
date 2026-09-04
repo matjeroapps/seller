@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { loadPresentation } from '../../../server/presentation';
+import { isExpectedMetadataError, loadPresentation } from '../../../server/presentation';
 import { currentPreviewToken, storefrontClient } from '../../../server/store-context';
 import { metadataForPage, requestOrigin } from '../../../server/seo';
 import { toHomeModel, toProductCard, topLevelCategories } from '../../../lib/view-models';
@@ -22,8 +22,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       description: typeof tagline === 'string' ? tagline : undefined,
       origin
     });
-  } catch {
-    return {};
+  } catch (error) {
+    if (isExpectedMetadataError(error)) {
+      return {};
+    }
+    throw error;
   }
 }
 

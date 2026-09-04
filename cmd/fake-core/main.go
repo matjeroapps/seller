@@ -37,11 +37,12 @@ type storeData struct {
 }
 
 type fakeCoreServer struct {
-	mu          sync.RWMutex
-	expectedTok string
-	unavailable atomic.Bool
-	callCounts  map[string]int64
-	stores      map[string]*storeData
+	mu                 sync.RWMutex
+	expectedTok        string
+	unavailable        atomic.Bool
+	extraFieldsEnabled atomic.Bool
+	callCounts         map[string]int64
+	stores             map[string]*storeData
 }
 
 func newServer(token string) *fakeCoreServer {
@@ -59,6 +60,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 	defer s.mu.Unlock()
 
 	s.unavailable.Store(false)
+	s.extraFieldsEnabled.Store(false)
 	s.callCounts = make(map[string]int64)
 	s.stores = map[string]*storeData{
 		"store-a.localhost": {
@@ -79,7 +81,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 			theme: map[string]any{
 				"key":                    "matjero-default",
 				"version":                "1.0.0",
-				"configuration":          map[string]any{"hero": map[string]any{"title": "Store A Title STORE_A_THEME_MARKER"}},
+				"configuration":          map[string]any{"hero": map[string]any{"title": "Store A Title STORE_A_THEME_MARKER <img src=x onerror=\"window.__MATJERO_XSS__='theme'\"><script>window.__MATJERO_XSS__='theme-script'</script>"}},
 				"configuration_revision": 1,
 			},
 			draftTheme: map[string]any{
@@ -103,7 +105,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 					"slug":         "product-a",
 					"name":         "Product A",
 					"summary":      "Product A Summary STORE_A_ONLY_MARKER",
-					"description":  "Product A Description <script>alert('xss')</script>",
+					"description":  "Product A Description <script>window.__MATJERO_XSS__='product-script'</script><img src=x onerror=\"window.__MATJERO_XSS__='product-img'\">",
 					"availability": "in_stock",
 					"price": map[string]any{
 						"amount_minor": int64(10000),
@@ -307,7 +309,7 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"error": map[string]any{
-				"code":    "service_unavailable",
+				"code":    "unavailable",
 				"message": "fake core is temporarily unavailable",
 			},
 		})
@@ -514,6 +516,13 @@ func (s *fakeCoreServer) cleanPublicProduct(p map[string]any) map[string]any {
 		}
 		out[k] = v
 	}
+	if s.extraFieldsEnabled.Load() {
+		out["supplier_id"] = "SUPPLIER_FORBIDDEN_MARKER"
+		out["supplier_contact"] = "SUPPLIER_CONTACT_FORBIDDEN"
+		out["supplier_offer_id"] = "OFFER_FORBIDDEN_MARKER"
+		out["wholesale_price_minor"] = 5000
+		out["supplier_margin_minor"] = 5000
+	}
 	return out
 }
 
@@ -526,6 +535,21 @@ func (s *fakeCoreServer) handleControlPlane(w http.ResponseWriter, r *http.Reque
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"calls": s.callCounts,
 		})
+
+	case "/test-control/extra-fields":
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		s.extraFieldsEnabled.Store(req.Enabled)
+		_ = json.NewEncoder(w).Encode(map[string]any{"enabled": s.extraFieldsEnabled.Load()})
 
 	case "/test-control/revision":
 		if r.Method != http.MethodPost {

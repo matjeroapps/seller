@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 
 import { isStorefrontApiError } from '../../../../../lib/api';
 import { toProductDetailModel } from '../../../../../lib/view-models';
-import { loadPresentation } from '../../../../../server/presentation';
+import { isExpectedMetadataError, loadPresentation } from '../../../../../server/presentation';
 import { currentPreviewToken, storefrontClient } from '../../../../../server/store-context';
 import { metadataForPage, productJsonLd, requestOrigin } from '../../../../../server/seo';
 
@@ -29,8 +29,11 @@ export async function generateMetadata({
       images: (product.images || []).map((image) => image.uri),
       origin
     });
-  } catch {
-    return {};
+  } catch (error) {
+    if (isExpectedMetadataError(error)) {
+      return {};
+    }
+    throw error;
   }
 }
 
@@ -78,7 +81,7 @@ export default async function ProductPage({
       {jsonLd ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
         />
       ) : null}
     </>

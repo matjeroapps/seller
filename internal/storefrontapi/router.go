@@ -147,6 +147,8 @@ func writeStorefrontError(w http.ResponseWriter, err error) {
 			httpx.WriteError(w, http.StatusNotFound, "storefront_unavailable", "storefront not available")
 		case coreclient.CodePreviewUnavailable:
 			httpx.WriteError(w, http.StatusServiceUnavailable, "preview_unavailable", "preview unavailable")
+		case coreclient.CodeUnavailable:
+			httpx.WriteError(w, http.StatusServiceUnavailable, "service_unavailable", "service temporarily unavailable")
 		case coreclient.CodeNotFound:
 			httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
 		case coreclient.CodeValidationError, coreclient.CodeInvalidArgument, coreclient.CodeSchemaMismatch, coreclient.CodeUnsafeContent:

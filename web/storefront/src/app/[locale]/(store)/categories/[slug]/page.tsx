@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { isStorefrontApiError } from '../../../../../lib/api';
 import { parseCatalogParams, toCatalogQuery, type SearchParamsInput } from '../../../../../lib/catalog-query';
 import { categoryHref, toCategoryModel, toProductListModel } from '../../../../../lib/view-models';
-import { loadPresentation } from '../../../../../server/presentation';
+import { isExpectedMetadataError, loadPresentation } from '../../../../../server/presentation';
 import { currentPreviewToken, storefrontClient } from '../../../../../server/store-context';
 import { metadataForPage, categoryDescription, requestOrigin } from '../../../../../server/seo';
 
@@ -29,8 +29,11 @@ export async function generateMetadata({
       description: categoryDescription(category, presentation.store),
       origin
     });
-  } catch {
-    return {};
+  } catch (error) {
+    if (isExpectedMetadataError(error)) {
+      return {};
+    }
+    throw error;
   }
 }
 
