@@ -5,8 +5,11 @@ import {
   STORE_A_MARKER,
   STORE_B_MARKER,
   STOREFRONT_API_URL,
+  PRIVACY_EXTRA_FIELDS_REVISION,
   setCoreUnavailable,
   setExtraFieldsMode,
+  setRevision,
+  getExtraFieldEmissions,
   resetFakeCore,
 } from './support/fixtures';
 
@@ -116,30 +119,41 @@ test.describe('Storefront Security & Privacy Regression', () => {
   });
 
   test('Seller public boundary privacy: raw extra internal fields are NEVER proxied to public HTML/JSON', async ({ page, request }) => {
-    // Enable extra internal fields on Fake Core (supplier_id, wholesale_price_minor, etc.)
+    // 1. Enable extra internal fields on Fake Core (supplier_id, wholesale_price_minor, etc.)
     await setExtraFieldsMode(true);
 
-    // 1. Fetch public product detail page HTML
-    await page.goto(`${STORE_A_BASE_URL}/en/products/product-a`);
-    const html = await page.content();
+    // 2. Set a unique revision to guarantee an uncached Redis lookup
+    await setRevision('store-a.localhost', PRIVACY_EXTRA_FIELDS_REVISION);
 
-    expect(html).not.toContain('SUPPLIER_FORBIDDEN_MARKER');
-    expect(html).not.toContain('SUPPLIER_CONTACT_FORBIDDEN');
-    expect(html).not.toContain('OFFER_FORBIDDEN_MARKER');
-    expect(html).not.toContain('wholesale_price_minor');
-    expect(html).not.toContain('supplier_margin_minor');
+    const emissionsBefore = await getExtraFieldEmissions();
 
-    // 2. Fetch public storefront-api JSON response directly
+    // 3. Fetch public storefront-api JSON response directly (uncached revision)
     const apiRes = await request.get(`${STOREFRONT_API_URL}/v1/storefront/products/product-a`, {
       headers: { Host: 'store-a.localhost' },
     });
     expect(apiRes.status()).toBe(200);
     const apiText = await apiRes.text();
 
+    const emissionsAfter = await getExtraFieldEmissions();
+    expect(emissionsAfter).toBeGreaterThan(emissionsBefore);
+
+    // Prove storefront-api stripped the raw extra fields before returning JSON
     expect(apiText).not.toContain('SUPPLIER_FORBIDDEN_MARKER');
     expect(apiText).not.toContain('SUPPLIER_CONTACT_FORBIDDEN');
     expect(apiText).not.toContain('OFFER_FORBIDDEN_MARKER');
     expect(apiText).not.toContain('wholesale_price_minor');
+    expect(apiText).not.toContain('supplier_margin_minor');
+
+    // 4. Fetch Next.js rendered product detail page HTML (uses sanitized cached response)
+    await page.goto(`${STORE_A_BASE_URL}/en/products/product-a`);
+    const html = await page.content();
+
+    expect(html).toContain('Product A');
+    expect(html).not.toContain('SUPPLIER_FORBIDDEN_MARKER');
+    expect(html).not.toContain('SUPPLIER_CONTACT_FORBIDDEN');
+    expect(html).not.toContain('OFFER_FORBIDDEN_MARKER');
+    expect(html).not.toContain('wholesale_price_minor');
+    expect(html).not.toContain('supplier_margin_minor');
 
     // Clean up extra fields mode
     await setExtraFieldsMode(false);

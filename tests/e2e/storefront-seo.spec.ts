@@ -92,16 +92,22 @@ test.describe('Storefront SEO & Sitemap Isolation', () => {
     await page.goto(`${STORE_B_BASE_URL}/ar`);
     const bHreflangAr = page.locator('link[rel="alternate"][hreflang="ar"]');
     const bHreflangEn = page.locator('link[rel="alternate"][hreflang="en"]');
+    const bHreflangDefault = page.locator('link[rel="alternate"][hreflang="x-default"]');
 
     await expect(bHreflangAr).toHaveCount(1);
     await expect(bHreflangEn).toHaveCount(1);
+    await expect(bHreflangDefault).toHaveCount(1);
 
     const bHrefAr = await bHreflangAr.getAttribute('href');
     const bHrefEn = await bHreflangEn.getAttribute('href');
+    const bHrefDefault = await bHreflangDefault.getAttribute('href');
+
     expect(bHrefAr).toContain('store-b.localhost/ar');
     expect(bHrefEn).toContain('store-b.localhost/en');
+    expect(bHrefDefault).toContain('store-b.localhost/ar');
     expect(bHrefAr).not.toContain('store-a.localhost');
     expect(bHrefEn).not.toContain('store-a.localhost');
+    expect(bHrefDefault).not.toContain('store-a.localhost');
   });
 
   test('OpenGraph metadata existence and tenant isolation', async ({ page }) => {
@@ -128,16 +134,21 @@ test.describe('Storefront SEO & Sitemap Isolation', () => {
     await page.goto(`${STORE_A_BASE_URL}/en`);
     const twitterCard = page.locator('meta[name="twitter:card"]');
     const twitterTitle = page.locator('meta[name="twitter:title"]');
+    const twitterDescription = page.locator('meta[name="twitter:description"]');
 
     await expect(twitterCard).toHaveCount(1);
     await expect(twitterTitle).toHaveCount(1);
+    await expect(twitterDescription).toHaveCount(1);
 
     const cardVal = await twitterCard.getAttribute('content');
     const titleVal = await twitterTitle.getAttribute('content');
+    const descVal = await twitterDescription.getAttribute('content');
 
     expect(cardVal).toBeTruthy();
     expect(titleVal).toContain('Store A');
     expect(titleVal).not.toContain('Store B');
+    expect(descVal).toBeTruthy();
+    expect(descVal).not.toContain('Store B');
   });
 
   test('Product JSON-LD existence, structure and privacy isolation', async ({ page }) => {
@@ -186,6 +197,7 @@ test.describe('Storefront SEO & Sitemap Isolation', () => {
     await expect(robotsLocator).toHaveCount(1);
     const robotsContent = await robotsLocator.getAttribute('content');
     expect(robotsContent).toContain('noindex');
+    expect(robotsContent).toContain('nofollow');
 
     // Product JSON-LD must be suppressed on preview
     await page.goto(`${STORE_A_BASE_URL}/en/products/product-a?theme_preview=valid-preview-token-store-a`);

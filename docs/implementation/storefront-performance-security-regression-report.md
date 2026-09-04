@@ -5,7 +5,7 @@
 - **Seller Base SHA**: `1354a9ab2d4e001b5ac5ac13aaac958aa69505c7`
 - **Core Reference SHA**: `a466e5166e844a64215362c288f3c353f702d7a2`
 - **PR**: https://github.com/matjeroapps/seller/pull/12
-- **Test Suite Status**: SELLER E2E CONTRACT/TRANSPORT TEST (Playwright 36/36 PASS)
+- **Test Suite Status**: SELLER E2E CONTRACT/TRANSPORT TEST (Playwright 41/41 PASS)
 
 ---
 
@@ -41,20 +41,20 @@ Playwright suite (`tests/e2e/storefront-seo.spec.ts`) strictly enforces non-cond
    - Exactly one `link[rel="canonical"]` required per page.
    - Must use resolved tenant host (`store-a.localhost`), never Store B host, with valid locale/path.
 2. **Language Alternates (`hreflang`)**:
-   - `hreflang="en"`, `hreflang="ar"`, and `hreflang="x-default"` links are strictly required.
-   - Every alternate URL uses the resolved host and matches the tenant locale routing matrix.
-3. **OpenGraph Metadata (`og:url`, `og:site_name`, `og:title`, etc.)**:
+   - Mandatory `hreflang="en"`, `hreflang="ar"`, and `hreflang="x-default"` links verified for both Store A and Store B.
+   - Every alternate URL strictly uses the target store's host and matches the tenant locale routing matrix (`store-a.localhost/en`, `store-a.localhost/ar`, `store-b.localhost/ar`, `store-b.localhost/en`).
+3. **OpenGraph Metadata (`og:url`, `og:site_name`, `og:title`)**:
    - `meta[property="og:url"]` required; must equal host-resolved canonical URL.
    - `og:site_name` matches store name (`Store A` / `Store B`).
-4. **Twitter Cards (`twitter:card`)**:
-   - `meta[name="twitter:card"]` required (`summary_large_image`).
+4. **Twitter Cards & Description (`twitter:card`, `twitter:title`, `twitter:description`)**:
+   - Mandatory `meta[name="twitter:card"]` (`summary_large_image`), `twitter:title`, and `twitter:description`.
    - Title and description verified for tenant isolation.
 5. **Product JSON-LD (`script[type="application/ld+json"]`)**:
    - Parsed JSON `@type` must be `Product`.
    - `name`, `url` (host-scoped), `offers.price`, and `offers.priceCurrency` verified.
    - Verified strict absence of `supplier_id`, `supplier_offer_id`, `wholesale_price`, `margin`, or Store B host.
 6. **Preview SEO Safety**:
-   - Preview pages require `robots` tag equal to `noindex, nofollow`.
+   - Preview pages require `robots` tag containing both `noindex` and `nofollow` (`content="noindex, nofollow"`).
    - Product JSON-LD is intentionally suppressed on preview pages.
 
 ---
@@ -77,30 +77,27 @@ During P4.9 hardening, Playwright tests identified three production metadata/rou
 
 3. **Core Outage Service Unavailable Mapping (`internal/storefrontapi/router.go`)**:
    - **Bug Discovered**: Core unavailability returned HTTP 500 Internal Server Error instead of the mandated HTTP 503.
-   - **Root Cause**: `router.go` `writeStorefrontError` missed a explicit case for `coreclient.CodeUnavailable`.
+   - **Root Cause**: `router.go` `writeStorefrontError` missed an explicit case for `coreclient.CodeUnavailable`.
    - **Files Changed**: `internal/storefrontapi/router.go` & `cmd/fake-core/main.go`.
    - **Safe Behavior**: Mapped `coreclient.CodeUnavailable` explicitly to `http.StatusServiceUnavailable` (503).
 
 ---
 
-## 5. Security, Privacy & XSS Assertions
+## 5. Security, Privacy & Extra-Field Emissions Proof
 
-1. **Theme XSS Proof**:
-   - Malicious theme title fixtures containing script tags (`<script>window.__MATJERO_XSS__='theme-script'</script>`) and event handlers (`<img src=x onerror="window.__MATJERO_XSS__='theme'">`) rendered through normal React theme components.
-   - Execution marker `window.__MATJERO_XSS__` remained `undefined`. No inline event handlers or active attacker script elements executed in the DOM.
-2. **Product Content XSS Proof**:
-   - Malicious product name/description fixtures (`<svg onload="window.__MATJERO_XSS__='product-svg'">`) tested.
-   - Execution marker `window.__MATJERO_XSS__` remained `undefined`.
-3. **Seller Transport Privacy & Defense-in-Depth**:
-   - **Core Privacy Claim (Separation)**: Core PostgreSQL & API internal privacy rules are proven separately by Core's unit/integration test suites.
-   - **Seller Defense-in-Depth**: Verified via Fake Core `/test-control/extra-fields` endpoint where Fake Core injects raw upstream fields (`supplier_id`, `supplier_contact`, `supplier_offer_id`, `wholesale_price_minor`, `supplier_margin_minor`).
-   - Verified that Next.js rendered HTML, RSC payloads, and storefront-api JSON responses contain **zero forbidden markers**, proving Seller's local typed DTO boundary does not proxy unknown upstream internal fields.
-4. **Cross-Store IDOR**:
-   - Requesting Store A host + Store B product slug returns HTTP 404 without Store B content or internal markers.
-5. **Category Path Isolation**:
-   - Unknown category slugs and Store B-only category slugs on Store A host return clean HTTP 404 pages.
-6. **Host Normalization**:
-   - Inbound hosts with upper/mixed case (`STORE-A.LOCALHOST`) or explicit ports (`store-a.localhost:3000`) resolve to normalized `store-a.localhost`.
+1. **Extra-Fields Privacy Proof (Uncached Revision + Emissions Counter)**:
+   - **False-Positive Prevention**: To prevent testing against pre-existing Redis entries from prior test runs, `setExtraFieldsMode(true)` assigns a unique revision (`PRIVACY_EXTRA_FIELDS_REVISION = 91001`).
+   - **Emissions Proof**: Fake Core maintains a dedicated counter (`GET /test-control/extra-field-emissions`). In the test, `emissionsAfter > emissionsBefore` strictly proves that `storefront-api` issued a live call to Fake Core and received raw extra fields (`supplier_id`, `supplier_contact`, `supplier_offer_id`, `wholesale_price_minor`, `supplier_margin_minor`).
+   - **Sanitization & Cache Invariant**: `storefront-api` stripped the raw extra fields from public JSON, cached the sanitized response in Redis, and Next.js rendered safe product HTML containing zero forbidden fields or markers.
+2. **Core Privacy Claim (Separation)**:
+   - Core PostgreSQL & API internal privacy rules are proven separately by Core's unit/integration test suites.
+   - Seller proves defense-in-depth transport privacy at its public DTO boundary.
+3. **Theme & Product XSS Safety**:
+   - Malicious theme title fixtures (`<script>window.__MATJERO_XSS__='theme-script'</script>`) and product content (`<svg onload="...">`) rendered through normal React components. Execution marker `window.__MATJERO_XSS__` remained `undefined` with zero script execution.
+4. **Cross-Store IDOR & Category Isolation**:
+   - Store A host + Store B product slug or rival category slug strictly returns HTTP 404 with zero Store B data leakage.
+5. **Host Normalization**:
+   - Inbound upper/mixed case hosts (`STORE-A.LOCALHOST`) and explicit ports (`store-a.localhost:3000`) resolve to normalized `store-a.localhost`.
 
 ---
 
@@ -110,30 +107,32 @@ During P4.9 hardening, Playwright tests identified three production metadata/rou
 2. **Revision Invalidation & Store B Unaffected Proof**:
    - Warm Store A and Store B caches.
    - Bump Store A revision only.
-   - Request Store A: Cash invalidated, triggers fresh Core payload call.
+   - Request Store A: Cache invalidated, triggers fresh Core payload call.
    - Request Store B: Served directly from Redis cache; Store B payload call counter does not increment.
    - Proves tenant revision namespaces are fully isolated (`tenant:{store_id}:rev:{rev_id}`).
 
 ---
 
-## 7. Performance Critical-Path Findings & Call Counts
+## 7. Measured Page-Level Performance & Core Call Counts
 
-Measurements taken using deterministic Fake Core endpoint call counters:
+Measurements captured using deterministic Fake Core call counters (`GET /test-control/calls`) with counter resets (`POST /test-control/calls/reset`) on dedicated revisions:
 
-| Path | Cold Core Calls | Warm Core Calls | Cacheable? | Performance Finding |
-| :--- | :---: | :---: | :---: | :--- |
-| **Home (`/`)** | 1 Rev Probe + 1 Payload | 1 Rev Probe + 0 Payload | Yes | Sub-millisecond warm render; zero duplicate payload calls. |
-| **Catalog (`/en/products`)** | 1 Rev Probe + 1 Payload | 1 Rev Probe + 0 Payload | Yes | Paginated product list cached per host + query parameters. |
-| **Product Detail (`/en/products/[slug]`)** | 1 Rev Probe + 1 Payload | 1 Rev Probe + 0 Payload | Yes | Single payload fetch hydrates both UI components and JSON-LD script. |
-| **Search (`/en/search?q=...`)** | 1 Rev Probe + 1 Payload | 1 Rev Probe + 0 Payload | Yes | Query-indexed cache prevents redundant Core search lookups. |
-| **Sitemap (`/sitemap.xml`)** | 1 Rev Probe + 1 Payload | 1 Rev Probe + 0 Payload | Yes | Deterministic tenant-filtered URL listing generated from cache. |
-| **Theme Bootstrap / Preview** | 1 Payload (Direct) | Uncached | No | `Cache-Control: private, no-store`, `robots: noindex, nofollow` prevents cache poisoning. |
+| Path | Cold Rev Probes | Cold Payload Calls | Warm Rev Probes | Warm Payload Calls | Observed Payload Endpoints | Caching Finding |
+| :--- | :---: | :---: | :---: | :---: | :--- | :--- |
+| **Home (`/en`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products` | Store metadata, categories, and featured products cached in Redis. |
+| **Catalog (`/en/products`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products` | Page bootstrap and catalog list cached per host + query key. |
+| **Product Detail (`/en/products/product-a`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products/product-a` | Bootstrap & product detail cached; JSON-LD derived from cached DTO. |
+| **Search (`/en/search?q=Product`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/search` | Bootstrap & search result query cached in Redis. |
+| **Sitemap (`/sitemap.xml`)** | 1 | 5 | 1 | 0 | `/store`, `/categories`, `/products` | Sitemap fetches store, categories & products across supported locales; cached in Redis. |
+| **Theme Preview** | N/A | 1 (Direct) | N/A | Uncached | `/store` | `Cache-Control: private, no-store`, `robots: noindex, nofollow` prevents cache poisoning. |
+
+*Note: Performance measurements assert deterministic structural invariants (warm payload calls == 0, revision probe count == 1) rather than unstable wall-clock timing.*
 
 ---
 
 ## 8. Verification Matrix & CI Status
 
-- **Playwright Test Count**: 36 / 36 PASSING
+- **Playwright Test Count**: 41 / 41 PASSING
 - **Go Backend Tests**: `GOWORK=off go test -count=1 ./...` — PASS
 - **Go Vet & Format**: `gofmt -l`, `go vet ./...` — PASS
 - **Frontend Typecheck & Tests**: `npm run typecheck`, `npm run test` — PASS (190 unit tests passing)

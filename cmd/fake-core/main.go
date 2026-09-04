@@ -37,12 +37,13 @@ type storeData struct {
 }
 
 type fakeCoreServer struct {
-	mu                 sync.RWMutex
-	expectedTok        string
-	unavailable        atomic.Bool
-	extraFieldsEnabled atomic.Bool
-	callCounts         map[string]int64
-	stores             map[string]*storeData
+	mu                  sync.RWMutex
+	expectedTok         string
+	unavailable         atomic.Bool
+	extraFieldsEnabled  atomic.Bool
+	extraFieldEmissions atomic.Uint64
+	callCounts          map[string]int64
+	stores              map[string]*storeData
 }
 
 func newServer(token string) *fakeCoreServer {
@@ -61,6 +62,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 
 	s.unavailable.Store(false)
 	s.extraFieldsEnabled.Store(false)
+	s.extraFieldEmissions.Store(0)
 	s.callCounts = make(map[string]int64)
 	s.stores = map[string]*storeData{
 		"store-a.localhost": {
@@ -517,6 +519,7 @@ func (s *fakeCoreServer) cleanPublicProduct(p map[string]any) map[string]any {
 		out[k] = v
 	}
 	if s.extraFieldsEnabled.Load() {
+		s.extraFieldEmissions.Add(1)
 		out["supplier_id"] = "SUPPLIER_FORBIDDEN_MARKER"
 		out["supplier_contact"] = "SUPPLIER_CONTACT_FORBIDDEN"
 		out["supplier_offer_id"] = "OFFER_FORBIDDEN_MARKER"
@@ -534,6 +537,21 @@ func (s *fakeCoreServer) handleControlPlane(w http.ResponseWriter, r *http.Reque
 		defer s.mu.RUnlock()
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"calls": s.callCounts,
+		})
+
+	case "/test-control/calls/reset":
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		s.mu.Lock()
+		s.callCounts = make(map[string]int64)
+		s.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "calls_reset_complete"})
+
+	case "/test-control/extra-field-emissions":
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"emissions": s.extraFieldEmissions.Load(),
 		})
 
 	case "/test-control/extra-fields":
