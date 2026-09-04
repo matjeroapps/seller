@@ -9,12 +9,9 @@ export const STORE_B_MARKER = 'STORE_B_ONLY_MARKER';
 export const FAKE_CORE_CONTROL_URL = process.env.FAKE_CORE_CONTROL_URL || 'http://127.0.0.1:18080';
 export const STOREFRONT_API_URL = process.env.STOREFRONT_API_BASE_URL || 'http://127.0.0.1:8080';
 
-export const PRIVACY_EXTRA_FIELDS_REVISION = 91001;
-export const PERF_REVISION_HOME = 92001;
-export const PERF_REVISION_CATALOG = 92002;
-export const PERF_REVISION_PRODUCT = 92003;
-export const PERF_REVISION_SEARCH = 92004;
-export const PERF_REVISION_SITEMAP = 92005;
+export function getUniqueTestRevision(): number {
+  return Date.now() + Math.floor(Math.random() * 10000);
+}
 
 export async function getCallCounts(): Promise<Record<string, number>> {
   const res = await fetch(`${FAKE_CORE_CONTROL_URL}/test-control/calls`);

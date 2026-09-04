@@ -86,9 +86,9 @@ During P4.9 hardening, Playwright tests identified three production metadata/rou
 ## 5. Security, Privacy & Extra-Field Emissions Proof
 
 1. **Extra-Fields Privacy Proof (Uncached Revision + Emissions Counter)**:
-   - **False-Positive Prevention**: To prevent testing against pre-existing Redis entries from prior test runs, `setExtraFieldsMode(true)` assigns a unique revision (`PRIVACY_EXTRA_FIELDS_REVISION = 91001`).
-   - **Emissions Proof**: Fake Core maintains a dedicated counter (`GET /test-control/extra-field-emissions`). In the test, `emissionsAfter > emissionsBefore` strictly proves that `storefront-api` issued a live call to Fake Core and received raw extra fields (`supplier_id`, `supplier_contact`, `supplier_offer_id`, `wholesale_price_minor`, `supplier_margin_minor`).
-   - **Sanitization & Cache Invariant**: `storefront-api` stripped the raw extra fields from public JSON, cached the sanitized response in Redis, and Next.js rendered safe product HTML containing zero forbidden fields or markers.
+   - **False-Positive Elimination**: `setExtraFieldsMode(true)` assigns Store A a unique revision (`getUniqueTestRevision()`), ensuring an uncached lookup in Redis.
+   - **Emissions Counter Proof**: Fake Core tracks raw extra-field payload emissions via `GET /test-control/extra-field-emissions`. Asserting `emissionsAfter > emissionsBefore` strictly proves that `storefront-api` issued a live call to Fake Core and received the forbidden fields (`supplier_id`, `supplier_contact`, `supplier_offer_id`, `wholesale_price_minor`, `supplier_margin_minor`).
+   - **Sanitization & Safe Cache**: `storefront-api` stripped the raw extra fields from public JSON, cached the sanitized DTO in Redis, and Next.js rendered safe product HTML containing zero forbidden fields or internal markers.
 2. **Core Privacy Claim (Separation)**:
    - Core PostgreSQL & API internal privacy rules are proven separately by Core's unit/integration test suites.
    - Seller proves defense-in-depth transport privacy at its public DTO boundary.
@@ -115,18 +115,20 @@ During P4.9 hardening, Playwright tests identified three production metadata/rou
 
 ## 7. Measured Page-Level Performance & Core Call Counts
 
-Measurements captured using deterministic Fake Core call counters (`GET /test-control/calls`) with counter resets (`POST /test-control/calls/reset`) on dedicated revisions:
+Measurements captured using deterministic Fake Core call counters (`GET /test-control/calls`) with counter resets (`POST /test-control/calls/reset`) on dedicated test revisions:
 
-| Path | Cold Rev Probes | Cold Payload Calls | Warm Rev Probes | Warm Payload Calls | Observed Payload Endpoints | Caching Finding |
+| Path | Cold Revision Probes | Cold Payload Calls | Warm Revision Probes | Warm Payload Calls | Endpoint Count Breakdown | Caching Finding |
 | :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| **Home (`/en`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products` | Store metadata, categories, and featured products cached in Redis. |
-| **Catalog (`/en/products`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products` | Page bootstrap and catalog list cached per host + query key. |
-| **Product Detail (`/en/products/product-a`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/products/product-a` | Bootstrap & product detail cached; JSON-LD derived from cached DTO. |
-| **Search (`/en/search?q=Product`)** | 1 | 3 | 1 | 0 | `/store`, `/categories`, `/search` | Bootstrap & search result query cached in Redis. |
-| **Sitemap (`/sitemap.xml`)** | 1 | 5 | 1 | 0 | `/store`, `/categories`, `/products` | Sitemap fetches store, categories & products across supported locales; cached in Redis. |
-| **Theme Preview** | N/A | 1 (Direct) | N/A | Uncached | `/store` | `Cache-Control: private, no-store`, `robots: noindex, nofollow` prevents cache poisoning. |
+| **Home (`/en`)** | 3 | 3 | 3 | 0 | `/store`: 1, `/categories`: 1, `/products`: 1 | Warm Redis eliminates Core payload calls; 3 revision probes check cache freshness. |
+| **Catalog (`/en/products`)** | 3 | 3 | 3 | 0 | `/store`: 1, `/categories`: 1, `/products`: 1 | Page bootstrap and catalog list cached in Redis. |
+| **Product Detail (`/en/products/product-a`)** | 4 | 4 | 4 | 0 | `/store`: 1, `/categories`: 1, `/products/product-a`: 2 | Independent `generateMetadata` + page fetches cached in Redis. |
+| **Search (`/en/search?q=Product`)** | 3 | 3 | 3 | 0 | `/store`: 1, `/categories`: 1, `/search`: 1 | Bootstrap & search result query cached in Redis. |
+| **Sitemap (`/sitemap.xml`)** | 5 | 5 | 5 | 0 | `/store`: 1, `/categories`: 2, `/products`: 2 | Sitemap iterates supported locales (en, ar); payloads cached in Redis. |
+| **Theme Preview** | N/A | 1 (Direct) | N/A | Uncached | `/store`: 1 | `Cache-Control: private, no-store`, `robots: noindex, nofollow` prevents cache poisoning. |
 
-*Note: Performance measurements assert deterministic structural invariants (warm payload calls == 0, revision probe count == 1) rather than unstable wall-clock timing.*
+### Architectural Performance Interpretation
+- **Warm Redis Caching**: Eliminates Core **PAYLOAD** reads (`warmPayloadCalls == 0`).
+- **Core Revision Probes**: Intentionally remain on warm requests (`warmRevisionProbes == coldRevisionProbes`). Per P4.4 architecture, every `storefront-api` resource request executes `deps.serve()`, which probes Core's `/internal/v1/storefront/revision` before checking Redis. This guarantees a disabled store, inactive domain, or superseded revision is immediately recognized without serving stale cached content.
 
 ---
 

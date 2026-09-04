@@ -5,7 +5,7 @@ import {
   STORE_A_MARKER,
   STORE_B_MARKER,
   STOREFRONT_API_URL,
-  PRIVACY_EXTRA_FIELDS_REVISION,
+  getUniqueTestRevision,
   setCoreUnavailable,
   setExtraFieldsMode,
   setRevision,
@@ -123,7 +123,7 @@ test.describe('Storefront Security & Privacy Regression', () => {
     await setExtraFieldsMode(true);
 
     // 2. Set a unique revision to guarantee an uncached Redis lookup
-    await setRevision('store-a.localhost', PRIVACY_EXTRA_FIELDS_REVISION);
+    await setRevision('store-a.localhost', getUniqueTestRevision());
 
     const emissionsBefore = await getExtraFieldEmissions();
 
