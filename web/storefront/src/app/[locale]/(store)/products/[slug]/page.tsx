@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 
 import { isStorefrontApiError } from '../../../../../lib/api';
 import { toProductDetailModel } from '../../../../../lib/view-models';
-import { loadPresentation } from '../../../../../server/presentation';
+import { isExpectedMetadataError, loadPresentation } from '../../../../../server/presentation';
 import { currentPreviewToken, storefrontClient } from '../../../../../server/store-context';
 import { metadataForPage, productJsonLd, requestOrigin } from '../../../../../server/seo';
 
@@ -12,22 +12,29 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { locale, slug } = await params;
-  const presentation = await loadPresentation(locale);
-  const product = await storefrontClient().product(presentation.host, presentation.locale, slug);
-  const origin = await requestOrigin(presentation.host);
+  try {
+    const { locale, slug } = await params;
+    const presentation = await loadPresentation(locale);
+    const product = await storefrontClient().product(presentation.host, presentation.locale, slug);
+    const origin = await requestOrigin(presentation.host);
 
-  return await metadataForPage({
-    host: presentation.host,
-    store: presentation.store,
-    locale: presentation.locale,
-    page: 'product',
-    slug,
-    title: `${product.name} | ${presentation.store.store_name}`,
-    description: product.description,
-    images: product.images.map((image) => image.uri),
-    origin
-  });
+    return await metadataForPage({
+      host: presentation.host,
+      store: presentation.store,
+      locale: presentation.locale,
+      page: 'product',
+      slug,
+      title: `${product.name} | ${presentation.store.store_name}`,
+      description: product.description,
+      images: (product.images || []).map((image) => image.uri),
+      origin
+    });
+  } catch (error) {
+    if (isExpectedMetadataError(error)) {
+      return {};
+    }
+    throw error;
+  }
 }
 
 /**
@@ -74,7 +81,7 @@ export default async function ProductPage({
       {jsonLd ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
         />
       ) : null}
     </>

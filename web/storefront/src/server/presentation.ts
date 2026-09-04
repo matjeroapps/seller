@@ -48,6 +48,16 @@ export function isStoreUnavailable(error: unknown): error is StoreUnavailableErr
   return error instanceof StoreUnavailableError;
 }
 
+export function isExpectedMetadataError(error: unknown): boolean {
+  if (isStorefrontApiError(error) && (error.kind === 'not_found' || error.kind === 'invalid_request')) {
+    return true;
+  }
+  if (isStoreUnavailable(error) && error.reason === 'store_unresolved') {
+    return true;
+  }
+  return false;
+}
+
 /**
  * localesFor intersects the store's published locale set with the ones this storefront
  * implements.

@@ -158,7 +158,7 @@ export async function productJsonLd(
 
   const origin = requestUrl;
   const url = localizedUrl(origin, context.locale, seoPath('product', product.slug));
-  const images = product.images
+  const images = (product.images || [])
     .map((image) => image.uri)
     .filter((image) => /^https?:\/\//i.test(image));
 

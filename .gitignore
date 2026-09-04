@@ -8,3 +8,5 @@ coverage/
 *.log
 go.work
 go.work.sum
+test-results/
+playwright-report/
