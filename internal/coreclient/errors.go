@@ -25,6 +25,11 @@ const (
 	CodeUnsafeContent         = "unsafe_content"
 	CodePreviewUnavailable    = "preview_unavailable"
 	CodeStorefrontUnavailable = "storefront_unavailable"
+	CodeCheckoutExpired        = "checkout_expired"
+	CodeIdempotencyConflict    = "idempotency_conflict"
+	CodeInvalidOrderTransition = "invalid_order_transition"
+	CodePriceChanged           = "price_changed"
+	CodeListingUnavailable     = "listing_unavailable"
 	CodeUnavailable           = "unavailable"
 	CodeInternalError         = "internal_error"
 )
@@ -82,7 +87,7 @@ func statusForCode(code string) int {
 		return http.StatusUnauthorized
 	case CodeForbidden:
 		return http.StatusForbidden
-	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory:
+	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory, CodeCheckoutExpired, CodeIdempotencyConflict, CodeInvalidOrderTransition, CodePriceChanged, CodeListingUnavailable:
 		return http.StatusConflict
 	case CodeUnavailable, CodePreviewUnavailable:
 		return http.StatusServiceUnavailable

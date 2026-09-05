@@ -16,13 +16,16 @@ package storefrontapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+
 
 	"github.com/matjeroapps/seller/internal/config"
 	"github.com/matjeroapps/seller/internal/coreclient"
@@ -67,11 +70,26 @@ type PayloadCache interface {
 	Save(ctx context.Context, id storefrontcache.Identity, revision int64, body []byte)
 }
 
+// CommerceClient handles public cart, checkout, and guest order capabilities over HTTP to Core.
+// *coreclient.Client satisfies it.
+type CommerceClient interface {
+	CreateCart(ctx context.Context, host string) (coreclient.CartResponse, error)
+	GetCart(ctx context.Context, host, cartToken string) (coreclient.CartResponse, error)
+	AddCartItem(ctx context.Context, host, cartToken, skuID string, quantity int64) (coreclient.CartResponse, error)
+	UpdateCartItem(ctx context.Context, host, cartToken, itemID string, quantity int64) (coreclient.CartResponse, error)
+	RemoveCartItem(ctx context.Context, host, cartToken, itemID string) (coreclient.CartResponse, error)
+	CreateCheckoutSession(ctx context.Context, host, cartToken string) (coreclient.CheckoutSessionResponse, error)
+	FinalizeCheckoutSession(ctx context.Context, host, sessionID string, request coreclient.FinalizeRequest) (coreclient.PublicOrder, error)
+	GetGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error)
+	CancelGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error)
+}
+
 // Dependencies wires the public catalog routes. Config supplies the trusted
 // forwarded-host policy established in P4.1; host parsing is not reimplemented
 // here.
 type Dependencies struct {
 	Catalog  CatalogReader
+	Commerce CommerceClient
 	Platform config.Config
 	// Cache stores public payloads. Nil disables caching entirely, which is the
 	// default: the storefront must never require Redis to serve a request.
@@ -91,6 +109,16 @@ func RegisterStorefrontRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/storefront/products", deps.handleProducts)
 		r.Get("/storefront/products/{slug}", deps.handleProduct)
 		r.Get("/storefront/search", deps.handleSearch)
+
+		r.Post("/storefront/carts", deps.handleCreateCart)
+		r.Get("/storefront/carts", deps.handleGetCart)
+		r.Post("/storefront/carts/items", deps.handleAddCartItem)
+		r.Patch("/storefront/carts/items/{itemID}", deps.handleUpdateCartItem)
+		r.Delete("/storefront/carts/items/{itemID}", deps.handleRemoveCartItem)
+		r.Post("/storefront/checkout/sessions", deps.handleCreateCheckoutSession)
+		r.Post("/storefront/checkout/sessions/{sessionID}/finalize", deps.handleFinalizeCheckoutSession)
+		r.Get("/storefront/orders/{orderID}", deps.handleGetGuestOrder)
+		r.Post("/storefront/orders/{orderID}/cancel", deps.handleCancelGuestOrder)
 	}
 }
 
@@ -153,6 +181,26 @@ func writeStorefrontError(w http.ResponseWriter, err error) {
 			httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
 		case coreclient.CodeValidationError, coreclient.CodeInvalidArgument, coreclient.CodeSchemaMismatch, coreclient.CodeUnsafeContent:
 			httpx.WriteError(w, http.StatusBadRequest, "validation_error", "invalid request parameters")
+		case coreclient.CodeUnauthorized:
+			httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		case coreclient.CodeForbidden:
+			httpx.WriteError(w, http.StatusForbidden, "forbidden", "forbidden")
+		case coreclient.CodeMarketMismatch:
+			httpx.WriteError(w, http.StatusConflict, "market_mismatch", "market mismatch")
+		case coreclient.CodeInsufficientInventory:
+			httpx.WriteError(w, http.StatusConflict, "insufficient_inventory", "insufficient inventory")
+		case coreclient.CodePriceChanged:
+			httpx.WriteError(w, http.StatusConflict, "price_changed", "price changed")
+		case coreclient.CodeListingUnavailable:
+			httpx.WriteError(w, http.StatusConflict, "listing_unavailable", "listing unavailable")
+		case coreclient.CodeCheckoutExpired:
+			httpx.WriteError(w, http.StatusConflict, "checkout_expired", "checkout session expired")
+		case coreclient.CodeIdempotencyConflict:
+			httpx.WriteError(w, http.StatusConflict, "idempotency_conflict", "idempotency conflict")
+		case coreclient.CodeInvalidOrderTransition:
+			httpx.WriteError(w, http.StatusConflict, "invalid_order_transition", "invalid order transition")
+		case coreclient.CodeConflict:
+			httpx.WriteError(w, http.StatusConflict, "conflict", "conflict")
 		default:
 			httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal error")
 		}
@@ -384,3 +432,269 @@ func intParam(raw, name string) (*int64, error) {
 	}
 	return &value, nil
 }
+
+func (deps Dependencies) setCookie(w http.ResponseWriter, name, value string, maxAge int) {
+	cookie := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   deps.Platform.StorefrontCookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	}
+	if maxAge < 0 {
+		cookie.MaxAge = -1
+		cookie.Expires = time.Unix(0, 0)
+	} else if maxAge > 0 {
+		cookie.MaxAge = maxAge
+	}
+	http.SetCookie(w, cookie)
+}
+
+func getCookieValue(r *http.Request, name string) string {
+	c, err := r.Cookie(name)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(c.Value)
+}
+
+func (deps Dependencies) handleCreateCart(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken != "" {
+		cart, err := deps.Commerce.GetCart(r.Context(), host, cartToken)
+		if err == nil && cart.Status == "active" {
+			cart.CartToken = ""
+			w.Header().Set("Cache-Control", "private, no-store")
+			deps.writeJSON(w, cart)
+			return
+		}
+	}
+	cart, err := deps.Commerce.CreateCart(r.Context(), host)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	deps.setCookie(w, "matjero_cart", cart.CartToken, 30*24*3600)
+	cart.CartToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, cart)
+}
+
+func (deps Dependencies) handleGetCart(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
+	}
+	cart, err := deps.Commerce.GetCart(r.Context(), host, cartToken)
+	if err != nil {
+		var coreErr *coreclient.Error
+		if errors.As(err, &coreErr) && coreErr.Code == coreclient.CodeConflict {
+			deps.setCookie(w, "matjero_cart", "", -1)
+			httpx.WriteError(w, http.StatusConflict, "cart_expired", "cart expired")
+			return
+		}
+		writeStorefrontError(w, err)
+		return
+	}
+	cart.CartToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, cart)
+}
+
+func (deps Dependencies) handleAddCartItem(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	var body struct {
+		SKUID    string `json:"sku_id"`
+		Quantity int64  `json:"quantity"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_argument", "invalid request parameters")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken == "" {
+		cart, err := deps.Commerce.CreateCart(r.Context(), host)
+		if err != nil {
+			writeStorefrontError(w, err)
+			return
+		}
+		cartToken = cart.CartToken
+		deps.setCookie(w, "matjero_cart", cartToken, 30*24*3600)
+	}
+	cart, err := deps.Commerce.AddCartItem(r.Context(), host, cartToken, body.SKUID, body.Quantity)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	cart.CartToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, cart)
+}
+
+func (deps Dependencies) handleUpdateCartItem(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	var body struct {
+		Quantity int64 `json:"quantity"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_argument", "invalid request parameters")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
+	}
+	itemID := chi.URLParam(r, "itemID")
+	cart, err := deps.Commerce.UpdateCartItem(r.Context(), host, cartToken, itemID, body.Quantity)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	cart.CartToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, cart)
+}
+
+func (deps Dependencies) handleRemoveCartItem(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
+	}
+	itemID := chi.URLParam(r, "itemID")
+	cart, err := deps.Commerce.RemoveCartItem(r.Context(), host, cartToken, itemID)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	cart.CartToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, cart)
+}
+
+func (deps Dependencies) handleCreateCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	host := deps.hostFor(r)
+	cartToken := getCookieValue(r, "matjero_cart")
+	if cartToken == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", "active cart required for checkout session")
+		return
+	}
+	session, err := deps.Commerce.CreateCheckoutSession(r.Context(), host, cartToken)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	deps.setCookie(w, "matjero_guest_session_"+session.ID, session.GuestOrderAccessToken, 3600)
+	session.GuestOrderAccessToken = ""
+	w.Header().Set("Cache-Control", "private, no-store")
+	httpx.WriteJSON(w, http.StatusCreated, session)
+}
+
+func (deps Dependencies) handleFinalizeCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	sessionID := chi.URLParam(r, "sessionID")
+	rawGuestToken := getCookieValue(r, "matjero_guest_session_"+sessionID)
+	if rawGuestToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "guest checkout capability required")
+		return
+	}
+	var req coreclient.FinalizeRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", "invalid checkout payload")
+		return
+	}
+	host := deps.hostFor(r)
+	order, err := deps.Commerce.FinalizeCheckoutSession(r.Context(), host, sessionID, req)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+
+	deps.setCookie(w, "matjero_guest_order_"+order.ID, rawGuestToken, 30*24*3600)
+	deps.setCookie(w, "matjero_guest_session_"+sessionID, "", -1)
+
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, ToOrderResponse(order))
+}
+
+func (deps Dependencies) handleGetGuestOrder(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	orderID := chi.URLParam(r, "orderID")
+	rawGuestToken := getCookieValue(r, "matjero_guest_order_"+orderID)
+	if rawGuestToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "guest order capability required")
+		return
+	}
+	host := deps.hostFor(r)
+	order, err := deps.Commerce.GetGuestOrder(r.Context(), host, orderID, rawGuestToken)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, ToOrderResponse(order))
+}
+
+func (deps Dependencies) handleCancelGuestOrder(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	orderID := chi.URLParam(r, "orderID")
+	rawGuestToken := getCookieValue(r, "matjero_guest_order_"+orderID)
+	if rawGuestToken == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "guest order capability required")
+		return
+	}
+	host := deps.hostFor(r)
+	order, err := deps.Commerce.CancelGuestOrder(r.Context(), host, orderID, rawGuestToken)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, ToOrderResponse(order))
+}
+

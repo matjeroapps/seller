@@ -9,7 +9,16 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
   typedRoutes: true,
   // The build must not disclose the framework version to a customer.
-  poweredByHeader: false
+  poweredByHeader: false,
+  async rewrites() {
+    const apiBaseUrl = (process.env.STOREFRONT_API_BASE_URL || 'http://127.0.0.1:8080').trim();
+    return [
+      {
+        source: '/v1/storefront/:path*',
+        destination: `${apiBaseUrl}/v1/storefront/:path*`
+      }
+    ];
+  }
 };
 
 export default nextConfig;

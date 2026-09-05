@@ -132,6 +132,47 @@ export type Dictionary = {
     heading: string;
     rights: string;
   };
+  cart: {
+    title: string;
+    addToCart: string;
+    added: string;
+    viewCart: string;
+    quantity: string;
+    remove: string;
+    subtotal: string;
+    checkout: string;
+    empty: string;
+    continueShopping: string;
+    unitPrice: string;
+    lineTotal: string;
+  };
+  checkout: {
+    title: string;
+    recipientName: string;
+    addressLine1: string;
+    addressLine2: string;
+    city: string;
+    region: string;
+    postalCode: string;
+    countryCode: string;
+    contactEmail: string;
+    submit: string;
+    submitting: string;
+  };
+  order: {
+    title: string;
+    number: string;
+    status: string;
+    statusPending: string;
+    statusCancelled: string;
+    statusConfirmed: string;
+    cancelOrder: string;
+    cancelling: string;
+    items: string;
+    totals: string;
+    confirmationDeadline: string;
+    created: string;
+  };
 };
 
 const en: Dictionary = {
@@ -232,6 +273,47 @@ const en: Dictionary = {
   footer: {
     heading: 'Store information',
     rights: '© {year} {store}. All rights reserved.'
+  },
+  cart: {
+    title: 'Cart',
+    addToCart: 'Add to Cart',
+    added: 'Added to cart',
+    viewCart: 'View Cart',
+    quantity: 'Quantity',
+    remove: 'Remove',
+    subtotal: 'Subtotal',
+    checkout: 'Proceed to Checkout',
+    empty: 'Your cart is empty',
+    continueShopping: 'Continue Shopping',
+    unitPrice: 'Unit Price',
+    lineTotal: 'Total'
+  },
+  checkout: {
+    title: 'Checkout',
+    recipientName: 'Recipient Name',
+    addressLine1: 'Address Line 1',
+    addressLine2: 'Address Line 2 (Optional)',
+    city: 'City',
+    region: 'Region / State',
+    postalCode: 'Postal Code',
+    countryCode: 'Country Code',
+    contactEmail: 'Email Address',
+    submit: 'Place Order',
+    submitting: 'Processing...'
+  },
+  order: {
+    title: 'Order Details',
+    number: 'Order #{number}',
+    status: 'Status',
+    statusPending: 'Pending',
+    statusCancelled: 'Cancelled',
+    statusConfirmed: 'Confirmed',
+    cancelOrder: 'Cancel Order',
+    cancelling: 'Cancelling...',
+    items: 'Items',
+    totals: 'Totals',
+    confirmationDeadline: 'Confirmation Deadline',
+    created: 'Order Date'
   }
 };
 
@@ -333,6 +415,47 @@ const ar: Dictionary = {
   footer: {
     heading: 'معلومات المتجر',
     rights: '© {year} {store}. جميع الحقوق محفوظة.'
+  },
+  cart: {
+    title: 'سلة التسوق',
+    addToCart: 'إضافة إلى السلة',
+    added: 'تمت الإضافة إلى السلة',
+    viewCart: 'عرض السلة',
+    quantity: 'الكمية',
+    remove: 'إزالة',
+    subtotal: 'المجموع الفرعي',
+    checkout: 'إتمام الطلب',
+    empty: 'سلة التسوق فارغة',
+    continueShopping: 'متابعة التسوق',
+    unitPrice: 'سعر الوحدة',
+    lineTotal: 'الإجمالي'
+  },
+  checkout: {
+    title: 'إتمام الطلب',
+    recipientName: 'اسم المستلم',
+    addressLine1: 'عنوان الشارع',
+    addressLine2: 'عنوان إضافي (اختياري)',
+    city: 'المدينة',
+    region: 'المنطقة / المحافظة',
+    postalCode: 'الرمز البريدي',
+    countryCode: 'رمز الدولة',
+    contactEmail: 'البريد الإلكتروني',
+    submit: 'تأكيد الطلب',
+    submitting: 'جاري معالجة الطلب...'
+  },
+  order: {
+    title: 'تفاصيل الطلب',
+    number: 'طلب رقم {number}',
+    status: 'الحالة',
+    statusPending: 'قيد الانتظار',
+    statusCancelled: 'ملغي',
+    statusConfirmed: 'مؤكد',
+    cancelOrder: 'إلغاء الطلب',
+    cancelling: 'جاري الإلغاء...',
+    items: 'المنتجات',
+    totals: 'الإجمالي',
+    confirmationDeadline: 'الموعد النهائي للتأكيد',
+    created: 'تاريخ الطلب'
   }
 };
 

@@ -20,6 +20,7 @@ export FAKE_CORE_CONTROL_URL="http://127.0.0.1:$CORE_PORT"
 export CORE_API_BASE_URL="http://127.0.0.1:$CORE_PORT"
 export STOREFRONT_API_BASE_URL="http://127.0.0.1:$STOREFRONT_API_PORT"
 export STOREFRONT_CACHE_ENABLED=${STOREFRONT_CACHE_ENABLED:-true}
+export STOREFRONT_CHECKOUT_ENABLED=${STOREFRONT_CHECKOUT_ENABLED:-true}
 export REDIS_ADDR=$REDIS_HOST
 export HTTP_ADDR=":$STOREFRONT_API_PORT"
 export PORT=$NEXT_PORT
@@ -75,6 +76,9 @@ wait_for_url "http://127.0.0.1:$CORE_PORT/test-control/calls" "Fake Core" 10
 wait_for_url "http://127.0.0.1:$STOREFRONT_API_PORT/healthz" "Storefront API" 10
 
 npm run build --workspace=@commerce/storefront-web
+rm -rf web/storefront/.next/standalone/web/storefront/.next/static
+cp -r web/storefront/.next/static web/storefront/.next/standalone/web/storefront/.next/static
+cp -r web/storefront/public web/storefront/.next/standalone/web/storefront/public 2>/dev/null || true
 
 # Run Next.js server directly
 NODE_ENV=production STOREFRONT_API_BASE_URL="http://127.0.0.1:$STOREFRONT_API_PORT" PORT=$NEXT_PORT HOSTNAME="0.0.0.0" node web/storefront/.next/standalone/web/storefront/server.js &
