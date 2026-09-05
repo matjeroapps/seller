@@ -8,6 +8,7 @@ import type {
   ThemeContext
 } from '../contract';
 import { CategoryCard, EmptyState, ProductCard, SectionHeading } from './components';
+import { PurchaseControl } from './PurchaseControl';
 
 /**
  * The page bodies of the Matjero default theme.
@@ -328,22 +329,13 @@ export function ProductDetail({
             </section>
           ) : null}
 
-          {model.variants.length > 0 ? (
-            <section className="product__section">
-              <h2 className="product__heading">{copy.product.variants}</h2>
-              <ul className="variants" role="list">
-                {model.variants.map((variant) => (
-                  <li
-                    className={variant.available ? 'variants__item' : 'variants__item variants__item--out'}
-                    key={variant.code}
-                  >
-                    <span className="variants__code">{variant.code}</span>
-                    <span className="variants__stock">{variant.availabilityLabel}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <PurchaseControl
+            variants={model.variants}
+            defaultSkuId={model.defaultSkuId}
+            available={model.available}
+            copy={copy}
+            locale={context.locale}
+          />
 
           {model.categories.length > 0 ? (
             <section className="product__section">

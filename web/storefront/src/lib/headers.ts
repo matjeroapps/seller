@@ -25,3 +25,7 @@ export const PREVIEW_TOKEN_HEADER = 'x-matjero-preview-token';
 
 /** Internal header indicating an invalid or malformed preview token was presented. */
 export const PREVIEW_INVALID_HEADER = 'x-matjero-preview-invalid';
+
+/** Internal header carrying the original customer storefront host from proxy to API. */
+export const STOREFRONT_HOST_HEADER = 'x-matjero-storefront-host';
+

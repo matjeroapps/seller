@@ -34,6 +34,10 @@ const (
 	HeaderStorefrontHost = "X-Matjero-Storefront-Host"
 	// HeaderStorefrontPreview carries the signed draft theme preview token.
 	HeaderStorefrontPreview = "X-Matjero-Storefront-Preview"
+	// HeaderCartToken carries the opaque Cart bearer token.
+	HeaderCartToken = "X-Matjero-Cart-Token"
+	// HeaderGuestOrderToken carries the raw guest order capability token.
+	HeaderGuestOrderToken = "X-Matjero-Guest-Order-Token"
 	// HeaderRequestID and HeaderCorrelationID propagate request correlation.
 	HeaderRequestID     = "X-Request-Id"
 	HeaderCorrelationID = "X-Correlation-Id"
@@ -115,6 +119,10 @@ type requestOptions struct {
 	StorefrontHost string
 	// StorefrontPreview is the signed draft theme preview token.
 	StorefrontPreview string
+	// CartToken is the opaque Cart bearer token.
+	CartToken string
+	// GuestOrderToken is the raw guest order capability token.
+	GuestOrderToken string
 	// Locale overrides locale negotiation when set.
 	Locale string
 }
@@ -134,6 +142,18 @@ func (c *Client) getWithHeader(ctx context.Context, path string, query url.Value
 // post performs a POST with a JSON body and decodes the response into dst.
 func (c *Client) post(ctx context.Context, path string, body any, opts requestOptions, dst any) error {
 	_, err := c.do(ctx, http.MethodPost, path, nil, body, opts, dst)
+	return err
+}
+
+// patch performs a PATCH with a JSON body and decodes the response into dst.
+func (c *Client) patch(ctx context.Context, path string, body any, opts requestOptions, dst any) error {
+	_, err := c.do(ctx, http.MethodPatch, path, nil, body, opts, dst)
+	return err
+}
+
+// delete performs a DELETE and decodes the response into dst.
+func (c *Client) delete(ctx context.Context, path string, opts requestOptions, dst any) error {
+	_, err := c.do(ctx, http.MethodDelete, path, nil, nil, opts, dst)
 	return err
 }
 
@@ -180,6 +200,12 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 	if opts.StorefrontPreview != "" {
 		req.Header.Set(HeaderStorefrontPreview, opts.StorefrontPreview)
+	}
+	if opts.CartToken != "" {
+		req.Header.Set(HeaderCartToken, opts.CartToken)
+	}
+	if opts.GuestOrderToken != "" {
+		req.Header.Set(HeaderGuestOrderToken, opts.GuestOrderToken)
 	}
 	if opts.Locale != "" {
 		// query is nil when the caller passed no values; Set on a nil map panics.

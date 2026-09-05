@@ -688,3 +688,184 @@ func TestStorefrontPreviewErrorMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestHostForResolutionAndSecurity(t *testing.T) {
+	// A. Trusted proxy preserves forwarded storefront host
+	depsTrusted := Dependencies{Platform: config.Config{TrustedForwardedHost: true}}
+	req1 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req1.Host = "internal-proxy.local:8080"
+	req1.Header.Set("X-Matjero-Storefront-Host", "STORE-A.LOCALHOST:3000")
+	if got := depsTrusted.hostFor(req1); got != "store-a.localhost" {
+		t.Errorf("hostFor trusted X-Matjero-Storefront-Host = %q, want store-a.localhost", got)
+	}
+
+	// B. Direct public client sending X-Forwarded-Host / X-Matjero-Storefront-Host is IGNORED when TrustedForwardedHost is false
+	depsUntrusted := Dependencies{Platform: config.Config{TrustedForwardedHost: false}}
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req2.Host = "untrusted-client.com"
+	req2.Header.Set("X-Matjero-Storefront-Host", "store-a.localhost")
+	req2.Header.Set("X-Forwarded-Host", "store-a.localhost")
+	if got := depsUntrusted.hostFor(req2); got != "untrusted-client.com" {
+		t.Errorf("hostFor untrusted direct client = %q, want untrusted-client.com", got)
+	}
+
+	// C. Host normalization: uppercase and port stripping
+	req3 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req3.Host = "STORE-B.EXAMPLE.COM:8443"
+	if got := depsUntrusted.hostFor(req3); got != "store-b.example.com" {
+		t.Errorf("hostFor normalized host = %q, want store-b.example.com", got)
+	}
+}
+
+func TestToOrderResponseMapsShippingAddress(t *testing.T) {
+	phone := "+201000000000"
+	line2 := "Apt 4B"
+	region := "Cairo Governorate"
+	postal := "11511"
+
+	publicOrder := coreclient.PublicOrder{
+		ID:          "ord-123",
+		OrderNumber: "#10001",
+		Status:      "pending",
+		Address: &coreclient.OrderAddress{
+			ID:            "addr-1",
+			OrderID:       "ord-123",
+			AddressType:   "shipping",
+			RecipientName: "Jane Doe",
+			Phone:         &phone,
+			AddressLine1:  "123 Main St",
+			AddressLine2:  &line2,
+			City:          "Cairo",
+			Region:        &region,
+			PostalCode:    &postal,
+			CountryCode:   "EG",
+		},
+	}
+
+	res := ToOrderResponse(publicOrder)
+	if res.Address == nil {
+		t.Fatalf("ToOrderResponse Address is nil, want non-nil")
+	}
+	if res.Address.RecipientName != "Jane Doe" || res.Address.AddressLine1 != "123 Main St" || res.Address.City != "Cairo" || res.Address.CountryCode != "EG" {
+		t.Errorf("Address fields mismatch: %+v", res.Address)
+	}
+	if res.Address.Phone == nil || *res.Address.Phone != phone {
+		t.Errorf("Address phone mismatch: %v", res.Address.Phone)
+	}
+}
+
+type stubCommerce struct {
+	finalizeOrder coreclient.PublicOrder
+	finalizeErr   error
+}
+
+func (s *stubCommerce) CreateCart(ctx context.Context, host string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) GetCart(ctx context.Context, host, cartToken string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) AddCartItem(ctx context.Context, host, cartToken, skuID string, quantity int64) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) UpdateCartItem(ctx context.Context, host, cartToken, itemID string, quantity int64) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) RemoveCartItem(ctx context.Context, host, cartToken, itemID string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) CreateCheckoutSession(ctx context.Context, host, cartToken string) (coreclient.CheckoutSessionResponse, error) {
+	return coreclient.CheckoutSessionResponse{}, nil
+}
+func (s *stubCommerce) FinalizeCheckoutSession(ctx context.Context, host, sessionID string, request coreclient.FinalizeRequest) (coreclient.PublicOrder, error) {
+	return s.finalizeOrder, s.finalizeErr
+}
+func (s *stubCommerce) GetGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error) {
+	return coreclient.PublicOrder{}, nil
+}
+func (s *stubCommerce) CancelGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error) {
+	return coreclient.PublicOrder{}, nil
+}
+
+func TestFinalizeCheckoutClearsCartCookie(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeOrder: coreclient.PublicOrder{ID: "ord-999", OrderNumber: "#10099", Status: "pending"},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-123/finalize", strings.NewReader(`{"contact_email":"a@b.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-123", Value: "guest-tok-123"})
+	req.AddCookie(&http.Cookie{Name: "matjero_cart", Value: "cart-tok-123"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+
+	setCookies := rec.Result().Cookies()
+	var foundOrderCookie, expiredSessionCookie, expiredCartCookie bool
+	for _, c := range setCookies {
+		if c.Name == "matjero_guest_order_ord-999" && c.Value == "guest-tok-123" {
+			foundOrderCookie = true
+		}
+		if c.Name == "matjero_guest_session_sess-123" && (c.MaxAge < 0 || c.Expires.Year() < 2000) {
+			expiredSessionCookie = true
+		}
+		if c.Name == "matjero_cart" && (c.MaxAge < 0 || c.Expires.Year() < 2000) {
+			expiredCartCookie = true
+		}
+	}
+
+	if !foundOrderCookie {
+		t.Errorf("expected matjero_guest_order_ord-999 cookie to be set")
+	}
+	if !expiredSessionCookie {
+		t.Errorf("expected matjero_guest_session_sess-123 cookie to be expired")
+	}
+	if !expiredCartCookie {
+		t.Errorf("expected matjero_cart cookie to be expired")
+	}
+}
+
+func TestFailedFinalizeDoesNotClearCartCookie(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeErr: &coreclient.Error{Status: http.StatusConflict, Code: coreclient.CodeConflict},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-123/finalize", strings.NewReader(`{"contact_email":"a@b.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-123", Value: "guest-tok-123"})
+	req.AddCookie(&http.Cookie{Name: "matjero_cart", Value: "cart-tok-123"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", rec.Code)
+	}
+
+	setCookies := rec.Result().Cookies()
+	for _, c := range setCookies {
+		if c.Name == "matjero_cart" {
+			t.Errorf("failed finalize MUST NOT alter or expire matjero_cart cookie, got cookie %v", c)
+		}
+	}
+}

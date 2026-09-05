@@ -101,6 +101,7 @@ func run(ctx context.Context) error {
 		Register: func(r chi.Router) {
 			storefrontapi.RegisterStorefrontRoutes(storefrontapi.Dependencies{
 				Catalog:   core,
+				Commerce:  core,
 				Platform:  cfg,
 				Cache:     cache,
 				Revisions: core,

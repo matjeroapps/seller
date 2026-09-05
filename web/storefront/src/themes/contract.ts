@@ -181,6 +181,7 @@ export type ProductVariantModel = {
   available: boolean;
   availabilityLabel: string;
   skuCount: number;
+  skuId?: string;
 };
 
 export type ProductDetailViewModel = {
@@ -192,6 +193,7 @@ export type ProductDetailViewModel = {
   images: { uri: string; alt: string }[];
   categories: StoreLink[];
   variants: ProductVariantModel[];
+  defaultSkuId?: string;
 };
 
 export type SearchViewModel = {

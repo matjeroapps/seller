@@ -56,6 +56,11 @@ type Config struct {
 	// store code (e.g. www, api, admin).
 	ReservedSubdomains []string
 
+	// StorefrontCheckoutEnabled gates cart, checkout, and guest order routes.
+	StorefrontCheckoutEnabled bool
+	// StorefrontCookieSecure controls the Secure attribute on storefront capability cookies.
+	StorefrontCookieSecure bool
+
 	// CoreAPIBaseURL is the root of the Core internal API, e.g.
 	// "http://core-api:8080". Every Core-owned business capability is reached
 	// through it (ADR-017).
@@ -129,6 +134,9 @@ func Load(serviceName string) (Config, error) {
 		StorefrontCacheEnabled:         boolEnv("STOREFRONT_CACHE_ENABLED", false),
 		StorefrontCacheTTL:             time.Duration(cacheTTLSeconds) * time.Second,
 		StorefrontCacheMaxPayloadBytes: cacheMaxPayloadBytes,
+
+		StorefrontCheckoutEnabled: boolEnv("STOREFRONT_CHECKOUT_ENABLED", false),
+		StorefrontCookieSecure:    boolEnv("STOREFRONT_COOKIE_SECURE", stringEnv("APP_ENV", "development") == "production"),
 	}, nil
 }
 
