@@ -688,3 +688,68 @@ func TestStorefrontPreviewErrorMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestHostForResolutionAndSecurity(t *testing.T) {
+	// A. Trusted proxy preserves forwarded storefront host
+	depsTrusted := Dependencies{Platform: config.Config{TrustedForwardedHost: true}}
+	req1 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req1.Host = "internal-proxy.local:8080"
+	req1.Header.Set("X-Matjero-Storefront-Host", "STORE-A.LOCALHOST:3000")
+	if got := depsTrusted.hostFor(req1); got != "store-a.localhost" {
+		t.Errorf("hostFor trusted X-Matjero-Storefront-Host = %q, want store-a.localhost", got)
+	}
+
+	// B. Direct public client sending X-Forwarded-Host / X-Matjero-Storefront-Host is IGNORED when TrustedForwardedHost is false
+	depsUntrusted := Dependencies{Platform: config.Config{TrustedForwardedHost: false}}
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req2.Host = "untrusted-client.com"
+	req2.Header.Set("X-Matjero-Storefront-Host", "store-a.localhost")
+	req2.Header.Set("X-Forwarded-Host", "store-a.localhost")
+	if got := depsUntrusted.hostFor(req2); got != "untrusted-client.com" {
+		t.Errorf("hostFor untrusted direct client = %q, want untrusted-client.com", got)
+	}
+
+	// C. Host normalization: uppercase and port stripping
+	req3 := httptest.NewRequest(http.MethodGet, "/v1/storefront/store", nil)
+	req3.Host = "STORE-B.EXAMPLE.COM:8443"
+	if got := depsUntrusted.hostFor(req3); got != "store-b.example.com" {
+		t.Errorf("hostFor normalized host = %q, want store-b.example.com", got)
+	}
+}
+
+func TestToOrderResponseMapsShippingAddress(t *testing.T) {
+	phone := "+201000000000"
+	line2 := "Apt 4B"
+	region := "Cairo Governorate"
+	postal := "11511"
+
+	publicOrder := coreclient.PublicOrder{
+		ID:          "ord-123",
+		OrderNumber: "#10001",
+		Status:      "pending",
+		Address: &coreclient.OrderAddress{
+			ID:            "addr-1",
+			OrderID:       "ord-123",
+			AddressType:   "shipping",
+			RecipientName: "Jane Doe",
+			Phone:         &phone,
+			AddressLine1:  "123 Main St",
+			AddressLine2:  &line2,
+			City:          "Cairo",
+			Region:        &region,
+			PostalCode:    &postal,
+			CountryCode:   "EG",
+		},
+	}
+
+	res := ToOrderResponse(publicOrder)
+	if res.Address == nil {
+		t.Fatalf("ToOrderResponse Address is nil, want non-nil")
+	}
+	if res.Address.RecipientName != "Jane Doe" || res.Address.AddressLine1 != "123 Main St" || res.Address.City != "Cairo" || res.Address.CountryCode != "EG" {
+		t.Errorf("Address fields mismatch: %+v", res.Address)
+	}
+	if res.Address.Phone == nil || *res.Address.Phone != phone {
+		t.Errorf("Address phone mismatch: %v", res.Address.Phone)
+	}
+}

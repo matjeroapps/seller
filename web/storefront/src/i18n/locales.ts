@@ -172,6 +172,7 @@ export type Dictionary = {
     totals: string;
     confirmationDeadline: string;
     created: string;
+    shippingAddress: string;
   };
 };
 
@@ -313,7 +314,8 @@ const en: Dictionary = {
     items: 'Items',
     totals: 'Totals',
     confirmationDeadline: 'Confirmation Deadline',
-    created: 'Order Date'
+    created: 'Order Date',
+    shippingAddress: 'Shipping Address'
   }
 };
 
@@ -455,7 +457,8 @@ const ar: Dictionary = {
     items: 'المنتجات',
     totals: 'الإجمالي',
     confirmationDeadline: 'الموعد النهائي للتأكيد',
-    created: 'تاريخ الطلب'
+    created: 'تاريخ الطلب',
+    shippingAddress: 'عنوان الشحن'
   }
 };
 

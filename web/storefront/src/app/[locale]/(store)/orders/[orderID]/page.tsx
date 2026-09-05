@@ -14,6 +14,17 @@ type OrderItem = {
   line_total_minor: number;
 };
 
+type OrderAddress = {
+  recipient_name: string;
+  phone?: string;
+  address_line_1: string;
+  address_line_2?: string;
+  city: string;
+  region?: string;
+  postal_code?: string;
+  country_code: string;
+};
+
 type Order = {
   id: string;
   order_number: string;
@@ -27,6 +38,7 @@ type Order = {
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+  address?: OrderAddress;
 };
 
 export default function OrderDetailPage({
@@ -196,6 +208,24 @@ export default function OrderDetailPage({
             <strong>{formatMoney(order.total_minor, order.currency_code)}</strong>
           </div>
         </section>
+
+        {order.address ? (
+          <section className="order-address-section">
+            <h2>{copy.order.shippingAddress}</h2>
+            <div className="address-card">
+              <p><strong>{order.address.recipient_name}</strong></p>
+              <p>{order.address.address_line_1}</p>
+              {order.address.address_line_2 ? <p>{order.address.address_line_2}</p> : null}
+              <p>
+                {order.address.city}
+                {order.address.region ? `, ${order.address.region}` : ''}
+                {order.address.postal_code ? ` ${order.address.postal_code}` : ''}
+              </p>
+              <p>{order.address.country_code}</p>
+              {order.address.phone ? <p>Phone: {order.address.phone}</p> : null}
+            </div>
+          </section>
+        ) : null}
 
         {isPending ? (
           <div className="order-actions">

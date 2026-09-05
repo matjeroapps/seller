@@ -26,7 +26,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-
 	"github.com/matjeroapps/seller/internal/config"
 	"github.com/matjeroapps/seller/internal/coreclient"
 	"github.com/matjeroapps/seller/internal/httpx"
@@ -122,18 +121,25 @@ func RegisterStorefrontRoutes(deps Dependencies) func(r chi.Router) {
 	}
 }
 
+const HeaderStorefrontHost = "X-Matjero-Storefront-Host"
+
 // hostFor extracts the trusted storefront host from the request using the
 // deployment's own proxy policy.
 //
-// The request Host header is authoritative by default. X-Forwarded-Host is only
-// honored when the deployment explicitly trusts a reverse proxy
+// The request Host header is authoritative by default. X-Matjero-Storefront-Host
+// and X-Forwarded-Host are only honored when the deployment explicitly trusts a reverse proxy
 // (config.TrustedForwardedHost), which prevents hostname spoofing by an
 // untrusted client. The result is forwarded to Core as the tenant authority;
 // Core ignores the HTTP Host entirely.
 func (deps Dependencies) hostFor(r *http.Request) string {
 	host := r.Host
 	if deps.Platform.TrustedForwardedHost {
-		if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
+		if forwarded := r.Header.Get(HeaderStorefrontHost); forwarded != "" {
+			if i := strings.IndexByte(forwarded, ','); i >= 0 {
+				forwarded = forwarded[:i]
+			}
+			host = forwarded
+		} else if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
 			// Take the first host when multiple are comma-separated.
 			if i := strings.IndexByte(forwarded, ','); i >= 0 {
 				forwarded = forwarded[:i]
@@ -697,4 +703,3 @@ func (deps Dependencies) handleCancelGuestOrder(w http.ResponseWriter, r *http.R
 	w.Header().Set("Cache-Control", "private, no-store")
 	deps.writeJSON(w, ToOrderResponse(order))
 }
-

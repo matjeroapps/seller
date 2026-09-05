@@ -69,20 +69,33 @@ type OrderItemResponse struct {
 	LineTotalMinor       int64   `json:"line_total_minor"`
 }
 
+// OrderAddressResponse represents a buyer-safe Shipping Address DTO.
+type OrderAddressResponse struct {
+	RecipientName string  `json:"recipient_name"`
+	Phone         *string `json:"phone,omitempty"`
+	AddressLine1  string  `json:"address_line_1"`
+	AddressLine2  *string `json:"address_line_2,omitempty"`
+	City          string  `json:"city"`
+	Region        *string `json:"region,omitempty"`
+	PostalCode    *string `json:"postal_code,omitempty"`
+	CountryCode   string  `json:"country_code"`
+}
+
 // OrderResponse represents a buyer-safe Order response.
 type OrderResponse struct {
-	ID                     string              `json:"id"`
-	OrderNumber            string              `json:"order_number"`
-	MarketCode             string              `json:"market_code"`
-	Status                 string              `json:"status"`
-	CurrencyCode           string              `json:"currency_code"`
-	SubtotalMinor          int64               `json:"subtotal_minor"`
-	TotalMinor             int64               `json:"total_minor"`
-	ConfirmationDeadlineAt string              `json:"confirmation_deadline_at"`
-	CancellationReason     *string             `json:"cancellation_reason,omitempty"`
-	CreatedAt              string              `json:"created_at"`
-	UpdatedAt              string              `json:"updated_at"`
-	Items                  []OrderItemResponse `json:"items,omitempty"`
+	ID                     string                `json:"id"`
+	OrderNumber            string                `json:"order_number"`
+	MarketCode             string                `json:"market_code"`
+	Status                 string                `json:"status"`
+	CurrencyCode           string                `json:"currency_code"`
+	SubtotalMinor          int64                 `json:"subtotal_minor"`
+	TotalMinor             int64                 `json:"total_minor"`
+	ConfirmationDeadlineAt string                `json:"confirmation_deadline_at"`
+	CancellationReason     *string               `json:"cancellation_reason,omitempty"`
+	CreatedAt              string                `json:"created_at"`
+	UpdatedAt              string                `json:"updated_at"`
+	Items                  []OrderItemResponse   `json:"items,omitempty"`
+	Address                *OrderAddressResponse `json:"address,omitempty"`
 }
 
 // ToOrderResponse maps an internal coreclient.PublicOrder into a buyer-safe OrderResponse DTO.
@@ -100,6 +113,19 @@ func ToOrderResponse(o coreclient.PublicOrder) OrderResponse {
 			LineTotalMinor:       item.LineTotalMinor,
 		}
 	}
+	var address *OrderAddressResponse
+	if o.Address != nil {
+		address = &OrderAddressResponse{
+			RecipientName: o.Address.RecipientName,
+			Phone:         o.Address.Phone,
+			AddressLine1:  o.Address.AddressLine1,
+			AddressLine2:  o.Address.AddressLine2,
+			City:          o.Address.City,
+			Region:        o.Address.Region,
+			PostalCode:    o.Address.PostalCode,
+			CountryCode:   o.Address.CountryCode,
+		}
+	}
 	return OrderResponse{
 		ID:                     o.ID,
 		OrderNumber:            o.OrderNumber,
@@ -113,6 +139,6 @@ func ToOrderResponse(o coreclient.PublicOrder) OrderResponse {
 		CreatedAt:              o.CreatedAt,
 		UpdatedAt:              o.UpdatedAt,
 		Items:                  items,
+		Address:                address,
 	}
 }
-

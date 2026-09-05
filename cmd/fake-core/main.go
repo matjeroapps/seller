@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -44,9 +45,19 @@ type fakeCoreServer struct {
 	extraFieldEmissions atomic.Uint64
 	callCounts          map[string]int64
 	stores              map[string]*storeData
-	orderStores         sync.Map
-	orderTokens         sync.Map
-	sessionTokens       sync.Map
+
+	cartSeq    atomic.Uint64
+	sessionSeq atomic.Uint64
+	orderSeq   atomic.Uint64
+	itemSeq    atomic.Uint64
+
+	carts             map[string]map[string]any
+	cartTokens        map[string]map[string]any
+	sessions          map[string]map[string]any
+	finalizedSessions map[string]string
+	orders            map[string]map[string]any
+	orderStores       map[string]string
+	orderTokens       map[string]string
 }
 
 func newServer(token string) *fakeCoreServer {
@@ -67,6 +78,13 @@ func (s *fakeCoreServer) resetDefaultState() {
 	s.extraFieldsEnabled.Store(false)
 	s.extraFieldEmissions.Store(0)
 	s.callCounts = make(map[string]int64)
+	s.carts = make(map[string]map[string]any)
+	s.cartTokens = make(map[string]map[string]any)
+	s.sessions = make(map[string]map[string]any)
+	s.finalizedSessions = make(map[string]string)
+	s.orders = make(map[string]map[string]any)
+	s.orderStores = make(map[string]string)
+	s.orderTokens = make(map[string]string)
 	s.stores = map[string]*storeData{
 		"store-a.localhost": {
 			code:             "store-a",
@@ -503,8 +521,22 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 
 	case r.URL.Path == "/internal/v1/storefront/carts" && r.Method == http.MethodPost:
-		cartID := "cart-" + store.code
-		cartToken := "token-" + store.code
+		s.mu.Lock()
+		seq := s.cartSeq.Add(1)
+		cartID := fmt.Sprintf("cart-%s-%d", store.code, seq)
+		cartToken := fmt.Sprintf("token-%s-%d", store.code, seq)
+		cart := map[string]any{
+			"id":          cartID,
+			"status":      "active",
+			"market_code": store.market,
+			"cart_token":  cartToken,
+			"store_code":  store.code,
+			"items":       []any{},
+		}
+		s.carts[cartID] = cart
+		s.cartTokens[cartToken] = cart
+		s.mu.Unlock()
+
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":          cartID,
 			"status":      "active",
@@ -520,224 +552,276 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
 			return
 		}
+		s.mu.RLock()
+		cart, ok := s.cartTokens[cartToken]
+		s.mu.RUnlock()
+		if !ok || cart["store_code"] != store.code {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":          "cart-" + store.code,
+			"id":          cart["id"],
 			"status":      "active",
 			"market_code": store.market,
-			"items": []any{
-				map[string]any{
-					"id":                        "item-1",
-					"sku_id":                    "sku-test-1",
-					"quantity":                  1,
-					"expected_unit_price_minor": 1000,
-					"expected_currency_code":   store.currencyCode,
-				},
-			},
+			"items":       cart["items"],
 		})
 
 	case r.URL.Path == "/internal/v1/storefront/carts/items" && r.Method == http.MethodPost:
+		cartToken := strings.TrimSpace(r.Header.Get("X-Matjero-Cart-Token"))
+		s.mu.Lock()
+		cart, ok := s.cartTokens[cartToken]
+		if !ok || cart["store_code"] != store.code {
+			seq := s.cartSeq.Add(1)
+			cartID := fmt.Sprintf("cart-%s-%d", store.code, seq)
+			cartToken = fmt.Sprintf("token-%s-%d", store.code, seq)
+			cart = map[string]any{
+				"id":          cartID,
+				"status":      "active",
+				"market_code": store.market,
+				"cart_token":  cartToken,
+				"store_code":  store.code,
+				"items":       []any{},
+			}
+			s.carts[cartID] = cart
+			s.cartTokens[cartToken] = cart
+		}
+
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		skuID, _ := body["sku_id"].(string)
-		qty, _ := body["quantity"].(float64)
+		qtyFloat, _ := body["quantity"].(float64)
+		qty := int64(qtyFloat)
 		if qty <= 0 {
 			qty = 1
 		}
+		itemID := fmt.Sprintf("item-%d", s.itemSeq.Add(1))
+		newItem := map[string]any{
+			"id":                        itemID,
+			"sku_id":                    skuID,
+			"quantity":                  qty,
+			"expected_unit_price_minor": int64(1000),
+			"expected_currency_code":    store.currencyCode,
+		}
+		items, _ := cart["items"].([]any)
+		items = append(items, newItem)
+		cart["items"] = items
+		s.mu.Unlock()
+
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":          "cart-" + store.code,
+			"id":          cart["id"],
 			"status":      "active",
 			"market_code": store.market,
-			"items": []any{
-				map[string]any{
-					"id":                        "item-1",
-					"sku_id":                    skuID,
-					"quantity":                  int64(qty),
-					"expected_unit_price_minor": 1000,
-					"expected_currency_code":   store.currencyCode,
-				},
-			},
+			"items":       items,
 		})
 
 	case strings.HasPrefix(r.URL.Path, "/internal/v1/storefront/carts/items/") && (r.Method == http.MethodPatch || r.Method == http.MethodDelete):
+		cartToken := strings.TrimSpace(r.Header.Get("X-Matjero-Cart-Token"))
+		s.mu.RLock()
+		cart, ok := s.cartTokens[cartToken]
+		s.mu.RUnlock()
+		if !ok || cart["store_code"] != store.code {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":          "cart-" + store.code,
+			"id":          cart["id"],
 			"status":      "active",
 			"market_code": store.market,
-			"items":       []any{},
+			"items":       cart["items"],
 		})
 
 	case r.URL.Path == "/internal/v1/storefront/checkout-sessions" && r.Method == http.MethodPost:
-		sessionID := "session-" + store.code
-		token := "guest-token-" + store.code
-		s.sessionTokens.Store(sessionID, token)
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":                        sessionID,
-			"cart_id":                   "cart-" + store.code,
-			"status":                    "open",
-			"expires_at":                "2026-12-31T23:59:59Z",
-			"guest_order_access_token": token,
-		})
+		cartToken := strings.TrimSpace(r.Header.Get("X-Matjero-Cart-Token"))
+		s.mu.Lock()
+		cart, ok := s.cartTokens[cartToken]
+		if !ok || cart["store_code"] != store.code {
+			s.mu.Unlock()
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "validation_error", "message": "active cart required"}})
+			return
+		}
+		seq := s.sessionSeq.Add(1)
+		sessionID := fmt.Sprintf("session-%s-%d", store.code, seq)
+		guestToken := fmt.Sprintf("guest-token-%s-%d", store.code, seq)
+		sess := map[string]any{
+			"id":                       sessionID,
+			"cart_id":                  cart["id"],
+			"status":                   "open",
+			"expires_at":               "2026-12-31T23:59:59Z",
+			"guest_order_access_token": guestToken,
+			"store_code":               store.code,
+		}
+		s.sessions[sessionID] = sess
+		s.mu.Unlock()
+
+		_ = json.NewEncoder(w).Encode(sess)
 
 	case strings.HasPrefix(r.URL.Path, "/internal/v1/storefront/checkout-sessions/") && strings.HasSuffix(r.URL.Path, "/finalize"):
 		parts := strings.Split(r.URL.Path, "/")
 		sessionID := parts[len(parts)-2]
-		orderID := "ord-" + store.code
-		if tokenVal, ok := s.sessionTokens.Load(sessionID); ok {
-			s.orderTokens.Store(orderID, tokenVal)
-		} else {
-			s.orderTokens.Store(orderID, "guest-token-"+store.code)
-		}
-		s.orderStores.Store(orderID, store.code)
 
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		s.mu.Lock()
+		sess, ok := s.sessions[sessionID]
+		if !ok || sess["store_code"] != store.code {
+			s.mu.Unlock()
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "not_found", "message": "session not found"}})
+			return
+		}
+
+		if existingOrderID, finalized := s.finalizedSessions[sessionID]; finalized {
+			existingOrder := s.orders[existingOrderID]
+			s.mu.Unlock()
+			_ = json.NewEncoder(w).Encode(existingOrder)
+			return
+		}
+
+		var req struct {
+			ShippingAddress struct {
+				RecipientName string  `json:"recipient_name"`
+				Phone         *string `json:"phone"`
+				AddressLine1  string  `json:"address_line_1"`
+				AddressLine2  *string `json:"address_line_2"`
+				City          string  `json:"city"`
+				Region        *string `json:"region"`
+				PostalCode    *string `json:"postal_code"`
+				CountryCode   string  `json:"country_code"`
+			} `json:"shipping_address"`
+			ContactEmail string `json:"contact_email"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		seq := s.orderSeq.Add(1)
+		orderID := fmt.Sprintf("ord-%s-%d", store.code, seq)
+		orderNum := fmt.Sprintf("#10000%d", seq)
+		guestToken := sess["guest_order_access_token"].(string)
+
+		recName := req.ShippingAddress.RecipientName
+		if recName == "" {
+			recName = "Jane Doe"
+		}
+		addrLine1 := req.ShippingAddress.AddressLine1
+		if addrLine1 == "" {
+			addrLine1 = "123 Main St"
+		}
+		city := req.ShippingAddress.City
+		if city == "" {
+			city = "Cairo"
+		}
+		country := req.ShippingAddress.CountryCode
+		if country == "" {
+			country = "EG"
+		}
+
+		addrMap := map[string]any{
+			"id":             fmt.Sprintf("addr-%d", seq),
+			"order_id":       orderID,
+			"address_type":   "shipping",
+			"recipient_name": recName,
+			"phone":          req.ShippingAddress.Phone,
+			"address_line_1": addrLine1,
+			"address_line_2": req.ShippingAddress.AddressLine2,
+			"city":           city,
+			"region":         req.ShippingAddress.Region,
+			"postal_code":    req.ShippingAddress.PostalCode,
+			"country_code":   country,
+			"created_at":     "2026-09-05T12:00:00Z",
+		}
+
+		orderMap := map[string]any{
 			"id":                       orderID,
-			"order_number":             "#100001",
+			"order_number":             orderNum,
 			"store_id":                 store.code,
 			"market_code":              store.market,
 			"checkout_session_id":      sessionID,
 			"status":                   "pending",
 			"currency_code":            store.currencyCode,
-			"subtotal_minor":           1000,
-			"total_minor":              1000,
+			"subtotal_minor":           int64(1000),
+			"total_minor":              int64(1000),
 			"confirmation_deadline_at": "2026-12-31T23:59:59Z",
-			"aggregate_version":       1,
+			"aggregate_version":        int64(1),
 			"created_at":               "2026-09-05T12:00:00Z",
 			"updated_at":               "2026-09-05T12:00:00Z",
 			"items": []any{
 				map[string]any{
-					"id":                     "ord-item-1",
+					"id":                     fmt.Sprintf("ord-item-%d", seq),
 					"order_id":               orderID,
 					"product_title_snapshot": "Test Product",
 					"sku_code_snapshot":      "SKU-1",
-					"unit_price_minor":       1000,
+					"unit_price_minor":       int64(1000),
 					"currency_code":          store.currencyCode,
-					"quantity":               1,
-					"line_total_minor":       1000,
+					"quantity":               int64(1),
+					"line_total_minor":       int64(1000),
 					"created_at":             "2026-09-05T12:00:00Z",
 				},
 			},
-			"address": map[string]any{
-				"id":             "addr-1",
-				"order_id":       orderID,
-				"address_type":   "shipping",
-				"recipient_name": "John Doe",
-				"address_line_1": "123 Test St",
-				"city":           "Cairo",
-				"country_code":   "EG",
-				"created_at":     "2026-09-05T12:00:00Z",
-			},
-		})
+			"address": addrMap,
+		}
+
+		s.orders[orderID] = orderMap
+		s.finalizedSessions[sessionID] = orderID
+		s.orderStores[orderID] = store.code
+		s.orderTokens[orderID] = guestToken
+		s.mu.Unlock()
+
+		_ = json.NewEncoder(w).Encode(orderMap)
 
 	case strings.HasPrefix(r.URL.Path, "/internal/v1/storefront/orders/") && strings.HasSuffix(r.URL.Path, "/cancel"):
 		orderID := strings.TrimPrefix(r.URL.Path, "/internal/v1/storefront/orders/")
 		orderID = strings.TrimSuffix(orderID, "/cancel")
 
-		if expectedStore, ok := s.orderStores.Load(orderID); ok && expectedStore.(string) != store.code {
+		s.mu.Lock()
+		expectedStore, okStore := s.orderStores[orderID]
+		expectedToken, okToken := s.orderTokens[orderID]
+		orderMap, okOrder := s.orders[orderID]
+		s.mu.Unlock()
+
+		if !okStore || expectedStore != store.code || !okOrder {
 			w.WriteHeader(http.StatusNotFound)
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "not_found", "message": "not found"}})
 			return
 		}
 
 		guestToken := strings.TrimSpace(r.Header.Get("X-Matjero-Guest-Order-Token"))
-		if guestToken == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
-			return
-		}
-		if expectedToken, ok := s.orderTokens.Load(orderID); ok && expectedToken.(string) != guestToken {
+		if guestToken == "" || !okToken || expectedToken != guestToken {
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
 			return
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":                       orderID,
-			"order_number":             "#100001",
-			"store_id":                 store.code,
-			"market_code":              store.market,
-			"checkout_session_id":      "session-1",
-			"status":                   "cancelled",
-			"currency_code":            store.currencyCode,
-			"subtotal_minor":           1000,
-			"total_minor":              1000,
-			"confirmation_deadline_at": "2026-12-31T23:59:59Z",
-			"aggregate_version":       2,
-			"created_at":               "2026-09-05T12:00:00Z",
-			"updated_at":               "2026-09-05T12:05:00Z",
-			"items": []any{
-				map[string]any{
-					"id":                     "ord-item-1",
-					"order_id":               orderID,
-					"product_title_snapshot": "Test Product",
-					"sku_code_snapshot":      "SKU-1",
-					"unit_price_minor":       1000,
-					"currency_code":          store.currencyCode,
-					"quantity":               1,
-					"line_total_minor":       1000,
-					"created_at":             "2026-09-05T12:00:00Z",
-				},
-			},
-		})
+		s.mu.Lock()
+		orderMap["status"] = "cancelled"
+		orderMap["aggregate_version"] = int64(2)
+		orderMap["updated_at"] = "2026-09-05T12:05:00Z"
+		s.mu.Unlock()
+
+		_ = json.NewEncoder(w).Encode(orderMap)
 
 	case strings.HasPrefix(r.URL.Path, "/internal/v1/storefront/orders/"):
 		orderID := strings.TrimPrefix(r.URL.Path, "/internal/v1/storefront/orders/")
 
-		if expectedStore, ok := s.orderStores.Load(orderID); ok && expectedStore.(string) != store.code {
+		s.mu.RLock()
+		expectedStore, okStore := s.orderStores[orderID]
+		expectedToken, okToken := s.orderTokens[orderID]
+		orderMap, okOrder := s.orders[orderID]
+		s.mu.RUnlock()
+
+		if !okStore || expectedStore != store.code || !okOrder {
 			w.WriteHeader(http.StatusNotFound)
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "not_found", "message": "not found"}})
 			return
 		}
 
 		guestToken := strings.TrimSpace(r.Header.Get("X-Matjero-Guest-Order-Token"))
-		if guestToken == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
-			return
-		}
-		if expectedToken, ok := s.orderTokens.Load(orderID); ok && expectedToken.(string) != guestToken {
+		if guestToken == "" || !okToken || expectedToken != guestToken {
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
 			return
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":                       orderID,
-			"order_number":             "#100001",
-			"store_id":                 store.code,
-			"market_code":              store.market,
-			"checkout_session_id":      "session-1",
-			"status":                   "pending",
-			"currency_code":            store.currencyCode,
-			"subtotal_minor":           1000,
-			"total_minor":              1000,
-			"confirmation_deadline_at": "2026-12-31T23:59:59Z",
-			"aggregate_version":       1,
-			"created_at":               "2026-09-05T12:00:00Z",
-			"updated_at":               "2026-09-05T12:00:00Z",
-			"items": []any{
-				map[string]any{
-					"id":                     "ord-item-1",
-					"order_id":               orderID,
-					"product_title_snapshot": "Test Product",
-					"sku_code_snapshot":      "SKU-1",
-					"unit_price_minor":       1000,
-					"currency_code":          store.currencyCode,
-					"quantity":               1,
-					"line_total_minor":       1000,
-					"created_at":             "2026-09-05T12:00:00Z",
-				},
-			},
-			"address": map[string]any{
-				"id":             "addr-1",
-				"order_id":       orderID,
-				"address_type":   "shipping",
-				"recipient_name": "John Doe",
-				"address_line_1": "123 Test St",
-				"city":           "Cairo",
-				"country_code":   "EG",
-				"created_at":     "2026-09-05T12:00:00Z",
-			},
-		})
+		_ = json.NewEncoder(w).Encode(orderMap)
 
 	default:
 		w.WriteHeader(http.StatusNotFound)

@@ -45,7 +45,7 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     await page.fill('#countryCode', 'EG');
 
     // 7. Finalize Checkout
-    await page.click('button[type="submit"]');
+    await page.click('.checkout-form button[type="submit"]');
 
     // 8. Redirected to Order Confirmation Page
     await expect(page).toHaveURL(/\/en\/orders\/.+/);
@@ -79,7 +79,7 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     await page.fill('#addressLine1', '1 First St');
     await page.fill('#city', 'Alexandria');
     await page.fill('#countryCode', 'EG');
-    await page.click('button[type="submit"]');
+    await page.click('.checkout-form button[type="submit"]');
     await expect(page).toHaveURL(/\/en\/orders\/.+/);
     const order1Url = page.url();
 
@@ -93,7 +93,7 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     await page.fill('#addressLine1', '2 Second St');
     await page.fill('#city', 'Giza');
     await page.fill('#countryCode', 'EG');
-    await page.click('button[type="submit"]');
+    await page.click('.checkout-form button[type="submit"]');
     await expect(page).toHaveURL(/\/en\/orders\/.+/);
     const order2Url = page.url();
 
@@ -163,5 +163,56 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
 
     // Must be rejected (404 not found so cross-tenant existence is hidden)
     expect(crossHostRes.status()).toBe(404);
+  });
+
+  test('Response-Loss Replay: Retrying Finalize on same Session returns same Order', async ({ request }) => {
+    // 1. Create Cart
+    const cartRes = await request.post(`${STOREFRONT_API_URL}/v1/storefront/carts`, {
+      headers: { Host: STORE_A_HOST }
+    });
+    const cartCookieHeader = cartRes.headers()['set-cookie'];
+
+    // 2. Add Item
+    await request.post(`${STOREFRONT_API_URL}/v1/storefront/carts/items`, {
+      headers: { Host: STORE_A_HOST, Cookie: cartCookieHeader },
+      data: { sku_id: 'sku-a-1', quantity: 1 }
+    });
+
+    // 3. Create Checkout Session
+    const sessionRes = await request.post(`${STOREFRONT_API_URL}/v1/storefront/checkout/sessions`, {
+      headers: { Host: STORE_A_HOST, Cookie: cartCookieHeader }
+    });
+    const sessionData = await sessionRes.json();
+    const sessionCookieHeader = sessionRes.headers()['set-cookie'];
+
+    const payload = {
+      shipping_address: {
+        recipient_name: 'Replay Buyer',
+        address_line_1: '99 Replay Way',
+        city: 'Cairo',
+        country_code: 'EG'
+      },
+      contact_email: 'replay@example.com'
+    };
+
+    // 4. First Finalize
+    const finalize1 = await request.post(`${STOREFRONT_API_URL}/v1/storefront/checkout/sessions/${sessionData.id}/finalize`, {
+      headers: { Host: STORE_A_HOST, Cookie: sessionCookieHeader },
+      data: payload
+    });
+    expect(finalize1.ok()).toBeTruthy();
+    const order1 = await finalize1.json();
+
+    // 5. Replay Finalize (simulating response loss)
+    const finalize2 = await request.post(`${STOREFRONT_API_URL}/v1/storefront/checkout/sessions/${sessionData.id}/finalize`, {
+      headers: { Host: STORE_A_HOST, Cookie: sessionCookieHeader },
+      data: payload
+    });
+    expect(finalize2.ok()).toBeTruthy();
+    const order2 = await finalize2.json();
+
+    // Assert SAME Order ID and order_number
+    expect(order2.id).toBe(order1.id);
+    expect(order2.order_number).toBe(order1.order_number);
   });
 });

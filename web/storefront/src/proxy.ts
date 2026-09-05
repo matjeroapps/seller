@@ -7,7 +7,8 @@ import {
   PATH_HEADER,
   PREVIEW_INVALID_HEADER,
   PREVIEW_PARAM,
-  PREVIEW_TOKEN_HEADER
+  PREVIEW_TOKEN_HEADER,
+  STOREFRONT_HOST_HEADER
 } from './lib/headers';
 
 /**
@@ -15,7 +16,7 @@ import {
  *
  * In Next.js 16 the `middleware` file convention was renamed to `proxy`; the build
  * warns that `middleware.ts` is deprecated and names `proxy.ts` as its replacement.
- * This file is that convention, and it does exactly two things.
+ * This file is that convention, and it does exactly three things.
  *
  * First, it strips every inbound `x-matjero-*` request header. Those headers are this
  * application's own channel from the proxy to the render, so a client must not be
@@ -26,6 +27,10 @@ import {
  * document, and the store chrome must build a locale switch that lands on the
  * equivalent page. Both need the path, and this is the supported way to give it to
  * them.
+ *
+ * Third, it captures the original customer request host and forwards it via an
+ * internal header (`x-matjero-storefront-host`) so backend API rewrites preserve the
+ * exact tenant host even when proxied through Node.
  *
  * Tenant identity is deliberately *not* resolved here. The host is read from the
  * request during rendering, where the store bootstrap it produces can be reused by
@@ -40,6 +45,11 @@ export function proxy(request: NextRequest): NextResponse {
     if (name.toLowerCase().startsWith(INTERNAL_HEADER_PREFIX)) {
       headers.delete(name);
     }
+  }
+
+  const rawHost = request.headers.get('host') || '';
+  if (rawHost) {
+    headers.set(STOREFRONT_HOST_HEADER, rawHost);
   }
 
   const segments = request.nextUrl.pathname.split('/').filter((segment) => segment !== '');

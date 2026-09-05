@@ -69,7 +69,7 @@ echo "2. Starting fake-core..."
 PIDS+=($!)
 
 echo "3. Starting storefront-api..."
-/tmp/storefront-api &
+TRUSTED_FORWARDED_HOST=true /tmp/storefront-api &
 PIDS+=($!)
 
 wait_for_url "http://127.0.0.1:$CORE_PORT/test-control/calls" "Fake Core" 10

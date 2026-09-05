@@ -2254,6 +2254,46 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "address": {
+                      "nullable": true,
+                      "properties": {
+                        "address_line_1": {
+                          "type": "string"
+                        },
+                        "address_line_2": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "postal_code": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "recipient_name": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "address_line_1",
+                        "city",
+                        "country_code",
+                        "recipient_name"
+                      ],
+                      "type": "object"
+                    },
                     "cancellation_reason": {
                       "nullable": true,
                       "type": "string"
@@ -2481,6 +2521,46 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "address": {
+                      "nullable": true,
+                      "properties": {
+                        "address_line_1": {
+                          "type": "string"
+                        },
+                        "address_line_2": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "postal_code": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "recipient_name": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "address_line_1",
+                        "city",
+                        "country_code",
+                        "recipient_name"
+                      ],
+                      "type": "object"
+                    },
                     "cancellation_reason": {
                       "nullable": true,
                       "type": "string"
@@ -2708,6 +2788,46 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "address": {
+                      "nullable": true,
+                      "properties": {
+                        "address_line_1": {
+                          "type": "string"
+                        },
+                        "address_line_2": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "country_code": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "postal_code": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "recipient_name": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "address_line_1",
+                        "city",
+                        "country_code",
+                        "recipient_name"
+                      ],
+                      "type": "object"
+                    },
                     "cancellation_reason": {
                       "nullable": true,
                       "type": "string"

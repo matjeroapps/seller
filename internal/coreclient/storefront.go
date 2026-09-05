@@ -459,4 +459,3 @@ func (c *Client) CancelGuestOrder(ctx context.Context, host, orderID, rawGuestTo
 	}, &payload)
 	return payload, err
 }
-
