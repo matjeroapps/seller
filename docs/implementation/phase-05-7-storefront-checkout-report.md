@@ -1,8 +1,8 @@
 # Phase 5.7 Implementation Report — Storefront Cart, Checkout & Secure Guest Orders (Seller)
 
 **Base SHA**: `d75f84c66cfca9ab4c79c8a3495c5080be28a7af`  
-**Previous Head SHA**: `46fa08e13a3895ee947000b0e95c91c5aaae9832`  
-**Corrective Head SHA**: `f0dde27ef64820d79bfd6b5908723452fd07b315`  
+**Previous Reviewed Head SHA**: `e805113ab594ba2693ae47d411b51725969444dc`  
+**Final Corrective Head SHA**: `e7bea5b35db97d370ec068744bfc5b911237f39f`  
 **Branch**: `feature/p5-7-storefront-checkout`  
 **Repository**: `matjeroapps/seller`  
 **PR**: #13  
@@ -51,6 +51,7 @@ POST   /v1/storefront/orders/{orderID}/cancel
    - `HttpOnly`, `Path=/`, `SameSite=Lax`, host-bound.
    - Holds raw cart capability token returned from Core on cart creation.
    - Token is stripped from JSON body before responding to browser.
+   - **Lifecycle Fix**: Expired (`Max-Age=-1`) on successful checkout session finalization.
 
 2. **Pre-issued Checkout Session Cookie**: `matjero_guest_session_<checkoutSessionID>`
    - `HttpOnly`, `Path=/`, `SameSite=Lax`, host-bound.
@@ -61,6 +62,7 @@ POST   /v1/storefront/orders/{orderID}/cancel
 3. **Finalization Capability Promotion**:
    - Upon successful finalization in Core, Seller promotes the session capability token into an order-specific cookie: `matjero_guest_order_<orderID>`.
    - Session cookie is expired (`Max-Age=-1`) in the same response.
+   - Cart cookie (`matjero_cart`) is expired (`Max-Age=-1`) in the same response.
    - Capability promotion is idempotent on response-loss retry.
    - Multiple guest orders remain independently accessible (Order A cookie does not overwrite Order B cookie).
 
@@ -83,7 +85,7 @@ POST   /v1/storefront/orders/{orderID}/cancel
 
 ---
 
-## 6. Target Corrective Patch Details
+## 6. Corrective Patch Details
 
 ### Blocker 1: Go Formatting
 - Applied `gofmt -w` to all Go sources in `cmd/`, `internal/`, `apps/`.
@@ -101,10 +103,17 @@ POST   /v1/storefront/orders/{orderID}/cancel
 ### Blocker 4: Fake Core Multi-Order Identity & Replay Invariant
 - Refactored `cmd/fake-core` to generate atomic unique Cart IDs, Session IDs, and Order IDs per flow (`cart-1`, `session-1`, `order-1`).
 - Implemented `finalizedSessions` state tracking: retrying `POST /checkout/sessions/{sessionID}/finalize` with the same `sessionID` returns the exact same `OrderID` without creating duplicate orders or rotating access capabilities.
+- Implemented `checked_out` Cart status in `cmd/fake-core`: operations on checked-out carts return 409 conflict, matching Core semantics. Removed auto-healing cart behavior.
 
 ### Blocker 5: Buyer-Safe Shipping Address on Order Page
 - Added `OrderAddressResponse` DTO to `internal/storefrontapi/contracts.go` and mapped `address` field in `ToOrderResponse`.
 - Updated Next.js Order Detail page (`web/storefront/src/app/[locale]/(store)/orders/[orderID]/page.tsx`) and locale dictionaries (`en` / `ar`) to render the Shipping Address card.
+
+### Final Cart Lifecycle Fix (Checked-Out Cart Cookie Cleanup)
+- Updated `handleFinalizeCheckoutSession` in `internal/storefrontapi/router.go` to expire `matjero_cart` cookie on successful checkout finalization.
+- Added defensive recovery in `handleAddCartItem` to clear stale cart cookies on conflict and retry once with a fresh cart.
+- Added unit tests in `router_test.go` (`TestFinalizeCheckoutClearsCartCookie`, `TestFailedFinalizeDoesNotClearCartCookie`) and `fake-core/main_test.go`.
+- Updated Playwright E2E tests (`storefront-checkout.spec.ts`) to verify `matjero_cart` removal after Order 1, creation of fresh Cart B on subsequent purchase, and replay cookie headers.
 
 ---
 
