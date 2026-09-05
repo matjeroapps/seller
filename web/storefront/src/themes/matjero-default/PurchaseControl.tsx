@@ -9,13 +9,15 @@ export function PurchaseControl({
   defaultSkuId,
   available,
   copy,
-  locale
+  locale,
+  purchaseBehavior = 'add_to_cart'
 }: {
   variants: ProductVariantModel[];
   defaultSkuId?: string;
   available: boolean;
   copy: Dictionary;
   locale: string;
+  purchaseBehavior?: 'add_to_cart' | 'buy_now';
 }) {
   const [selectedCode, setSelectedCode] = useState<string>(
     variants.find((v) => v.available)?.code || variants[0]?.code || ''
@@ -32,6 +34,11 @@ export function PurchaseControl({
   async function handleAddToCart(e: React.FormEvent) {
     e.preventDefault();
     if (!targetSkuId || !isPurchasable) return;
+
+    if (purchaseBehavior === 'buy_now') {
+      await handleBuyNow();
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -67,6 +74,33 @@ export function PurchaseControl({
     } catch (err: any) {
       setError(err.message || 'Failed to add item to cart');
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBuyNow() {
+    if (!targetSkuId || !isPurchasable) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/v1/storefront/buy-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ sku_id: targetSkuId, quantity })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Failed to initialize buy now checkout');
+      }
+
+      const data = await res.json();
+      window.location.href = `/${locale}/checkout?session_id=${encodeURIComponent(data.checkout_session_id)}`;
+    } catch (err: any) {
+      setError(err.message || 'Buy Now failed');
       setLoading(false);
     }
   }
@@ -116,17 +150,18 @@ export function PurchaseControl({
         </div>
 
         <button
-          type="button"
-          onClick={handleAddToCart}
+          type="submit"
           disabled={!isPurchasable || loading}
           className="button button--primary add-to-cart-btn"
         >
           {loading
             ? copy.checkout.submitting
-            : added
-            ? copy.cart.added
             : !isPurchasable
             ? copy.availability.out_of_stock
+            : purchaseBehavior === 'buy_now'
+            ? locale === 'ar' ? 'اشتري الآن' : 'Buy Now'
+            : added
+            ? copy.cart.added
             : copy.cart.addToCart}
         </button>
       </div>

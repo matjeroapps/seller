@@ -335,6 +335,7 @@ export function ProductDetail({
             available={model.available}
             copy={copy}
             locale={context.locale}
+            purchaseBehavior={model.purchaseBehavior}
           />
 
           {model.categories.length > 0 ? (
@@ -353,6 +354,27 @@ export function ProductDetail({
           ) : null}
         </div>
       </div>
+
+      {model.sections && model.sections.length > 0 ? (
+        <div className="product__page-sections">
+          {model.sections.filter((s) => s.enabled).map((sec) => {
+            const langContent = sec.content[context.locale] || sec.content['en'] || {};
+            return (
+              <section key={sec.id} className={`product-page-section product-page-section--${sec.type}`}>
+                {langContent.title && <h2 className="section__title">{langContent.title}</h2>}
+                {langContent.text && <p className="section__text">{langContent.text}</p>}
+                {Array.isArray(langContent.items) && (
+                  <ul className="section__items">
+                    {langContent.items.map((item: any, i: number) => (
+                      <li key={i}>{typeof item === 'string' ? item : item.question ? `${item.question}: ${item.answer}` : JSON.stringify(item)}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
     </article>
   );
 }

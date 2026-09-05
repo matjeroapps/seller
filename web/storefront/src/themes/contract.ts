@@ -194,6 +194,8 @@ export type ProductDetailViewModel = {
   categories: StoreLink[];
   variants: ProductVariantModel[];
   defaultSkuId?: string;
+  purchaseBehavior?: 'add_to_cart' | 'buy_now';
+  sections?: Array<{ id: string; type: string; enabled: boolean; sort_order: number; content: Record<string, any> }>;
 };
 
 export type SearchViewModel = {

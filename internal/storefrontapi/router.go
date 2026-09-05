@@ -118,6 +118,7 @@ func RegisterStorefrontRoutes(deps Dependencies) func(r chi.Router) {
 		r.Post("/storefront/checkout/sessions/{sessionID}/finalize", deps.handleFinalizeCheckoutSession)
 		r.Get("/storefront/orders/{orderID}", deps.handleGetGuestOrder)
 		r.Post("/storefront/orders/{orderID}/cancel", deps.handleCancelGuestOrder)
+		r.Post("/storefront/buy-now", deps.handleBuyNow)
 	}
 }
 
@@ -670,12 +671,82 @@ func (deps Dependencies) handleFinalizeCheckoutSession(w http.ResponseWriter, r 
 		return
 	}
 
+	isBuyNow := getCookieValue(r, "matjero_buy_now_session_"+sessionID) == "1"
+
 	deps.setCookie(w, "matjero_guest_order_"+order.ID, rawGuestToken, 30*24*3600)
 	deps.setCookie(w, "matjero_guest_session_"+sessionID, "", -1)
-	deps.setCookie(w, "matjero_cart", "", -1)
+
+	if isBuyNow {
+		deps.setCookie(w, "matjero_buy_now_session_"+sessionID, "", -1)
+	} else {
+		deps.setCookie(w, "matjero_cart", "", -1)
+	}
 
 	w.Header().Set("Cache-Control", "private, no-store")
 	deps.writeJSON(w, ToOrderResponse(order))
+}
+
+type buyNowRequest struct {
+	SKUID    string `json:"sku_id"`
+	Quantity int64  `json:"quantity"`
+}
+
+type buyNowResponse struct {
+	CheckoutSessionID string `json:"checkout_session_id"`
+	Status            string `json:"status"`
+	ExpiresAt         string `json:"expires_at"`
+}
+
+func (deps Dependencies) handleBuyNow(w http.ResponseWriter, r *http.Request) {
+	if !deps.Platform.StorefrontCheckoutEnabled {
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "resource not found")
+		return
+	}
+	var req buyNowRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil || strings.TrimSpace(req.SKUID) == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", "invalid buy now payload")
+		return
+	}
+	qty := req.Quantity
+	if qty <= 0 {
+		qty = 1
+	}
+
+	host := deps.hostFor(r)
+
+	// 1. Create dedicated Cart B for Buy Now
+	cart, err := deps.Commerce.CreateCart(r.Context(), host)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+
+	// 2. Add SKU to dedicated Cart B
+	_, err = deps.Commerce.AddCartItem(r.Context(), host, cart.CartToken, req.SKUID, qty)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+
+	// 3. Create Checkout Session for Cart B
+	sess, err := deps.Commerce.CreateCheckoutSession(r.Context(), host, cart.CartToken)
+	if err != nil {
+		writeStorefrontError(w, err)
+		return
+	}
+
+	// 4. Set guest session cookie and buy now marker cookie
+	deps.setCookie(w, "matjero_guest_session_"+sess.ID, sess.GuestOrderAccessToken, 1800)
+	deps.setCookie(w, "matjero_buy_now_session_"+sess.ID, "1", 1800)
+
+	w.Header().Set("Cache-Control", "private, no-store")
+	deps.writeJSON(w, buyNowResponse{
+		CheckoutSessionID: sess.ID,
+		Status:            sess.Status,
+		ExpiresAt:         sess.ExpiresAt,
+	})
 }
 
 func (deps Dependencies) handleGetGuestOrder(w http.ResponseWriter, r *http.Request) {

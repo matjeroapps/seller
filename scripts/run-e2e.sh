@@ -6,6 +6,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+export PATH="$ROOT_DIR/node_modules/.bin:$ROOT_DIR/web/storefront/node_modules/.bin:$ROOT_DIR/web/seller/node_modules/.bin:$PATH"
 
 CORE_PORT=${FAKE_CORE_PORT:-18080}
 STOREFRONT_API_PORT=${STOREFRONT_API_PORT:-8080}

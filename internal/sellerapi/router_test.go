@@ -160,6 +160,79 @@ func (s *stubCore) CreateThemePreview(ctx context.Context, storeID, subject stri
 	return s.preview, s.err
 }
 
+func (s *stubCore) ListStoreProducts(ctx context.Context, subject, storeID, status, source, query string, limit, offset int) (*coreclient.SellerProductListResponse, error) {
+	return &coreclient.SellerProductListResponse{}, s.err
+}
+func (s *stubCore) CreateSellerProduct(ctx context.Context, subject, storeID string, draft coreclient.SellerProductDraft) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
+	return &coreclient.Variant{}, s.err
+}
+func (s *stubCore) UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error) {
+	return &coreclient.Variant{}, s.err
+}
+func (s *stubCore) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+	return &coreclient.SKU{}, s.err
+}
+func (s *stubCore) UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+	return &coreclient.SKU{}, s.err
+}
+func (s *stubCore) CreateMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.MediaUploadRequest) (*coreclient.MediaUploadResponse, error) {
+	return &coreclient.MediaUploadResponse{}, s.err
+}
+func (s *stubCore) CompleteMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.CompleteMediaUploadRequest) (*coreclient.MediaMetadata, error) {
+	return &coreclient.MediaMetadata{}, s.err
+}
+func (s *stubCore) UpdateMedia(ctx context.Context, subject, storeID, productID, mediaID, altText string, sortOrder int, isPrimary bool) (*coreclient.MediaMetadata, error) {
+	return &coreclient.MediaMetadata{}, s.err
+}
+func (s *stubCore) DeleteMedia(ctx context.Context, subject, storeID, productID, mediaID string) error {
+	return s.err
+}
+func (s *stubCore) ListStoreLocations(ctx context.Context, subject, storeID string) ([]coreclient.StoreLocation, error) {
+	return nil, s.err
+}
+func (s *stubCore) CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*coreclient.StoreLocation, error) {
+	return &coreclient.StoreLocation{}, s.err
+}
+func (s *stubCore) ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.InventorySnapshot, error) {
+	return nil, s.err
+}
+func (s *stubCore) CreateInventorySnapshot(ctx context.Context, subject, storeID string, req coreclient.CreateSnapshotRequest) (*coreclient.InventorySnapshot, error) {
+	return &coreclient.InventorySnapshot{}, s.err
+}
+func (s *stubCore) AdjustInventory(ctx context.Context, subject, storeID, snapshotID string, req coreclient.AdjustInventoryRequest) (*coreclient.InventorySnapshot, error) {
+	return &coreclient.InventorySnapshot{}, s.err
+}
+func (s *stubCore) GetListingPresentation(ctx context.Context, subject, storeID, listingID string) (*coreclient.SellerListingPresentation, error) {
+	return &coreclient.SellerListingPresentation{}, s.err
+}
+func (s *stubCore) UpdateListingPresentation(ctx context.Context, subject, storeID, listingID string, pres coreclient.SellerListingPresentation) (*coreclient.SellerListingPresentation, error) {
+	return &coreclient.SellerListingPresentation{}, s.err
+}
+func (s *stubCore) PublishSellerProduct(ctx context.Context, subject, storeID, productID string) error {
+	return s.err
+}
+func (s *stubCore) UnpublishSellerProduct(ctx context.Context, subject, storeID, productID string) error {
+	return s.err
+}
+func (s *stubCore) ListStoreOrders(ctx context.Context, subject, storeID, status string, limit, offset int) (*coreclient.SellerOrderListResponse, error) {
+	return &coreclient.SellerOrderListResponse{}, s.err
+}
+func (s *stubCore) GetStoreOrderDetail(ctx context.Context, subject, storeID, orderID string) (*coreclient.SellerOrderDetail, error) {
+	return &coreclient.SellerOrderDetail{}, s.err
+}
+func (s *stubCore) TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error) {
+	return &coreclient.SellerOrderDetail{}, s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()

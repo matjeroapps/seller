@@ -109,6 +109,8 @@ export type ProductDetail = {
   images: ProductImage[];
   categories: CategoryRef[];
   variants: PublicVariant[];
+  purchase_behavior?: 'add_to_cart' | 'buy_now';
+  sections?: Array<{ id: string; type: string; enabled: boolean; sort_order: number; content: Record<string, any> }>;
 };
 
 export type Pagination = {
