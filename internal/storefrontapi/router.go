@@ -547,6 +547,21 @@ func (deps Dependencies) handleAddCartItem(w http.ResponseWriter, r *http.Reques
 	}
 	cart, err := deps.Commerce.AddCartItem(r.Context(), host, cartToken, body.SKUID, body.Quantity)
 	if err != nil {
+		var coreErr *coreclient.Error
+		if errors.As(err, &coreErr) && coreErr.Code == coreclient.CodeConflict && cartToken != "" {
+			deps.setCookie(w, "matjero_cart", "", -1)
+			newCart, createErr := deps.Commerce.CreateCart(r.Context(), host)
+			if createErr == nil {
+				deps.setCookie(w, "matjero_cart", newCart.CartToken, 30*24*3600)
+				retryCart, retryErr := deps.Commerce.AddCartItem(r.Context(), host, newCart.CartToken, body.SKUID, body.Quantity)
+				if retryErr == nil {
+					retryCart.CartToken = ""
+					w.Header().Set("Cache-Control", "private, no-store")
+					deps.writeJSON(w, retryCart)
+					return
+				}
+			}
+		}
 		writeStorefrontError(w, err)
 		return
 	}
@@ -657,6 +672,7 @@ func (deps Dependencies) handleFinalizeCheckoutSession(w http.ResponseWriter, r 
 
 	deps.setCookie(w, "matjero_guest_order_"+order.ID, rawGuestToken, 30*24*3600)
 	deps.setCookie(w, "matjero_guest_session_"+sessionID, "", -1)
+	deps.setCookie(w, "matjero_cart", "", -1)
 
 	w.Header().Set("Cache-Control", "private, no-store")
 	deps.writeJSON(w, ToOrderResponse(order))

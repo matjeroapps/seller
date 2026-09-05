@@ -72,6 +72,11 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     // Order 1
     await page.goto(`${STORE_A_BASE_URL}/en/products/product-a`);
     await page.click('.add-to-cart-btn');
+
+    let cookies = await context.cookies();
+    const cartACookie = cookies.find((c) => c.name === 'matjero_cart');
+    expect(cartACookie).toBeTruthy();
+
     await page.goto(`${STORE_A_BASE_URL}/en/cart`);
     await page.click('button:has-text("Proceed to Checkout"), button:has-text("إتمام الطلب")');
     await page.fill('#recipientName', 'Alice');
@@ -83,9 +88,21 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     await expect(page).toHaveURL(/\/en\/orders\/.+/);
     const order1Url = page.url();
 
-    // Order 2
+    // Verify Cart A cookie has been removed from browser context after Order 1
+    cookies = await context.cookies();
+    const cartAfterOrder1 = cookies.find((c) => c.name === 'matjero_cart');
+    expect(cartAfterOrder1).toBeUndefined();
+
+    // Order 2 (Second Add to Cart creates a fresh Cart B)
     await page.goto(`${STORE_A_BASE_URL}/en/products/product-a`);
     await page.click('.add-to-cart-btn');
+    await expect(page.locator('.purchase-control__success')).toBeVisible();
+
+    cookies = await context.cookies();
+    const cartBCookie = cookies.find((c) => c.name === 'matjero_cart');
+    expect(cartBCookie).toBeTruthy();
+    expect(cartBCookie?.value).not.toEqual(cartACookie?.value);
+
     await page.goto(`${STORE_A_BASE_URL}/en/cart`);
     await page.click('button:has-text("Proceed to Checkout"), button:has-text("إتمام الطلب")');
     await page.fill('#recipientName', 'Bob');
@@ -214,5 +231,11 @@ test.describe('P5.7 Storefront Checkout & Guest Order E2E', () => {
     // Assert SAME Order ID and order_number
     expect(order2.id).toBe(order1.id);
     expect(order2.order_number).toBe(order1.order_number);
+
+    // Verify Set-Cookie header on replay clears cart & session cookies and sets order cookie
+    const setCookie2 = finalize2.headers()['set-cookie'] || '';
+    expect(setCookie2).toContain(`matjero_guest_order_${order1.id}=`);
+    expect(setCookie2).toContain(`matjero_guest_session_${sessionData.id}=`);
+    expect(setCookie2).toContain('matjero_cart=');
   });
 });

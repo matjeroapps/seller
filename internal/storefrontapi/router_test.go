@@ -753,3 +753,119 @@ func TestToOrderResponseMapsShippingAddress(t *testing.T) {
 		t.Errorf("Address phone mismatch: %v", res.Address.Phone)
 	}
 }
+
+type stubCommerce struct {
+	finalizeOrder coreclient.PublicOrder
+	finalizeErr   error
+}
+
+func (s *stubCommerce) CreateCart(ctx context.Context, host string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) GetCart(ctx context.Context, host, cartToken string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) AddCartItem(ctx context.Context, host, cartToken, skuID string, quantity int64) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) UpdateCartItem(ctx context.Context, host, cartToken, itemID string, quantity int64) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) RemoveCartItem(ctx context.Context, host, cartToken, itemID string) (coreclient.CartResponse, error) {
+	return coreclient.CartResponse{}, nil
+}
+func (s *stubCommerce) CreateCheckoutSession(ctx context.Context, host, cartToken string) (coreclient.CheckoutSessionResponse, error) {
+	return coreclient.CheckoutSessionResponse{}, nil
+}
+func (s *stubCommerce) FinalizeCheckoutSession(ctx context.Context, host, sessionID string, request coreclient.FinalizeRequest) (coreclient.PublicOrder, error) {
+	return s.finalizeOrder, s.finalizeErr
+}
+func (s *stubCommerce) GetGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error) {
+	return coreclient.PublicOrder{}, nil
+}
+func (s *stubCommerce) CancelGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (coreclient.PublicOrder, error) {
+	return coreclient.PublicOrder{}, nil
+}
+
+func TestFinalizeCheckoutClearsCartCookie(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeOrder: coreclient.PublicOrder{ID: "ord-999", OrderNumber: "#10099", Status: "pending"},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-123/finalize", strings.NewReader(`{"contact_email":"a@b.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-123", Value: "guest-tok-123"})
+	req.AddCookie(&http.Cookie{Name: "matjero_cart", Value: "cart-tok-123"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+
+	setCookies := rec.Result().Cookies()
+	var foundOrderCookie, expiredSessionCookie, expiredCartCookie bool
+	for _, c := range setCookies {
+		if c.Name == "matjero_guest_order_ord-999" && c.Value == "guest-tok-123" {
+			foundOrderCookie = true
+		}
+		if c.Name == "matjero_guest_session_sess-123" && (c.MaxAge < 0 || c.Expires.Year() < 2000) {
+			expiredSessionCookie = true
+		}
+		if c.Name == "matjero_cart" && (c.MaxAge < 0 || c.Expires.Year() < 2000) {
+			expiredCartCookie = true
+		}
+	}
+
+	if !foundOrderCookie {
+		t.Errorf("expected matjero_guest_order_ord-999 cookie to be set")
+	}
+	if !expiredSessionCookie {
+		t.Errorf("expected matjero_guest_session_sess-123 cookie to be expired")
+	}
+	if !expiredCartCookie {
+		t.Errorf("expected matjero_cart cookie to be expired")
+	}
+}
+
+func TestFailedFinalizeDoesNotClearCartCookie(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeErr: &coreclient.Error{Status: http.StatusConflict, Code: coreclient.CodeConflict},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-123/finalize", strings.NewReader(`{"contact_email":"a@b.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-123", Value: "guest-tok-123"})
+	req.AddCookie(&http.Cookie{Name: "matjero_cart", Value: "cart-tok-123"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", rec.Code)
+	}
+
+	setCookies := rec.Result().Cookies()
+	for _, c := range setCookies {
+		if c.Name == "matjero_cart" {
+			t.Errorf("failed finalize MUST NOT alter or expire matjero_cart cookie, got cookie %v", c)
+		}
+	}
+}

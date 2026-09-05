@@ -560,6 +560,11 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
 			return
 		}
+		if cart["status"] == "checked_out" {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "conflict", "message": "cart is checked out"}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":          cart["id"],
 			"status":      "active",
@@ -570,8 +575,8 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/internal/v1/storefront/carts/items" && r.Method == http.MethodPost:
 		cartToken := strings.TrimSpace(r.Header.Get("X-Matjero-Cart-Token"))
 		s.mu.Lock()
-		cart, ok := s.cartTokens[cartToken]
-		if !ok || cart["store_code"] != store.code {
+		var cart map[string]any
+		if cartToken == "" {
 			seq := s.cartSeq.Add(1)
 			cartID := fmt.Sprintf("cart-%s-%d", store.code, seq)
 			cartToken = fmt.Sprintf("token-%s-%d", store.code, seq)
@@ -585,6 +590,21 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			s.carts[cartID] = cart
 			s.cartTokens[cartToken] = cart
+		} else {
+			var ok bool
+			cart, ok = s.cartTokens[cartToken]
+			if !ok || cart["store_code"] != store.code {
+				s.mu.Unlock()
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
+				return
+			}
+			if cart["status"] == "checked_out" {
+				s.mu.Unlock()
+				w.WriteHeader(http.StatusConflict)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "conflict", "message": "cart is checked out"}})
+				return
+			}
 		}
 
 		var body map[string]any
@@ -625,6 +645,11 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "unauthorized", "message": "unauthorized"}})
 			return
 		}
+		if cart["status"] == "checked_out" {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "conflict", "message": "cart is checked out"}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":          cart["id"],
 			"status":      "active",
@@ -640,6 +665,12 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.mu.Unlock()
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "validation_error", "message": "active cart required"}})
+			return
+		}
+		if cart["status"] == "checked_out" {
+			s.mu.Unlock()
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"code": "conflict", "message": "cart is checked out"}})
 			return
 		}
 		seq := s.sessionSeq.Add(1)
@@ -758,6 +789,12 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 			"address": addrMap,
+		}
+
+		if cartID, ok := sess["cart_id"].(string); ok {
+			if cart, ok := s.carts[cartID]; ok {
+				cart["status"] = "checked_out"
+			}
 		}
 
 		s.orders[orderID] = orderMap
