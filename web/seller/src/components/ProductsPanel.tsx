@@ -40,6 +40,9 @@ type ProductsPanelProps = {
 };
 
 export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [storeCurrency, setStoreCurrency] = React.useState('EGP');
+  const [storeCurrencyMinorUnit, setStoreCurrencyMinorUnit] = React.useState(2);
   const [products, setProducts] = React.useState<ProductListItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -95,6 +98,29 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       setLoading(false);
     }
   }, [api, storeId, locale]);
+
+  // Fetch store market currency when store changes.
+  React.useEffect(() => {
+    if (!storeId) return;
+    (async () => {
+      try {
+        const res = await api.get(`/v1/seller/stores/${encodeURIComponent(storeId)}`);
+        if (res.ok) {
+          const store = await res.json();
+          const mktCode: string = store.market_code || 'EG';
+          const mktRes = await api.get(`/v1/markets/${encodeURIComponent(mktCode)}?locale=${locale}`);
+          if (mktRes.ok) {
+            const mkt = await mktRes.json();
+            if (mkt?.currency?.code) setStoreCurrency(mkt.currency.code);
+            if (mkt?.currency?.minor_unit != null) setStoreCurrencyMinorUnit(mkt.currency.minor_unit);
+          }
+        }
+      } catch {
+        // Non-fatal: fallback to EGP
+      }
+    })();
+  }, [api, storeId, locale]);
+
 
   React.useEffect(() => {
     void loadProducts();
@@ -247,36 +273,70 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     }
   };
 
-  const handleUploadImageMock = async () => {
-    if (!editingProductId) return;
+  const handlePickAndUploadImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingProductId) return;
+    // Reset file input so same file can be re-selected
+    e.target.value = '';
     try {
       setLoading(true);
-      // 1. Presign
-      const uploadRes = await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/media/uploads`, {
-        filename: 'product-image.webp',
-        content_type: 'image/webp',
-        size_bytes: 102400
-      });
-      if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        // 2. Complete upload
-        await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/media`, {
-          storage_key: uploadData.storage_key,
-          alt_text: nameEn || 'Product Image',
-          sort_order: (productDetail?.media.length || 0) + 1,
-          is_primary: (productDetail?.media.length || 0) === 0
-        });
-
-        // Refresh detail
-        const res = await api.get(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`);
-        if (res.ok) setProductDetail(await res.json());
+      setError(null);
+      // 1. Request presigned upload URL from Core (via Seller API)
+      const presignRes = await api.post(
+        `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/media/uploads`,
+        { filename: file.name, content_type: file.type, size_bytes: file.size }
+      );
+      if (!presignRes.ok) {
+        const errData = await presignRes.json().catch(() => ({}));
+        setError(errData.message || 'Failed to get upload URL');
+        return;
       }
+      const presignData: { upload_url: string; storage_key: string; upload_token: string } = await presignRes.json();
+
+      // 2. PUT file directly to S3 presigned URL (browser-native, bypasses Seller API)
+      const putRes = await fetch(presignData.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!putRes.ok) {
+        setError(`S3 upload failed: ${putRes.status} ${putRes.statusText}`);
+        return;
+      }
+
+      // 3. Complete upload — pass the upload_token back to Core for verification
+      const completeRes = await api.post(
+        `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/media`,
+        {
+          storage_key: presignData.storage_key,
+          upload_token: presignData.upload_token,
+          alt_text: file.name.replace(/\.[^.]+$/, '') || (nameEn || 'Product Image'),
+          sort_order: (productDetail?.media.length || 0) + 1,
+          is_primary: (productDetail?.media.length || 0) === 0,
+        }
+      );
+      if (!completeRes.ok) {
+        const errData = await completeRes.json().catch(() => ({}));
+        setError(errData.message || 'Failed to register image');
+        return;
+      }
+
+      // 4. Refresh product detail
+      const res = await api.get(
+        `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`
+      );
+      if (res.ok) setProductDetail(await res.json());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Media upload failed');
+      setError(err instanceof Error ? err.message : 'Image upload failed');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleSavePricingAndInventory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,10 +344,10 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     try {
       setLoading(true);
       // Set Listing Price
-      const amountMinor = Math.round(parseFloat(priceMajor || '0') * 100);
+      const amountMinor = Math.round(parseFloat(priceMajor || '0') * Math.pow(10, storeCurrencyMinorUnit));
       await api.post(`/v1/seller/listings/${encodeURIComponent(productDetail.listing.id)}/price`, {
         amount_minor: amountMinor,
-        currency: 'EGP'
+        currency: storeCurrency
       });
 
       // Ensure store location & inventory
@@ -323,7 +383,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
           const delta = targetOnHand - snap.on_hand_qty;
           if (delta !== 0) {
             await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory/${encodeURIComponent(snap.id)}/adjustments`, {
-              delta_quantity: delta,
+              quantity_delta: delta,
               reason: 'Manual dashboard update'
             });
           }
@@ -563,61 +623,192 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
 
             {editorStep === 'media' && (
               <div className="editor-form">
-                <h3>Product Images (S3 Upload)</h3>
-                <button type="button" className="btn btn-secondary" onClick={() => void handleUploadImageMock()} disabled={loading}>
-                  + Upload Image (Presigned S3 Flow)
+                <h3>Product Images</h3>
+                <p className="subtext">Upload images directly to S3 storage via presigned URL. First image is set as the primary image automatically.</p>
+                {/* Hidden native file input — triggered programmatically */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => void handleFileSelected(e)}
+                />
+                <button type="button" className="btn btn-secondary" onClick={handlePickAndUploadImage} disabled={loading}>
+                  📁 {loading ? 'Uploading…' : '+ Upload Image'}
                 </button>
                 <div className="media-gallery">
-                  {productDetail?.media?.map((m) => (
+                  {(productDetail?.media ?? []).map((m) => (
                     <div key={m.id} className="media-card">
                       <img src={m.uri} alt={m.alt_text} className="media-thumb" />
                       {m.is_primary && <span className="badge badge-primary">Primary</span>}
-                      <p>{m.alt_text}</p>
+                      <p className="subtext">{m.alt_text}</p>
                     </div>
                   ))}
+                  {(productDetail?.media ?? []).length === 0 && (
+                    <p className="subtext">No images uploaded yet. Add at least one image before publishing.</p>
+                  )}
                 </div>
                 <button type="button" className="btn btn-primary" onClick={() => setEditorStep('pricing')}>
-                  Next: Price & Inventory →
+                  Next: Price &amp; Inventory →
                 </button>
               </div>
             )}
 
             {editorStep === 'pricing' && (
               <form onSubmit={(e) => void handleSavePricingAndInventory(e)} className="editor-form">
-                <h3>Retail Pricing & Store Inventory</h3>
+                <h3>Retail Pricing &amp; Store Inventory</h3>
                 <div className="form-group">
-                  <label htmlFor="price-input">Retail Price (EGP)</label>
-                  <input id="price-input" type="number" step="0.01" value={priceMajor} onChange={(e) => setPriceMajor(e.target.value)} required className="form-control" />
+                  <label htmlFor="price-input">Retail Price ({storeCurrency})</label>
+                  <input id="price-input" type="number" step="0.01" min="0" value={priceMajor} onChange={(e) => setPriceMajor(e.target.value)} required className="form-control" />
+                  <span className="field-hint">Enter price in {storeCurrency} (e.g. 1.00 = 1 {storeCurrency})</span>
                 </div>
                 <div className="form-group">
                   <label htmlFor="stock-input">On-Hand Inventory (Units)</label>
-                  <input id="stock-input" type="number" value={onHandStock} onChange={(e) => setOnHandStock(e.target.value)} required className="form-control" />
+                  <input id="stock-input" type="number" min="0" value={onHandStock} onChange={(e) => setOnHandStock(e.target.value)} required className="form-control" />
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                  Save & Next: Product Page Editor →
+                  Save &amp; Next: Product Page Editor →
                 </button>
               </form>
             )}
 
             {editorStep === 'presentation' && (
               <form onSubmit={(e) => void handleSavePresentation(e)} className="editor-form">
-                <h3>Product Page Sections & Purchase Action</h3>
+                <h3>Product Page Sections &amp; Purchase Action</h3>
                 <div className="form-group">
                   <label htmlFor="purchase-behavior">Default Purchase Button CTA</label>
-                  <select id="purchase-behavior" value={purchaseBehavior} onChange={(e) => setPurchaseBehavior(e.target.value as any)} className="form-control">
+                  <select id="purchase-behavior" value={purchaseBehavior} onChange={(e) => setPurchaseBehavior(e.target.value as 'inherit' | 'add_to_cart' | 'buy_now')} className="form-control">
                     <option value="inherit">Use Store Default</option>
                     <option value="add_to_cart">Add to Cart</option>
                     <option value="buy_now">Buy Now</option>
                   </select>
                 </div>
-                <h4>Configured Sections</h4>
+                <h4>Configured Product Page Sections</h4>
                 {sections.map((sec, idx) => (
                   <div key={sec.id} className="section-box">
-                    <strong>Section #{idx + 1}: {sec.type}</strong>
+                    <div className="section-header">
+                      <strong>Section #{idx + 1}: {sec.type}</strong>
+                      <label className="toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={sec.enabled}
+                          onChange={(e) => {
+                            const updated = [...sections];
+                            updated[idx] = { ...updated[idx], enabled: e.target.checked };
+                            setSections(updated);
+                          }}
+                        />
+                        Enabled
+                      </label>
+                    </div>
+                    {sec.type === 'description' && (
+                      <div className="section-content">
+                        <div className="form-group">
+                          <label>Description (EN)</label>
+                          <textarea
+                            rows={3}
+                            className="form-control"
+                            value={(sec.content?.en?.text as string) || ''}
+                            onChange={(e) => {
+                              const updated = [...sections];
+                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), text: e.target.value } } };
+                              setSections(updated);
+                            }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Description (AR)</label>
+                          <textarea
+                            dir="rtl" rows={3} className="form-control"
+                            value={(sec.content?.ar?.text as string) || ''}
+                            onChange={(e) => {
+                              const updated = [...sections];
+                              updated[idx] = { ...sec, content: { ...sec.content, ar: { ...((sec.content?.ar as object) || {}), text: e.target.value } } };
+                              setSections(updated);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {sec.type === 'highlights' && (
+                      <div className="section-content">
+                        <div className="form-group">
+                          <label>Title (EN)</label>
+                          <input type="text" className="form-control" value={(sec.content?.en?.title as string) || ''}
+                            onChange={(e) => {
+                              const updated = [...sections];
+                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), title: e.target.value } } };
+                              setSections(updated);
+                            }} />
+                        </div>
+                        <div className="form-group">
+                          <label>Highlights (EN, comma-separated)</label>
+                          <input type="text" className="form-control"
+                            value={((sec.content?.en as {items?: string[]})?.items || []).join(', ')}
+                            onChange={(e) => {
+                              const items = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                              const updated = [...sections];
+                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), items } } };
+                              setSections(updated);
+                            }} />
+                        </div>
+                      </div>
+                    )}
+                    {sec.type === 'faq' && (
+                      <div className="section-content">
+                        <p className="subtext">FAQ content is schema-validated. Add question/answer pairs in JSON editor below.</p>
+                        <textarea rows={4} className="form-control"
+                          value={JSON.stringify(sec.content, null, 2)}
+                          onChange={(e) => {
+                            try {
+                              const parsed = JSON.parse(e.target.value) as Record<string, unknown>;
+                              const updated = [...sections];
+                              updated[idx] = { ...sec, content: parsed };
+                              setSections(updated);
+                            } catch {
+                              // invalid JSON, ignore
+                            }
+                          }} />
+                      </div>
+                    )}
+                    {!['description', 'highlights', 'faq'].includes(sec.type) && (
+                      <div className="section-content">
+                        <p className="subtext">Type: {sec.type} — saved automatically.</p>
+                      </div>
+                    )}
                   </div>
                 ))}
+                <div className="section-actions">
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
+                    setSections([...sections, {
+                      id: `sec-${Date.now()}`,
+                      type: 'description',
+                      enabled: true,
+                      sort_order: sections.length + 1,
+                      content: { en: { text: '' }, ar: { text: '' } }
+                    }]);
+                  }}>+ Add Description Section</button>{' '}
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
+                    setSections([...sections, {
+                      id: `sec-${Date.now()}`,
+                      type: 'highlights',
+                      enabled: true,
+                      sort_order: sections.length + 1,
+                      content: { en: { title: '', items: [] }, ar: { title: '', items: [] } }
+                    }]);
+                  }}>+ Add Highlights Section</button>{' '}
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
+                    setSections([...sections, {
+                      id: `sec-${Date.now()}`,
+                      type: 'faq',
+                      enabled: true,
+                      sort_order: sections.length + 1,
+                      content: { en: { items: [] }, ar: { items: [] } }
+                    }]);
+                  }}>+ Add FAQ Section</button>
+                </div>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                  Save & Next: Readiness & Publish →
+                  Save &amp; Next: Readiness &amp; Publish →
                 </button>
               </form>
             )}

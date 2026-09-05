@@ -134,16 +134,18 @@ type MediaUploadRequest struct {
 }
 
 type MediaUploadResponse struct {
-	UploadURL  string    `json:"upload_url"`
-	StorageKey string    `json:"storage_key"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	UploadURL   string    `json:"upload_url"`
+	StorageKey  string    `json:"storage_key"`
+	UploadToken string    `json:"upload_token"`
+	ExpiresAt   time.Time `json:"expires_at"`
 }
 
 type CompleteMediaUploadRequest struct {
-	StorageKey string `json:"storage_key"`
-	AltText    string `json:"alt_text"`
-	SortOrder  int    `json:"sort_order"`
-	IsPrimary  bool   `json:"is_primary"`
+	StorageKey  string `json:"storage_key"`
+	UploadToken string `json:"upload_token"`
+	AltText     string `json:"alt_text"`
+	SortOrder   int    `json:"sort_order"`
+	IsPrimary   bool   `json:"is_primary"`
 }
 
 type StoreLocation struct {
@@ -158,7 +160,7 @@ type StoreLocation struct {
 
 type InventorySnapshot struct {
 	ID                    string    `json:"id"`
-	FulfillmentLocationID string    `json:"id_fulfillment_location"`
+	FulfillmentLocationID string    `json:"fulfillment_location_id"`
 	SKUID                 string    `json:"sku_id"`
 	OnHandQty             int       `json:"on_hand_qty"`
 	ReservedQty           int       `json:"reserved_qty"`
@@ -174,18 +176,18 @@ type CreateSnapshotRequest struct {
 }
 
 type AdjustInventoryRequest struct {
-	DeltaQuantity int     `json:"delta_quantity"`
+	DeltaQuantity int     `json:"quantity_delta"`
 	Reason        *string `json:"reason,omitempty"`
 }
 
 type SellerOrderItem struct {
-	ID          string   `json:"id"`
-	SKUID       string   `json:"sku_id"`
-	SKUCode     string   `json:"sku_code"`
-	ProductName string   `json:"product_name"`
-	Quantity    int      `json:"quantity"`
-	UnitPrice   MoneyDTO `json:"unit_price"`
-	TotalPrice  MoneyDTO `json:"total_price"`
+	ID          string `json:"id"`
+	ProductName string `json:"product_name"`
+	SKUCode     string `json:"sku_code"`
+	Quantity    int    `json:"quantity"`
+	UnitPrice   int64  `json:"unit_price"`
+	TotalPrice  int64  `json:"total_price"`
+	Source      string `json:"source"`
 }
 
 type SellerOrderTimelineEvent struct {
@@ -194,6 +196,9 @@ type SellerOrderTimelineEvent struct {
 	Detail    string    `json:"detail"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// SellerOrderTimelineEntry aliases SellerOrderTimelineEvent for Core DTO alignment.
+type SellerOrderTimelineEntry = SellerOrderTimelineEvent
 
 type SellerOrder struct {
 	ID                     string     `json:"id"`
@@ -212,7 +217,9 @@ type SellerOrderDetail struct {
 	OrderNumber            string                     `json:"order_number"`
 	Status                 string                     `json:"status"`
 	Currency               string                     `json:"currency"`
+	Subtotal               int64                      `json:"subtotal"`
 	Total                  int64                      `json:"total"`
+	ItemCount              int                        `json:"item_count"`
 	ConfirmationDeadlineAt *time.Time                 `json:"confirmation_deadline_at,omitempty"`
 	ShippingAddress        map[string]any             `json:"shipping_address"`
 	ContactEmail           string                     `json:"contact_email"`
@@ -220,6 +227,7 @@ type SellerOrderDetail struct {
 	Timeline               []SellerOrderTimelineEvent `json:"timeline"`
 	AllowedNextActions     []string                   `json:"allowed_next_actions"`
 	CreatedAt              time.Time                  `json:"created_at"`
+	UpdatedAt              time.Time                  `json:"updated_at"`
 }
 
 type SellerOrderListResponse struct {
