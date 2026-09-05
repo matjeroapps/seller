@@ -257,14 +257,21 @@ export function toProductDetailModel(
       href: categoryHref(locale, category.slug, previewToken),
       label: plainText(category.name, 128)
     })),
-    variants: (product.variants ?? []).slice(0, MAX_VARIANTS).map((variant) => ({
-      code: plainText(variant.code, 128),
-      available: variant.availability === 'in_stock',
-      availabilityLabel: availabilityLabel(variant.availability, copy),
-      // The count of purchasable units, not their identifiers: a SKU id is an
-      // internal handle a customer has no use for before a cart exists.
-      skuCount: Array.isArray(variant.skus) ? variant.skus.length : 0
-    }))
+    variants: (product.variants ?? []).slice(0, MAX_VARIANTS).map((variant) => {
+      const firstAvailableSku = Array.isArray(variant.skus)
+        ? variant.skus.find((s) => s.availability === 'in_stock') || variant.skus[0]
+        : undefined;
+      return {
+        code: plainText(variant.code, 128),
+        available: variant.availability === 'in_stock',
+        availabilityLabel: availabilityLabel(variant.availability, copy),
+        skuCount: Array.isArray(variant.skus) ? variant.skus.length : 0,
+        skuId: firstAvailableSku?.id
+      };
+    }),
+    defaultSkuId:
+      (product.variants ?? [])[0]?.skus?.find((s) => s.availability === 'in_stock')?.id ||
+      (product.variants ?? [])[0]?.skus?.[0]?.id
   };
 }
 

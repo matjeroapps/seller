@@ -96,12 +96,11 @@ describe('supplier and cost privacy', () => {
     expect(model.price.amountMinor).toBe(24900);
   });
 
-  it('exposes the count of purchasable units, not their internal identifiers', () => {
+  it('exposes purchasable units and SKU ID for client purchasing without exposing raw SKU UUIDs to human DOM text', () => {
     const context = buildContext({ store: storeA, locale: 'en' });
     const model = toProductDetailModel(productDetailWithInternals, storeA.currency, 'en', context.copy);
 
-    expect(model.variants[0]).toMatchObject({ code: 'brass', available: true, skuCount: 1 });
-    expect(JSON.stringify(model)).not.toContain('sku-aurora-brass');
+    expect(model.variants[0]).toMatchObject({ code: 'brass', available: true, skuCount: 1, skuId: 'sku-aurora-brass' });
 
     const { container } = renderInDocument(<ProductDetail context={context} model={model} />, 'en');
     expect(container.innerHTML).not.toContain('sku-aurora-brass');

@@ -279,3 +279,183 @@ func productQueryValues(query ProductQuery) url.Values {
 	}
 	return values
 }
+
+type CartLine struct {
+	ID                     string `json:"id"`
+	SKUID                  string `json:"sku_id"`
+	Quantity               int64  `json:"quantity"`
+	ExpectedUnitPriceMinor int64  `json:"expected_unit_price_minor"`
+	ExpectedCurrencyCode   string `json:"expected_currency_code"`
+}
+
+type CartResponse struct {
+	ID         string     `json:"id"`
+	Status     string     `json:"status"`
+	MarketCode string     `json:"market_code"`
+	CartToken  string     `json:"cart_token,omitempty"`
+	Items      []CartLine `json:"items"`
+}
+
+type CheckoutSessionResponse struct {
+	ID                    string  `json:"id"`
+	CartID                string  `json:"cart_id"`
+	Status                string  `json:"status"`
+	ExpiresAt             string  `json:"expires_at"`
+	CustomerID            *string `json:"customer_id,omitempty"`
+	GuestOrderAccessToken string  `json:"guest_order_access_token,omitempty"`
+}
+
+type ShippingAddress struct {
+	RecipientName string  `json:"recipient_name"`
+	AddressLine1  string  `json:"address_line_1"`
+	AddressLine2  *string `json:"address_line_2,omitempty"`
+	City          string  `json:"city"`
+	Region        *string `json:"region,omitempty"`
+	PostalCode    *string `json:"postal_code,omitempty"`
+	CountryCode   string  `json:"country_code"`
+}
+
+type FinalizeRequest struct {
+	ShippingAddress ShippingAddress `json:"shipping_address"`
+	ContactEmail    string          `json:"contact_email"`
+}
+
+type PublicOrderItem struct {
+	ID                   string  `json:"id"`
+	OrderID              string  `json:"order_id"`
+	SellerListingID      *string `json:"seller_listing_id,omitempty"`
+	ProductID            *string `json:"product_id,omitempty"`
+	VariantID            *string `json:"variant_id,omitempty"`
+	SKUID                *string `json:"sku_id,omitempty"`
+	ProductTitleSnapshot string  `json:"product_title_snapshot"`
+	SKUCodeSnapshot      string  `json:"sku_code_snapshot"`
+	UnitPriceMinor       int64   `json:"unit_price_minor"`
+	CurrencyCode         string  `json:"currency_code"`
+	Quantity             int64   `json:"quantity"`
+	LineTotalMinor       int64   `json:"line_total_minor"`
+	CreatedAt            string  `json:"created_at"`
+}
+
+type OrderAddress struct {
+	ID            string  `json:"id"`
+	OrderID       string  `json:"order_id"`
+	AddressType   string  `json:"address_type"`
+	RecipientName string  `json:"recipient_name"`
+	Phone         *string `json:"phone,omitempty"`
+	AddressLine1  string  `json:"address_line_1"`
+	AddressLine2  *string `json:"address_line_2,omitempty"`
+	City          string  `json:"city"`
+	Region        *string `json:"region,omitempty"`
+	PostalCode    *string `json:"postal_code,omitempty"`
+	CountryCode   string  `json:"country_code"`
+	CreatedAt     string  `json:"created_at"`
+}
+
+type PublicOrder struct {
+	ID                     string            `json:"id"`
+	OrderNumber            string            `json:"order_number"`
+	StoreID                string            `json:"store_id"`
+	MarketCode             string            `json:"market_code"`
+	CustomerID             *string           `json:"customer_id,omitempty"`
+	CheckoutSessionID      string            `json:"checkout_session_id"`
+	Status                 string            `json:"status"`
+	CurrencyCode           string            `json:"currency_code"`
+	SubtotalMinor          int64             `json:"subtotal_minor"`
+	TotalMinor             int64             `json:"total_minor"`
+	ConfirmationDeadlineAt string            `json:"confirmation_deadline_at"`
+	CancellationReason     *string           `json:"cancellation_reason,omitempty"`
+	AggregateVersion       int64             `json:"aggregate_version"`
+	CreatedAt              string            `json:"created_at"`
+	UpdatedAt              string            `json:"updated_at"`
+	Items                  []PublicOrderItem `json:"items,omitempty"`
+	Address                *OrderAddress     `json:"address,omitempty"`
+}
+
+func (c *Client) CreateCart(ctx context.Context, host string) (CartResponse, error) {
+	var payload CartResponse
+	err := c.post(ctx, "/internal/v1/storefront/carts", nil, requestOptions{
+		StorefrontHost: host,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) GetCart(ctx context.Context, host, cartToken string) (CartResponse, error) {
+	var payload CartResponse
+	err := c.get(ctx, "/internal/v1/storefront/carts", nil, requestOptions{
+		StorefrontHost: host,
+		CartToken:      cartToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) AddCartItem(ctx context.Context, host, cartToken, skuID string, quantity int64) (CartResponse, error) {
+	var payload CartResponse
+	body := map[string]any{
+		"sku_id":   skuID,
+		"quantity": quantity,
+	}
+	err := c.post(ctx, "/internal/v1/storefront/carts/items", body, requestOptions{
+		StorefrontHost: host,
+		CartToken:      cartToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) UpdateCartItem(ctx context.Context, host, cartToken, itemID string, quantity int64) (CartResponse, error) {
+	var payload CartResponse
+	body := map[string]any{
+		"quantity": quantity,
+	}
+	err := c.patch(ctx, "/internal/v1/storefront/carts/items/"+url.PathEscape(itemID), body, requestOptions{
+		StorefrontHost: host,
+		CartToken:      cartToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) RemoveCartItem(ctx context.Context, host, cartToken, itemID string) (CartResponse, error) {
+	var payload CartResponse
+	err := c.delete(ctx, "/internal/v1/storefront/carts/items/"+url.PathEscape(itemID), requestOptions{
+		StorefrontHost: host,
+		CartToken:      cartToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) CreateCheckoutSession(ctx context.Context, host, cartToken string) (CheckoutSessionResponse, error) {
+	var payload CheckoutSessionResponse
+	err := c.post(ctx, "/internal/v1/storefront/checkout-sessions", nil, requestOptions{
+		StorefrontHost: host,
+		CartToken:      cartToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) FinalizeCheckoutSession(ctx context.Context, host, sessionID string, request FinalizeRequest) (PublicOrder, error) {
+	var payload PublicOrder
+	path := "/internal/v1/storefront/checkout-sessions/" + url.PathEscape(sessionID) + "/finalize"
+	err := c.post(ctx, path, request, requestOptions{
+		StorefrontHost: host,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) GetGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (PublicOrder, error) {
+	var payload PublicOrder
+	path := "/internal/v1/storefront/orders/" + url.PathEscape(orderID)
+	err := c.get(ctx, path, nil, requestOptions{
+		StorefrontHost:  host,
+		GuestOrderToken: rawGuestToken,
+	}, &payload)
+	return payload, err
+}
+
+func (c *Client) CancelGuestOrder(ctx context.Context, host, orderID, rawGuestToken string) (PublicOrder, error) {
+	var payload PublicOrder
+	path := "/internal/v1/storefront/orders/" + url.PathEscape(orderID) + "/cancel"
+	err := c.post(ctx, path, nil, requestOptions{
+		StorefrontHost:  host,
+		GuestOrderToken: rawGuestToken,
+	}, &payload)
+	return payload, err
+}
