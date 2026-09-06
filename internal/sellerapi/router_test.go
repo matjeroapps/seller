@@ -202,7 +202,7 @@ func (s *stubCore) ListStoreLocations(ctx context.Context, subject, storeID stri
 func (s *stubCore) CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*coreclient.StoreLocation, error) {
 	return &coreclient.StoreLocation{}, s.err
 }
-func (s *stubCore) ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.InventorySnapshot, error) {
+func (s *stubCore) ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.SellerInventorySummary, error) {
 	return nil, s.err
 }
 func (s *stubCore) CreateInventorySnapshot(ctx context.Context, subject, storeID string, req coreclient.CreateSnapshotRequest) (*coreclient.InventorySnapshot, error) {
@@ -231,6 +231,9 @@ func (s *stubCore) GetStoreOrderDetail(ctx context.Context, subject, storeID, or
 }
 func (s *stubCore) TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error) {
 	return &coreclient.SellerOrderDetail{}, s.err
+}
+func (s *stubCore) ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error) {
+	return nil, s.err
 }
 
 // newHandler builds the seller routes behind an authenticated principal.

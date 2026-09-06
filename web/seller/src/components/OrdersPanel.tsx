@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ApiClient } from '../lib/api';
+import { minorToMajor } from '../lib/money';
 
 type OrderItem = {
   id: string;
@@ -9,6 +10,7 @@ type OrderItem = {
   quantity: number;
   unit_price: { amount: number; currency: string };
   total_price: { amount: number; currency: string };
+  source?: string;
 };
 
 type OrderTimelineEvent = {
@@ -35,7 +37,9 @@ type OrderDetail = {
   order_number: string;
   status: string;
   currency: string;
+  subtotal?: number;
   total: number;
+  item_count?: number;
   confirmation_deadline_at?: string;
   shipping_address: Record<string, any>;
   contact_email: string;
@@ -43,6 +47,24 @@ type OrderDetail = {
   timeline: OrderTimelineEvent[];
   allowed_next_actions: string[];
   created_at: string;
+};
+
+/**
+ * Button labels for allowed order status transitions, keyed by the target
+ * status the backend reports in `allowed_next_actions`.
+ */
+const TRANSITION_LABELS: Record<string, string> = {
+  confirmed: '✓ Confirm',
+  processing: '▶ Start Processing',
+  ready_for_shipping: '📦 Mark Ready for Shipping',
+  cancelled: 'Cancel'
+};
+
+const TRANSITION_STYLES: Record<string, string> = {
+  confirmed: 'btn btn-success',
+  processing: 'btn btn-primary',
+  ready_for_shipping: 'btn btn-success',
+  cancelled: 'btn btn-danger'
 };
 
 type OrdersPanelProps = {
@@ -58,6 +80,39 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
   const [statusFilter, setStatusFilter] = React.useState<string>('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Currency code -> minor unit, from market reference data; defaults to 2.
+  const [minorUnits, setMinorUnits] = React.useState<Record<string, number>>({});
+
+  const minorUnitFor = (currency: string) => minorUnits[currency] ?? 2;
+
+  const formatMoney = (amountMinor: number, currency: string) =>
+    `${minorToMajor(amountMinor, minorUnitFor(currency))} ${currency}`;
+
+  // Load market reference data so every amount is rendered with the right
+  // minor unit (e.g. EGP=2, KWD=3). Non-fatal: falls back to 2.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`/v1/markets?locale=${locale}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        for (const mkt of data.markets ?? []) {
+          if (mkt?.currency?.code) {
+            map[mkt.currency.code] = mkt.currency.minor_unit ?? 2;
+          }
+        }
+        setMinorUnits(map);
+      } catch {
+        // Non-fatal: minor unit defaults to 2.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, locale]);
 
   const loadOrders = React.useCallback(async () => {
     if (!storeId) return;
@@ -126,6 +181,8 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
     }
   };
 
+  const nextActions = selectedOrder?.allowed_next_actions ?? [];
+
   return (
     <div className="orders-panel">
       <div className="panel-header">
@@ -179,7 +236,7 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
                     <td>{o.recipient_name}</td>
                     <td>{new Date(o.created_at).toLocaleString()}</td>
                     <td>{o.item_count}</td>
-                    <td>{(o.total / 100).toFixed(2)} {o.currency}</td>
+                    <td>{formatMoney(o.total, o.currency)}</td>
                     <td>
                       <span className={`status-badge status-${o.status}`}>{o.status}</span>
                     </td>
@@ -203,41 +260,22 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
             </div>
 
             <div className="order-actions-bar">
-              {selectedOrder.status === 'pending' && (
-                <>
-                  <button type="button" className="btn btn-success" onClick={() => void handleTransition('confirmed')} disabled={loading}>
-                    ✓ Confirm Order
-                  </button>
-                  <button type="button" className="btn btn-danger" onClick={() => void handleTransition('cancelled')} disabled={loading}>
-                    Cancel Order
-                  </button>
-                </>
-              )}
-              {selectedOrder.status === 'confirmed' && (
-                <>
-                  <button type="button" className="btn btn-primary" onClick={() => void handleTransition('processing')} disabled={loading}>
-                    ▶ Start Processing
-                  </button>
-                  <button type="button" className="btn btn-danger" onClick={() => void handleTransition('cancelled')} disabled={loading}>
-                    Cancel Order
-                  </button>
-                </>
-              )}
-              {selectedOrder.status === 'processing' && (
-                <>
-                  <button type="button" className="btn btn-success" onClick={() => void handleTransition('ready_for_shipping')} disabled={loading}>
-                    📦 Mark Ready for Shipping
-                  </button>
-                  <button type="button" className="btn btn-danger" onClick={() => void handleTransition('cancelled')} disabled={loading}>
-                    Cancel Order
-                  </button>
-                </>
-              )}
-              {selectedOrder.status === 'ready_for_shipping' && (
+              {nextActions.length === 0 && selectedOrder.status === 'ready_for_shipping' && (
                 <div className="notice notice-info">
                   Ready for shipping (shipping integration is deferred in P5.8).
                 </div>
               )}
+              {nextActions.map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  className={TRANSITION_STYLES[action] || 'btn btn-secondary'}
+                  onClick={() => void handleTransition(action)}
+                  disabled={loading}
+                >
+                  {TRANSITION_LABELS[action] || action}
+                </button>
+              ))}
             </div>
 
             <div className="grid-2">
@@ -250,7 +288,10 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
 
               <div className="card-section">
                 <h4>Order Summary</h4>
-                <p><strong>Total Amount:</strong> {(selectedOrder.total / 100).toFixed(2)} {selectedOrder.currency}</p>
+                {selectedOrder.subtotal != null && (
+                  <p><strong>Subtotal:</strong> {formatMoney(selectedOrder.subtotal, selectedOrder.currency)}</p>
+                )}
+                <p><strong>Total Amount:</strong> {formatMoney(selectedOrder.total, selectedOrder.currency)}</p>
                 <p><strong>Created:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                 {selectedOrder.confirmation_deadline_at && (
                   <p><strong>Confirmation Deadline:</strong> {new Date(selectedOrder.confirmation_deadline_at).toLocaleString()}</p>
@@ -275,9 +316,9 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
                     <tr key={item.id}>
                       <td>{item.product_name}</td>
                       <td>{item.sku_code}</td>
-                      <td>{(item.unit_price.amount / 100).toFixed(2)} {item.unit_price.currency}</td>
+                      <td>{formatMoney(item.unit_price.amount, item.unit_price.currency)}</td>
                       <td>{item.quantity}</td>
-                      <td>{(item.total_price.amount / 100).toFixed(2)} {item.total_price.currency}</td>
+                      <td>{formatMoney(item.total_price.amount, item.total_price.currency)}</td>
                     </tr>
                   ))}
                 </tbody>

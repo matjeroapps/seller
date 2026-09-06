@@ -60,17 +60,33 @@ type MediaMetadata struct {
 	IsPrimary  bool           `json:"is_primary"`
 	Metadata   map[string]any `json:"metadata,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
+// MoneyDTO is Core's money object: a minor-unit amount plus an ISO currency code.
 type MoneyDTO struct {
 	Amount   int64  `json:"amount"`
 	Currency string `json:"currency"`
 }
 
+// InventoryLocation is one per-location inventory row inside the aggregate
+// inventory_summary of a product payload.
+type InventoryLocation struct {
+	LocationID   string `json:"location_id"`
+	LocationName string `json:"location_name"`
+	SKUID        string `json:"sku_id"`
+	OnHandQty    int64  `json:"on_hand_qty"`
+	ReservedQty  int64  `json:"reserved_qty"`
+	AvailableQty int64  `json:"available_qty"`
+}
+
+// InventorySummary is the aggregate product-level inventory projection:
+// store-wide totals plus one entry per fulfillment location.
 type InventorySummary struct {
-	TotalOnHand    int `json:"total_on_hand"`
-	TotalReserved  int `json:"total_reserved"`
-	TotalAvailable int `json:"total_available"`
+	TotalOnHand    int64               `json:"total_on_hand"`
+	TotalReserved  int64               `json:"total_reserved"`
+	TotalAvailable int64               `json:"total_available"`
+	Locations      []InventoryLocation `json:"locations"`
 }
 
 type PublishReadiness struct {
@@ -91,6 +107,8 @@ type SellerListingPresentation struct {
 	SchemaVersion    int                  `json:"schema_version"`
 	PurchaseBehavior string               `json:"purchase_behavior"`
 	Sections         []ProductPageSection `json:"sections"`
+	CreatedAt        time.Time            `json:"created_at"`
+	UpdatedAt        time.Time            `json:"updated_at"`
 }
 
 type SellerProductDetail struct {
@@ -148,35 +166,69 @@ type CompleteMediaUploadRequest struct {
 	IsPrimary   bool   `json:"is_primary"`
 }
 
+// StoreLocation mirrors Core's fulfillment location record. Store-owned
+// locations carry an empty supplier_id and supplier_market_id.
 type StoreLocation struct {
-	ID        string    `json:"id"`
-	StoreID   *string   `json:"store_id,omitempty"`
-	Code      string    `json:"code"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
+	SupplierID       string    `json:"supplier_id"`
+	StoreID          string    `json:"store_id,omitempty"`
+	ID               string    `json:"id"`
+	SupplierMarketID string    `json:"supplier_market_id"`
+	MarketCode       string    `json:"market_code"`
+	Code             string    `json:"code"`
+	Name             string    `json:"name"`
+	LocationType     string    `json:"location_type"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// StoreLocationListResponse is the list envelope Core returns for store
+// locations.
+type StoreLocationListResponse struct {
+	Locations []StoreLocation `json:"locations"`
+}
+
+// InventorySnapshot is Core's raw inventory snapshot record, returned by the
+// snapshot create and adjustment mutations.
 type InventorySnapshot struct {
 	ID                    string    `json:"id"`
 	FulfillmentLocationID string    `json:"fulfillment_location_id"`
 	SKUID                 string    `json:"sku_id"`
-	OnHandQty             int       `json:"on_hand_qty"`
-	ReservedQty           int       `json:"reserved_qty"`
-	AvailableQty          int       `json:"available_qty"`
-	Version               int       `json:"version"`
+	OnHandQty             int64     `json:"on_hand_qty"`
+	ReservedQty           int64     `json:"reserved_qty"`
+	Version               int64     `json:"version"`
+	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+// SellerInventorySummary is the enriched inventory row returned by the store
+// inventory list: the snapshot identity plus the resolved location name and
+// derived available quantity.
+type SellerInventorySummary struct {
+	ID                    string `json:"id"`
+	FulfillmentLocationID string `json:"fulfillment_location_id"`
+	LocationName          string `json:"location_name"`
+	SKUID                 string `json:"sku_id"`
+	OnHandQty             int64  `json:"on_hand_qty"`
+	ReservedQty           int64  `json:"reserved_qty"`
+	AvailableQty          int64  `json:"available_qty"`
+	Version               int64  `json:"version"`
+}
+
+// SellerInventoryListResponse is the list envelope Core returns for store
+// inventory.
+type SellerInventoryListResponse struct {
+	Inventory []SellerInventorySummary `json:"inventory"`
 }
 
 type CreateSnapshotRequest struct {
 	LocationID string `json:"location_id"`
 	SKUID      string `json:"sku_id"`
-	OnHandQty  int    `json:"on_hand_qty"`
+	OnHandQty  int64  `json:"on_hand_qty"`
 }
 
 type AdjustInventoryRequest struct {
-	DeltaQuantity int     `json:"quantity_delta"`
+	DeltaQuantity int64   `json:"quantity_delta"`
 	Reason        *string `json:"reason,omitempty"`
 }
 
@@ -377,16 +429,16 @@ func (c *Client) DeleteMedia(ctx context.Context, subject, storeID, productID, m
 
 func (c *Client) ListStoreLocations(ctx context.Context, subject, storeID string) ([]StoreLocation, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/locations", url.PathEscape(storeID))
-	var res []StoreLocation
+	var res StoreLocationListResponse
 	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
-	return res, nil
+	return res.Locations, nil
 }
 
 func (c *Client) CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*StoreLocation, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/locations", url.PathEscape(storeID))
-	body := map[string]any{"code": code, "name": name, "type": locType, "status": status}
+	body := map[string]any{"code": code, "name": name, "location_type": locType, "status": status}
 	var res StoreLocation
 	if err := c.post(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
@@ -394,13 +446,13 @@ func (c *Client) CreateStoreLocation(ctx context.Context, subject, storeID, code
 	return &res, nil
 }
 
-func (c *Client) ListStoreInventory(ctx context.Context, subject, storeID string) ([]InventorySnapshot, error) {
+func (c *Client) ListStoreInventory(ctx context.Context, subject, storeID string) ([]SellerInventorySummary, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/inventory", url.PathEscape(storeID))
-	var res []InventorySnapshot
+	var res SellerInventoryListResponse
 	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
-	return res, nil
+	return res.Inventory, nil
 }
 
 func (c *Client) CreateInventorySnapshot(ctx context.Context, subject, storeID string, reqDTO CreateSnapshotRequest) (*InventorySnapshot, error) {
@@ -485,4 +537,39 @@ func (c *Client) TransitionStoreOrder(ctx context.Context, subject, storeID, ord
 		return nil, err
 	}
 	return &res, nil
+}
+
+// SellerCategory is a global commerce category as exposed by Core's category
+// list endpoint. Only id, slug and status are carried; translations are not
+// needed for category assignment pickers.
+type SellerCategory struct {
+	ID     string `json:"id"`
+	Slug   string `json:"slug"`
+	Status string `json:"status"`
+}
+
+// SellerCategoryListResponse is Core's standard collection envelope for the
+// category list endpoint.
+type SellerCategoryListResponse struct {
+	Items []SellerCategory `json:"items"`
+}
+
+// ListCategories lists the platform categories Core exposes at
+// GET /internal/v1/categories. Note: Core currently gates that route to admin
+// callers (requireCallers(CallerAdmin)); the Seller service credential must be
+// allowed there for this call to succeed at runtime.
+func (c *Client) ListCategories(ctx context.Context, subject string, limit, offset int) ([]SellerCategory, error) {
+	values := make(url.Values)
+	if limit > 0 {
+		values.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		values.Set("offset", strconv.Itoa(offset))
+	}
+
+	var res SellerCategoryListResponse
+	if err := c.get(ctx, "/internal/v1/categories", values, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }

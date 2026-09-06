@@ -49,7 +49,7 @@ type CoreCapabilities interface {
 	DeleteMedia(ctx context.Context, subject, storeID, productID, mediaID string) error
 	ListStoreLocations(ctx context.Context, subject, storeID string) ([]coreclient.StoreLocation, error)
 	CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*coreclient.StoreLocation, error)
-	ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.InventorySnapshot, error)
+	ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.SellerInventorySummary, error)
 	CreateInventorySnapshot(ctx context.Context, subject, storeID string, req coreclient.CreateSnapshotRequest) (*coreclient.InventorySnapshot, error)
 	AdjustInventory(ctx context.Context, subject, storeID, snapshotID string, req coreclient.AdjustInventoryRequest) (*coreclient.InventorySnapshot, error)
 	GetListingPresentation(ctx context.Context, subject, storeID, listingID string) (*coreclient.SellerListingPresentation, error)
@@ -59,6 +59,7 @@ type CoreCapabilities interface {
 	ListStoreOrders(ctx context.Context, subject, storeID, status string, limit, offset int) (*coreclient.SellerOrderListResponse, error)
 	GetStoreOrderDetail(ctx context.Context, subject, storeID, orderID string) (*coreclient.SellerOrderDetail, error)
 	TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error)
+	ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error)
 }
 
 // Dependencies wires the seller routes.
@@ -111,6 +112,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/seller/stores/{store_id}/orders", deps.handleListStoreOrders)
 		r.Get("/seller/stores/{store_id}/orders/{order_id}", deps.handleGetStoreOrderDetail)
 		r.Post("/seller/stores/{store_id}/orders/{order_id}/transition", deps.handleTransitionStoreOrder)
+
+		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
 	}
 }
 

@@ -82,7 +82,9 @@ func CommonTags() []openapi3.Tag {
 		{Name: "Fulfillment Locations", Description: "Supplier fulfillment locations"},
 		{Name: "Supplier Offers", Description: "Supplier offers and availability"},
 		{Name: "Seller Listings", Description: "Seller listings and price/status controls"},
+		{Name: "Product Media", Description: "Product media uploads and metadata"},
 		{Name: "Inventory", Description: "Inventory snapshots and movements"},
+		{Name: "Orders", Description: "Order inspection and status transitions"},
 		{Name: "Audit", Description: "Administrative moderation and operational inspection"},
 	}
 }

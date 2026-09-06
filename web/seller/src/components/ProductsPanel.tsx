@@ -1,15 +1,15 @@
 import React from 'react';
-import type { ApiClient } from '../lib/api';
+import type { ApiClient, SellerCategory } from '../lib/api';
+import { inputStepForMinorUnit, majorToMinor, minorToMajor } from '../lib/money';
 
-type ProductListItem = {
-  product: { id: string; slug: string; status: string; created_at: string };
-  source: 'seller_owned' | 'supplier_backed';
-  name: string;
-  listing_status: string;
-  listing_id: string;
-  current_price?: { amount: number; currency: string } | null;
-  inventory_summary: { total_on_hand: number; total_reserved: number; total_available: number };
-  publish_readiness: { is_ready: boolean; reasons: string[] };
+type ProductMedia = {
+  id: string;
+  media_type: string;
+  uri: string;
+  storage_key?: string;
+  alt_text: string;
+  sort_order: number;
+  is_primary: boolean;
 };
 
 type ProductDetail = {
@@ -19,18 +19,116 @@ type ProductDetail = {
   category_ids: string[];
   variants: Array<{ id: string; code: string; status: string }>;
   skus: Array<{ id: string; variant_id: string; code: string; barcode?: string; status: string }>;
-  media: Array<{ id: string; uri: string; alt_text: string; sort_order: number; is_primary: boolean }>;
+  media: ProductMedia[];
   listing: { id: string; status: string };
   current_price?: { amount: number; currency: string } | null;
   inventory_summary: { total_on_hand: number; total_reserved: number; total_available: number };
   presentation: {
     seller_listing_id: string;
     purchase_behavior: 'inherit' | 'add_to_cart' | 'buy_now';
-    sections: Array<{ id: string; type: string; enabled: boolean; sort_order: number; content: Record<string, any> }>;
+    sections: PresentationSection[];
   };
   purchase_behavior: 'add_to_cart' | 'buy_now';
   publish_readiness: { is_ready: boolean; reasons: string[] };
 };
+
+type PresentationSection = {
+  id: string;
+  type: string;
+  enabled: boolean;
+  sort_order: number;
+  content: Record<string, any>;
+};
+
+type SectionType = 'description' | 'highlights' | 'image_text' | 'specifications' | 'faq' | 'final_cta';
+
+const SECTION_TYPES: SectionType[] = ['description', 'highlights', 'image_text', 'specifications', 'faq', 'final_cta'];
+
+/**
+ * Empty localized content template for a newly added section of `type`.
+ * Localized content always lives under `content: { en: {...}, ar: {...} }`.
+ */
+function emptyContentFor(type: SectionType): Record<string, any> {
+  switch (type) {
+    case 'description':
+      return { en: { heading: '', body: '' }, ar: { heading: '', body: '' } };
+    case 'highlights':
+      return { en: { title: '', items: [] }, ar: { title: '', items: [] } };
+    case 'image_text':
+      return { media_id: '', en: { heading: '', body: '' }, ar: { heading: '', body: '' } };
+    case 'specifications':
+      return { en: { items: [{ key: '', value: '' }] }, ar: { items: [{ key: '', value: '' }] } };
+    case 'faq':
+      return { en: { items: [{ question: '', answer: '' }] }, ar: { items: [{ question: '', answer: '' }] } };
+    case 'final_cta':
+      return { en: { title: '', body: '', action: 'add_to_cart' }, ar: { title: '', body: '' } };
+  }
+}
+
+/** Light client-side validation for enabled sections; returns an error message or null. */
+function validateSections(sections: PresentationSection[]): string | null {
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    if (!sec.enabled) continue;
+    const where = `Section ${i + 1} (${sec.type})`;
+    const en = sec.content?.en ?? {};
+    switch (sec.type) {
+      case 'description':
+        if (!String(en.body ?? '').trim()) return `${where}: English body text is required.`;
+        break;
+      case 'highlights': {
+        if (!String(en.title ?? '').trim()) return `${where}: English title is required.`;
+        const items = (en.items as string[]) ?? [];
+        if (!items.some((it) => String(it ?? '').trim())) return `${where}: at least one English highlight is required.`;
+        break;
+      }
+      case 'image_text':
+        if (!String(sec.content?.media_id ?? '').trim()) return `${where}: an image must be selected.`;
+        if (!String(en.heading ?? '').trim()) return `${where}: English heading is required.`;
+        break;
+      case 'specifications': {
+        const items = (en.items as Array<{ key?: string; value?: string }>) ?? [];
+        if (items.length === 0 || !items.some((it) => String(it.key ?? '').trim())) {
+          return `${where}: at least one specification key/value pair is required.`;
+        }
+        break;
+      }
+      case 'faq': {
+        const items = (en.items as Array<{ question?: string; answer?: string }>) ?? [];
+        if (items.length === 0 || !items.some((it) => String(it.question ?? '').trim())) {
+          return `${where}: at least one question is required.`;
+        }
+        break;
+      }
+      case 'final_cta':
+        if (!String(en.title ?? '').trim()) return `${where}: English title is required.`;
+        break;
+      default:
+        break;
+    }
+  }
+  return null;
+}
+
+/** Human-readable label for a section type. */
+function sectionTypeLabel(type: string): string {
+  switch (type) {
+    case 'description':
+      return 'Description';
+    case 'highlights':
+      return 'Highlights';
+    case 'image_text':
+      return 'Image & Text';
+    case 'specifications':
+      return 'Specifications';
+    case 'faq':
+      return 'FAQ';
+    case 'final_cta':
+      return 'Final Call-to-Action';
+    default:
+      return type;
+  }
+}
 
 type ProductsPanelProps = {
   api: ApiClient;
@@ -59,6 +157,8 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
   const [descEn, setDescEn] = React.useState('');
   const [nameAr, setNameAr] = React.useState('');
   const [descAr, setDescAr] = React.useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = React.useState<string[]>([]);
+  const [categories, setCategories] = React.useState<SellerCategory[]>([]);
   const [variantCode, setVariantCode] = React.useState('Default');
   const [skuCode, setSkuCode] = React.useState('SKU-001');
   const [skuBarcode, setSkuBarcode] = React.useState('');
@@ -66,19 +166,17 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
   const [onHandStock, setOnHandStock] = React.useState('10');
   const [purchaseBehavior, setPurchaseBehavior] = React.useState<'inherit' | 'add_to_cart' | 'buy_now'>('inherit');
 
-  // Presentation sections state
-  const [sections, setSections] = React.useState<Array<{ id: string; type: string; enabled: boolean; sort_order: number; content: Record<string, any> }>>([
-    {
-      id: 'sec-1',
-      type: 'highlights',
-      enabled: true,
-      sort_order: 1,
-      content: {
-        en: { title: 'Product Highlights', items: ['High quality material', 'Fast shipping'] },
-        ar: { title: 'مميزات المنتج', items: ['خامات عالي الجودة', 'شحن سريع'] }
-      }
-    }
-  ]);
+  // Media step: per-media alt-text drafts keyed by media id.
+  const [altDrafts, setAltDrafts] = React.useState<Record<string, string>>({});
+
+  // Presentation step state
+  const [sections, setSections] = React.useState<PresentationSection[]>([]);
+  const [newSectionType, setNewSectionType] = React.useState<SectionType>('description');
+
+  // Sorted gallery view of the product's media (order used for move up/down).
+  const sortedMedia = React.useMemo(() => {
+    return [...(productDetail?.media ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  }, [productDetail]);
 
   const loadProducts = React.useCallback(async () => {
     if (!storeId) return;
@@ -121,10 +219,50 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     })();
   }, [api, storeId, locale]);
 
+  // Fetch the store's categories once per store. If the endpoint is not
+  // available (or fails), degrade gracefully to an empty list.
+  React.useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const cats = await api.listStoreCategories(storeId);
+        if (!cancelled) setCategories(cats);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, storeId]);
+
+  // Seed alt-text drafts for newly loaded media without clobbering in-flight edits.
+  React.useEffect(() => {
+    if (!productDetail) return;
+    setAltDrafts((prev) => {
+      const next: Record<string, string> = {};
+      for (const m of productDetail.media) {
+        next[m.id] = m.id in prev ? prev[m.id] : m.alt_text;
+      }
+      return next;
+    });
+  }, [productDetail]);
 
   React.useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
+
+  const refreshProductDetail = React.useCallback(async (): Promise<ProductDetail | null> => {
+    if (!editingProductId) return null;
+    const res = await api.get(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`
+    );
+    if (!res.ok) return null;
+    const detail: ProductDetail = await res.json();
+    setProductDetail(detail);
+    return detail;
+  }, [api, storeId, locale, editingProductId]);
 
   const handleStartCreate = () => {
     setEditingProductId(null);
@@ -134,12 +272,14 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     setDescEn('');
     setNameAr('');
     setDescAr('');
+    setSelectedCategoryIds([]);
     setVariantCode('Default');
     setSkuCode(`SKU-${Date.now().toString().slice(-4)}`);
     setSkuBarcode('');
     setPriceMajor('100.00');
     setOnHandStock('10');
     setPurchaseBehavior('inherit');
+    setSections([]);
     setEditorStep('general');
     setActiveTab('editor');
   };
@@ -161,6 +301,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         setDescEn(trEn?.description || '');
         setNameAr(trAr?.name || '');
         setDescAr(trAr?.description || '');
+        setSelectedCategoryIds(detail.category_ids || []);
 
         if (detail.variants[0]) setVariantCode(detail.variants[0].code);
         if (detail.skus[0]) {
@@ -169,14 +310,12 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         }
 
         if (detail.current_price) {
-          setPriceMajor((detail.current_price.amount / 100).toFixed(2));
+          setPriceMajor(minorToMajor(detail.current_price.amount, storeCurrencyMinorUnit));
         }
 
         setOnHandStock(String(detail.inventory_summary.total_on_hand || 0));
         setPurchaseBehavior(detail.presentation?.purchase_behavior || 'inherit');
-        if (detail.presentation?.sections) {
-          setSections(detail.presentation.sections);
-        }
+        setSections(detail.presentation?.sections || []);
 
         setEditorStep('general');
         setActiveTab('editor');
@@ -185,6 +324,22 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       setError(err instanceof Error ? err.message : 'Error loading product detail');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(categoryId) ? prev.filter((id) => id !== categoryId) : [...prev, categoryId]
+    );
+  };
+
+  /** Parse a seller API error response body into a message string. */
+  const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
+    try {
+      const data = await res.json();
+      return data?.error?.message || data?.message || fallback;
+    } catch {
+      return fallback;
     }
   };
 
@@ -197,31 +352,28 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         { locale: 'en', name: nameEn || slug, description: descEn },
         { locale: 'ar', name: nameAr || nameEn || slug, description: descAr }
       ];
+      const body = { slug, translations, category_ids: selectedCategoryIds };
 
       if (!editingProductId) {
         // Create new seller product
-        const res = await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
-          slug,
-          translations
-        });
+        const res = await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, body);
         if (res.ok) {
           const detail: ProductDetail = await res.json();
           setEditingProductId(detail.product.id);
           setProductDetail(detail);
           setEditorStep('variants');
         } else {
-          setError('Failed to create product');
+          setError(await readErrorMessage(res, 'Failed to create product'));
         }
       } else {
         // Update existing product
-        const res = await api.put(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}`, {
-          slug,
-          translations
-        });
+        const res = await api.put(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}`, body);
         if (res.ok) {
           const detail: ProductDetail = await res.json();
           setProductDetail(detail);
           setEditorStep('variants');
+        } else {
+          setError(await readErrorMessage(res, 'Failed to update product'));
         }
       }
     } catch (err) {
@@ -234,37 +386,56 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
   const handleSaveVariantAndSKU = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProductId) return;
+    const base = `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}`;
     try {
       setLoading(true);
       setError(null);
 
-      let variantId = productDetail?.variants[0]?.id;
-      if (!variantId) {
-        const vRes = await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/variants`, {
+      const existingVariant = productDetail?.variants[0];
+      let variantId = existingVariant?.id;
+      if (variantId) {
+        // Update the existing variant with the edited values.
+        const vRes = await api.put(`${base}/variants/${encodeURIComponent(variantId)}`, {
           code: variantCode,
           status: 'active'
         });
-        if (vRes.ok) {
-          const v = await vRes.json();
-          variantId = v.id;
+        if (!vRes.ok) {
+          setError(await readErrorMessage(vRes, 'Failed to update variant'));
+          return;
+        }
+      } else {
+        const vRes = await api.post(`${base}/variants`, { code: variantCode, status: 'active' });
+        if (!vRes.ok) {
+          setError(await readErrorMessage(vRes, 'Failed to create variant'));
+          return;
+        }
+        const v = await vRes.json();
+        variantId = v.id;
+      }
+
+      if (!variantId) return;
+
+      const existingSku = productDetail?.skus[0];
+      const skuBody = { code: skuCode, barcode: skuBarcode || null, status: 'active' };
+      if (existingSku?.id) {
+        // Update the existing SKU with the edited values.
+        const sRes = await api.put(
+          `${base}/variants/${encodeURIComponent(variantId)}/skus/${encodeURIComponent(existingSku.id)}`,
+          skuBody
+        );
+        if (!sRes.ok) {
+          setError(await readErrorMessage(sRes, 'Failed to update SKU'));
+          return;
+        }
+      } else {
+        const sRes = await api.post(`${base}/variants/${encodeURIComponent(variantId)}/skus`, skuBody);
+        if (!sRes.ok) {
+          setError(await readErrorMessage(sRes, 'Failed to create SKU'));
+          return;
         }
       }
 
-      if (variantId) {
-        let skuId = productDetail?.skus[0]?.id;
-        if (!skuId) {
-          await api.post(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}/variants/${encodeURIComponent(variantId)}/skus`, {
-            code: skuCode,
-            barcode: skuBarcode || null,
-            status: 'active'
-          });
-        }
-      }
-
-      // Refresh product detail
-      const res = await api.get(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`);
-      if (res.ok) setProductDetail(await res.json());
-
+      await refreshProductDetail();
       setEditorStep('media');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save variant and SKU');
@@ -291,8 +462,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         { filename: file.name, content_type: file.type, size_bytes: file.size }
       );
       if (!presignRes.ok) {
-        const errData = await presignRes.json().catch(() => ({}));
-        setError(errData.message || 'Failed to get upload URL');
+        setError(await readErrorMessage(presignRes, 'Failed to get upload URL'));
         return;
       }
       const presignData: { upload_url: string; storage_key: string; upload_token: string } = await presignRes.json();
@@ -320,16 +490,12 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         }
       );
       if (!completeRes.ok) {
-        const errData = await completeRes.json().catch(() => ({}));
-        setError(errData.message || 'Failed to register image');
+        setError(await readErrorMessage(completeRes, 'Failed to register image'));
         return;
       }
 
-      // 4. Refresh product detail
-      const res = await api.get(
-        `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`
-      );
-      if (res.ok) setProductDetail(await res.json());
+      // 4. Refresh product detail so the gallery re-renders
+      await refreshProductDetail();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Image upload failed');
     } finally {
@@ -337,6 +503,85 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     }
   };
 
+  const handleSaveAltText = async (media: ProductMedia) => {
+    if (!editingProductId) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await api.updateProductMedia(storeId, editingProductId, media.id, {
+        alt_text: altDrafts[media.id] ?? media.alt_text,
+        sort_order: media.sort_order,
+        is_primary: media.is_primary
+      });
+      await refreshProductDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save alt text');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetPrimaryMedia = async (media: ProductMedia) => {
+    if (!editingProductId || media.is_primary) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await api.updateProductMedia(storeId, editingProductId, media.id, {
+        alt_text: media.alt_text,
+        sort_order: media.sort_order,
+        is_primary: true
+      });
+      await refreshProductDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set primary image');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveMedia = async (index: number, direction: -1 | 1) => {
+    if (!editingProductId) return;
+    const target = index + direction;
+    if (target < 0 || target >= sortedMedia.length) return;
+    const a = sortedMedia[index];
+    const b = sortedMedia[target];
+    try {
+      setLoading(true);
+      setError(null);
+      // Swap sort_order values, then persist both records.
+      await api.updateProductMedia(storeId, editingProductId, a.id, {
+        alt_text: a.alt_text,
+        sort_order: b.sort_order,
+        is_primary: a.is_primary
+      });
+      await api.updateProductMedia(storeId, editingProductId, b.id, {
+        alt_text: b.alt_text,
+        sort_order: a.sort_order,
+        is_primary: b.is_primary
+      });
+      await refreshProductDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reorder images');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMedia = async (media: ProductMedia) => {
+    if (!editingProductId) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await api.deleteProductMedia(storeId, editingProductId, media.id);
+      // The backend promotes the earliest remaining image to primary when the
+      // primary is deleted; the refetch below reflects the server state.
+      await refreshProductDetail();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete image');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSavePricingAndInventory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,7 +589,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     try {
       setLoading(true);
       // Set Listing Price
-      const amountMinor = Math.round(parseFloat(priceMajor || '0') * Math.pow(10, storeCurrencyMinorUnit));
+      const amountMinor = majorToMinor(priceMajor || '0', storeCurrencyMinorUnit);
       await api.post(`/v1/seller/listings/${encodeURIComponent(productDetail.listing.id)}/price`, {
         amount_minor: amountMinor,
         currency: storeCurrency
@@ -391,8 +636,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       }
 
       // Refresh detail
-      const res = await api.get(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`);
-      if (res.ok) setProductDetail(await res.json());
+      await refreshProductDetail();
 
       setEditorStep('presentation');
     } catch (err) {
@@ -402,21 +646,87 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     }
   };
 
+  // --- Presentation section helpers ---
+
+  const updateSection = (index: number, updater: (sec: PresentationSection) => PresentationSection) => {
+    setSections((prev) => prev.map((sec, i) => (i === index ? updater(sec) : sec)));
+  };
+
+  const updateLocalizedField = (index: number, lang: 'en' | 'ar', patch: Record<string, any>) => {
+    updateSection(index, (sec) => ({
+      ...sec,
+      content: {
+        ...sec.content,
+        [lang]: { ...(sec.content?.[lang] ?? {}), ...patch }
+      }
+    }));
+  };
+
+  const getLocalizedItems = (sec: PresentationSection, lang: 'en' | 'ar'): any[] => {
+    const items = sec.content?.[lang]?.items;
+    return Array.isArray(items) ? items : [];
+  };
+
+  const updateLocalizedItems = (index: number, lang: 'en' | 'ar', items: any[]) => {
+    updateLocalizedField(index, lang, { items });
+  };
+
+  const handleAddSection = () => {
+    setSections((prev) => [
+      ...prev,
+      {
+        id: `sec-${Date.now()}-${prev.length}`,
+        type: newSectionType,
+        enabled: true,
+        sort_order: prev.length + 1,
+        content: emptyContentFor(newSectionType)
+      }
+    ]);
+  };
+
+  const handleMoveSection = (index: number, direction: -1 | 1) => {
+    setSections((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      // Renumber so sort_order always matches visual order.
+      return next.map((sec, i) => ({ ...sec, sort_order: i + 1 }));
+    });
+  };
+
+  const handleDeleteSection = (index: number) => {
+    setSections((prev) => prev.filter((_, i) => i !== index).map((sec, i) => ({ ...sec, sort_order: i + 1 })));
+  };
+
   const handleSavePresentation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productDetail || !editingProductId) return;
+    const validationError = validateSections(sections);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     try {
       setLoading(true);
-      await api.put(`/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(productDetail.listing.id)}/presentation`, {
-        seller_listing_id: productDetail.listing.id,
-        schema_version: 1,
-        purchase_behavior: purchaseBehavior,
-        sections
-      });
+      setError(null);
+      const res = await api.put(
+        `/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(productDetail.listing.id)}/presentation`,
+        {
+          seller_listing_id: productDetail.listing.id,
+          schema_version: 1,
+          purchase_behavior: purchaseBehavior,
+          sections
+        }
+      );
+      if (!res.ok) {
+        setError(await readErrorMessage(res, 'Presentation save failed'));
+        return;
+      }
 
       // Refresh detail
-      const res = await api.get(`/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(editingProductId)}?locale=${locale}`);
-      if (res.ok) setProductDetail(await res.json());
+      await refreshProductDetail();
 
       setEditorStep('publish');
     } catch (err) {
@@ -435,8 +745,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
         await loadProducts();
         setActiveTab('list');
       } else {
-        const data = await res.json();
-        setError(data.message || 'Publish failed');
+        setError(await readErrorMessage(res, 'Publish failed'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Publish error');
@@ -456,6 +765,274 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       setError(err instanceof Error ? err.message : 'Unpublish error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** Renders the localized editing form for a section, by type. */
+  const renderSectionContent = (sec: PresentationSection, idx: number) => {
+    const setField = (lang: 'en' | 'ar', patch: Record<string, any>) => updateLocalizedField(idx, lang, patch);
+
+    switch (sec.type) {
+      case 'description':
+        return (
+          <div className="section-content">
+            {(['en', 'ar'] as const).map((lang) => (
+              <div className="form-grid" key={lang}>
+                <div className="form-group" dir={lang === 'ar' ? 'rtl' : undefined}>
+                  <label>Heading ({lang.toUpperCase()})</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={(sec.content?.[lang]?.heading as string) || ''}
+                    onChange={(e) => setField(lang, { heading: e.target.value })}
+                  />
+                </div>
+                <div className="form-group" dir={lang === 'ar' ? 'rtl' : undefined}>
+                  <label>Body ({lang.toUpperCase()})</label>
+                  <textarea
+                    rows={3}
+                    className="form-control"
+                    value={(sec.content?.[lang]?.body as string) || ''}
+                    onChange={(e) => setField(lang, { body: e.target.value })}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'highlights':
+        return (
+          <div className="section-content">
+            {(['en', 'ar'] as const).map((lang) => (
+              <div className="form-group" key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
+                <label>Title ({lang.toUpperCase()})</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={(sec.content?.[lang]?.title as string) || ''}
+                  onChange={(e) => setField(lang, { title: e.target.value })}
+                />
+                <label>Items ({lang.toUpperCase()}, one per line)</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  value={getLocalizedItems(sec, lang).join('\n')}
+                  onChange={(e) =>
+                    updateLocalizedItems(
+                      idx,
+                      lang,
+                      e.target.value.split('\n').map((s) => s.trim()).filter(Boolean)
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'image_text':
+        return (
+          <div className="section-content">
+            <div className="form-group">
+              <label>Image</label>
+              <select
+                className="form-control"
+                value={(sec.content?.media_id as string) || ''}
+                onChange={(e) => updateSection(idx, (s) => ({ ...s, content: { ...s.content, media_id: e.target.value } }))}
+              >
+                <option value="">— Select an image —</option>
+                {sortedMedia.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.alt_text || m.uri}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(['en', 'ar'] as const).map((lang) => (
+              <div className="form-group" key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
+                <label>Heading ({lang.toUpperCase()})</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={(sec.content?.[lang]?.heading as string) || ''}
+                  onChange={(e) => setField(lang, { heading: e.target.value })}
+                />
+                <label>Body ({lang.toUpperCase()})</label>
+                <textarea
+                  rows={3}
+                  className="form-control"
+                  value={(sec.content?.[lang]?.body as string) || ''}
+                  onChange={(e) => setField(lang, { body: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'specifications':
+        return (
+          <div className="section-content">
+            {(['en', 'ar'] as const).map((lang) => (
+              <div key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
+                <h5>Specifications ({lang.toUpperCase()})</h5>
+                {getLocalizedItems(sec, lang).map((row: { key?: string; value?: string }, rowIdx: number) => (
+                  <div className="spec-row" key={rowIdx}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Key"
+                      aria-label={`Specification key (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      value={row?.key || ''}
+                      onChange={(e) => {
+                        const items = [...getLocalizedItems(sec, lang)];
+                        items[rowIdx] = { ...items[rowIdx], key: e.target.value };
+                        updateLocalizedItems(idx, lang, items);
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Value"
+                      aria-label={`Specification value (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      value={row?.value || ''}
+                      onChange={(e) => {
+                        const items = [...getLocalizedItems(sec, lang)];
+                        items[rowIdx] = { ...items[rowIdx], value: e.target.value };
+                        updateLocalizedItems(idx, lang, items);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      aria-label={`Remove specification row (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      onClick={() =>
+                        updateLocalizedItems(
+                          idx,
+                          lang,
+                          getLocalizedItems(sec, lang).filter((_, i) => i !== rowIdx)
+                        )
+                      }
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => updateLocalizedItems(idx, lang, [...getLocalizedItems(sec, lang), { key: '', value: '' }])}
+                >
+                  + Add Row ({lang.toUpperCase()})
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'faq':
+        return (
+          <div className="section-content">
+            {(['en', 'ar'] as const).map((lang) => (
+              <div key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
+                <h5>Questions ({lang.toUpperCase()})</h5>
+                {getLocalizedItems(sec, lang).map((row: { question?: string; answer?: string }, rowIdx: number) => (
+                  <div className="faq-row" key={rowIdx}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Question"
+                      aria-label={`FAQ question (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      value={row?.question || ''}
+                      onChange={(e) => {
+                        const items = [...getLocalizedItems(sec, lang)];
+                        items[rowIdx] = { ...items[rowIdx], question: e.target.value };
+                        updateLocalizedItems(idx, lang, items);
+                      }}
+                    />
+                    <textarea
+                      rows={2}
+                      className="form-control"
+                      placeholder="Answer"
+                      aria-label={`FAQ answer (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      value={row?.answer || ''}
+                      onChange={(e) => {
+                        const items = [...getLocalizedItems(sec, lang)];
+                        items[rowIdx] = { ...items[rowIdx], answer: e.target.value };
+                        updateLocalizedItems(idx, lang, items);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      aria-label={`Remove FAQ row (${lang.toUpperCase()}, row ${rowIdx + 1})`}
+                      onClick={() =>
+                        updateLocalizedItems(
+                          idx,
+                          lang,
+                          getLocalizedItems(sec, lang).filter((_, i) => i !== rowIdx)
+                        )
+                      }
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => updateLocalizedItems(idx, lang, [...getLocalizedItems(sec, lang), { question: '', answer: '' }])}
+                >
+                  + Add Question ({lang.toUpperCase()})
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'final_cta':
+        return (
+          <div className="section-content">
+            {(['en', 'ar'] as const).map((lang) => (
+              <div className="form-group" key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
+                <label>Title ({lang.toUpperCase()})</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={(sec.content?.[lang]?.title as string) || ''}
+                  onChange={(e) => setField(lang, { title: e.target.value })}
+                />
+                <label>Body ({lang.toUpperCase()})</label>
+                <textarea
+                  rows={2}
+                  className="form-control"
+                  value={(sec.content?.[lang]?.body as string) || ''}
+                  onChange={(e) => setField(lang, { body: e.target.value })}
+                />
+                {lang === 'en' && (
+                  <>
+                    <label>Action</label>
+                    <select
+                      className="form-control"
+                      value={(sec.content?.en?.action as string) || 'add_to_cart'}
+                      onChange={(e) => setField('en', { action: e.target.value })}
+                    >
+                      <option value="add_to_cart">Add to Cart</option>
+                      <option value="buy_now">Buy Now</option>
+                    </select>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+
+      default:
+        return (
+          <div className="section-content">
+            <p className="subtext">Type: {sec.type} — no structured editor available for this type.</p>
+          </div>
+        );
     }
   };
 
@@ -509,7 +1086,7 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                     <td>
                       <span className={`status-badge status-${p.listing_status}`}>{p.listing_status}</span>
                     </td>
-                    <td>{p.current_price ? `${(p.current_price.amount / 100).toFixed(2)} ${p.current_price.currency}` : 'Unpriced'}</td>
+                    <td>{p.current_price ? `${minorToMajor(p.current_price.amount, storeCurrencyMinorUnit)} ${p.current_price.currency}` : 'Unpriced'}</td>
                     <td>{p.inventory_summary?.total_on_hand ?? 0}</td>
                     <td>
                       {p.publish_readiness?.is_ready ? (
@@ -593,6 +1170,25 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                     </div>
                   </div>
                 </div>
+                <div className="form-group">
+                  <label>Categories</label>
+                  {categories.length === 0 ? (
+                    <p className="subtext">No categories available for this store.</p>
+                  ) : (
+                    <div className="category-list">
+                      {categories.map((c) => (
+                        <label key={c.id} className="category-option">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategoryIds.includes(c.id)}
+                            onChange={() => toggleCategory(c.id)}
+                          />{' '}
+                          {c.slug}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   Save & Next: Variants →
                 </button>
@@ -624,7 +1220,10 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
             {editorStep === 'media' && (
               <div className="editor-form">
                 <h3>Product Images</h3>
-                <p className="subtext">Upload images directly to S3 storage via presigned URL. First image is set as the primary image automatically.</p>
+                <p className="subtext">
+                  Upload images directly to S3 storage via presigned URL. The first image is the primary image; the
+                  earliest remaining image is promoted automatically when the primary is deleted.
+                </p>
                 {/* Hidden native file input — triggered programmatically */}
                 <input
                   ref={fileInputRef}
@@ -637,11 +1236,64 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                   📁 {loading ? 'Uploading…' : '+ Upload Image'}
                 </button>
                 <div className="media-gallery">
-                  {(productDetail?.media ?? []).map((m) => (
+                  {sortedMedia.map((m, idx) => (
                     <div key={m.id} className="media-card">
                       <img src={m.uri} alt={m.alt_text} className="media-thumb" />
                       {m.is_primary && <span className="badge badge-primary">Primary</span>}
-                      <p className="subtext">{m.alt_text}</p>
+                      <div className="media-card-fields">
+                        <label htmlFor={`media-alt-${m.id}`}>Alt text</label>
+                        <input
+                          id={`media-alt-${m.id}`}
+                          type="text"
+                          className="form-control"
+                          value={altDrafts[m.id] ?? m.alt_text}
+                          onChange={(e) => setAltDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                        />
+                        <div className="media-card-actions">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            disabled={loading || (altDrafts[m.id] ?? m.alt_text) === m.alt_text}
+                            onClick={() => void handleSaveAltText(m)}
+                          >
+                            Save Alt Text
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            disabled={loading || m.is_primary}
+                            onClick={() => void handleSetPrimaryMedia(m)}
+                          >
+                            Set Primary
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            disabled={loading || idx === 0}
+                            aria-label="Move image up"
+                            onClick={() => void handleMoveMedia(idx, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            disabled={loading || idx === sortedMedia.length - 1}
+                            aria-label="Move image down"
+                            onClick={() => void handleMoveMedia(idx, 1)}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            disabled={loading}
+                            onClick={() => void handleDeleteMedia(m)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                   {(productDetail?.media ?? []).length === 0 && (
@@ -659,8 +1311,20 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                 <h3>Retail Pricing &amp; Store Inventory</h3>
                 <div className="form-group">
                   <label htmlFor="price-input">Retail Price ({storeCurrency})</label>
-                  <input id="price-input" type="number" step="0.01" min="0" value={priceMajor} onChange={(e) => setPriceMajor(e.target.value)} required className="form-control" />
-                  <span className="field-hint">Enter price in {storeCurrency} (e.g. 1.00 = 1 {storeCurrency})</span>
+                  <input
+                    id="price-input"
+                    type="number"
+                    step={inputStepForMinorUnit(storeCurrencyMinorUnit)}
+                    min="0"
+                    value={priceMajor}
+                    onChange={(e) => setPriceMajor(e.target.value)}
+                    required
+                    className="form-control"
+                  />
+                  <span className="field-hint">
+                    Enter price in {storeCurrency} (e.g. 1{storeCurrencyMinorUnit > 0 ? '.' + '0'.repeat(storeCurrencyMinorUnit) : ''} = 1{' '}
+                    {storeCurrency})
+                  </span>
                 </div>
                 <div className="form-group">
                   <label htmlFor="stock-input">On-Hand Inventory (Units)</label>
@@ -684,128 +1348,69 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                   </select>
                 </div>
                 <h4>Configured Product Page Sections</h4>
+                {sections.length === 0 && <p className="subtext">No sections yet. Add one below.</p>}
                 {sections.map((sec, idx) => (
                   <div key={sec.id} className="section-box">
                     <div className="section-header">
-                      <strong>Section #{idx + 1}: {sec.type}</strong>
+                      <strong>
+                        Section #{idx + 1}: {sectionTypeLabel(sec.type)}
+                      </strong>
                       <label className="toggle-label">
                         <input
                           type="checkbox"
                           checked={sec.enabled}
-                          onChange={(e) => {
-                            const updated = [...sections];
-                            updated[idx] = { ...updated[idx], enabled: e.target.checked };
-                            setSections(updated);
-                          }}
+                          onChange={(e) => updateSection(idx, (s) => ({ ...s, enabled: e.target.checked }))}
                         />
                         Enabled
                       </label>
+                      <div className="section-order-actions">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          disabled={idx === 0}
+                          aria-label={`Move section ${idx + 1} up`}
+                          onClick={() => handleMoveSection(idx, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          disabled={idx === sections.length - 1}
+                          aria-label={`Move section ${idx + 1} down`}
+                          onClick={() => handleMoveSection(idx, 1)}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          aria-label={`Delete section ${idx + 1}`}
+                          onClick={() => handleDeleteSection(idx)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    {sec.type === 'description' && (
-                      <div className="section-content">
-                        <div className="form-group">
-                          <label>Description (EN)</label>
-                          <textarea
-                            rows={3}
-                            className="form-control"
-                            value={(sec.content?.en?.text as string) || ''}
-                            onChange={(e) => {
-                              const updated = [...sections];
-                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), text: e.target.value } } };
-                              setSections(updated);
-                            }}
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Description (AR)</label>
-                          <textarea
-                            dir="rtl" rows={3} className="form-control"
-                            value={(sec.content?.ar?.text as string) || ''}
-                            onChange={(e) => {
-                              const updated = [...sections];
-                              updated[idx] = { ...sec, content: { ...sec.content, ar: { ...((sec.content?.ar as object) || {}), text: e.target.value } } };
-                              setSections(updated);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {sec.type === 'highlights' && (
-                      <div className="section-content">
-                        <div className="form-group">
-                          <label>Title (EN)</label>
-                          <input type="text" className="form-control" value={(sec.content?.en?.title as string) || ''}
-                            onChange={(e) => {
-                              const updated = [...sections];
-                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), title: e.target.value } } };
-                              setSections(updated);
-                            }} />
-                        </div>
-                        <div className="form-group">
-                          <label>Highlights (EN, comma-separated)</label>
-                          <input type="text" className="form-control"
-                            value={((sec.content?.en as {items?: string[]})?.items || []).join(', ')}
-                            onChange={(e) => {
-                              const items = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
-                              const updated = [...sections];
-                              updated[idx] = { ...sec, content: { ...sec.content, en: { ...((sec.content?.en as object) || {}), items } } };
-                              setSections(updated);
-                            }} />
-                        </div>
-                      </div>
-                    )}
-                    {sec.type === 'faq' && (
-                      <div className="section-content">
-                        <p className="subtext">FAQ content is schema-validated. Add question/answer pairs in JSON editor below.</p>
-                        <textarea rows={4} className="form-control"
-                          value={JSON.stringify(sec.content, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              const parsed = JSON.parse(e.target.value) as Record<string, unknown>;
-                              const updated = [...sections];
-                              updated[idx] = { ...sec, content: parsed };
-                              setSections(updated);
-                            } catch {
-                              // invalid JSON, ignore
-                            }
-                          }} />
-                      </div>
-                    )}
-                    {!['description', 'highlights', 'faq'].includes(sec.type) && (
-                      <div className="section-content">
-                        <p className="subtext">Type: {sec.type} — saved automatically.</p>
-                      </div>
-                    )}
+                    {renderSectionContent(sec, idx)}
                   </div>
                 ))}
                 <div className="section-actions">
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
-                    setSections([...sections, {
-                      id: `sec-${Date.now()}`,
-                      type: 'description',
-                      enabled: true,
-                      sort_order: sections.length + 1,
-                      content: { en: { text: '' }, ar: { text: '' } }
-                    }]);
-                  }}>+ Add Description Section</button>{' '}
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
-                    setSections([...sections, {
-                      id: `sec-${Date.now()}`,
-                      type: 'highlights',
-                      enabled: true,
-                      sort_order: sections.length + 1,
-                      content: { en: { title: '', items: [] }, ar: { title: '', items: [] } }
-                    }]);
-                  }}>+ Add Highlights Section</button>{' '}
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => {
-                    setSections([...sections, {
-                      id: `sec-${Date.now()}`,
-                      type: 'faq',
-                      enabled: true,
-                      sort_order: sections.length + 1,
-                      content: { en: { items: [] }, ar: { items: [] } }
-                    }]);
-                  }}>+ Add FAQ Section</button>
+                  <select
+                    aria-label="New section type"
+                    value={newSectionType}
+                    onChange={(e) => setNewSectionType(e.target.value as SectionType)}
+                    className="form-control form-control-sm"
+                  >
+                    {SECTION_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {sectionTypeLabel(t)}
+                      </option>
+                    ))}
+                  </select>{' '}
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={handleAddSection}>
+                    + Add Section
+                  </button>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   Save &amp; Next: Readiness &amp; Publish →
@@ -842,3 +1447,14 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
     </div>
   );
 }
+
+type ProductListItem = {
+  product: { id: string; slug: string; status: string; created_at: string };
+  source: 'seller_owned' | 'supplier_backed';
+  name: string;
+  listing_status: string;
+  listing_id: string;
+  current_price?: { amount: number; currency: string } | null;
+  inventory_summary: { total_on_hand: number; total_reserved: number; total_available: number };
+  publish_readiness: { is_ready: boolean; reasons: string[] };
+};
