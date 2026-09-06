@@ -156,12 +156,16 @@ jobs:
         run: npx playwright install chromium --with-deps
       - name: Create MinIO bucket
         run: |
-          for i in $(seq 1 24); do
-            if docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest ready local; then
+          # `mc ready local` retries internally forever when the server is
+          # down, so poll the health endpoint from the runner instead.
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9000/minio/health/live; then
+              echo "MinIO is ready (attempt $i)."
               break
             fi
             echo "MinIO not ready yet (attempt $i)..."; sleep 5
           done
+          curl -sf http://127.0.0.1:9000/minio/health/live
           docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest mb --ignore-existing local/matjero-media
           docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest anonymous set download local/matjero-media
       - name: Run E2E Test Suite
