@@ -9,7 +9,7 @@ import type {
 } from '../contract';
 import { CategoryCard, EmptyState, ProductCard, SectionHeading } from './components';
 import { ProductSections } from './ProductSections';
-import { PurchaseControl } from './PurchaseControl';
+import { PurchaseControl } from '../shared/PurchaseControl';
 
 /**
  * The page bodies of the Matjero default theme.
