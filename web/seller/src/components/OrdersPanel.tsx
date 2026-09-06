@@ -4,12 +4,13 @@ import { minorToMajor } from '../lib/money';
 
 type OrderItem = {
   id: string;
-  sku_id: string;
+  sku_id?: string;
   sku_code: string;
   product_name: string;
   quantity: number;
-  unit_price: { amount: number; currency: string };
-  total_price: { amount: number; currency: string };
+  // Minor-unit amounts; currency is carried at order level, not per item.
+  unit_price: number;
+  total_price: number;
   source?: string;
 };
 
@@ -316,9 +317,9 @@ export function OrdersPanel({ api, storeId, locale, copy }: OrdersPanelProps) {
                     <tr key={item.id}>
                       <td>{item.product_name}</td>
                       <td>{item.sku_code}</td>
-                      <td>{formatMoney(item.unit_price.amount, item.unit_price.currency)}</td>
+                      <td>{formatMoney(item.unit_price, selectedOrder.currency)}</td>
                       <td>{item.quantity}</td>
-                      <td>{formatMoney(item.total_price.amount, item.total_price.currency)}</td>
+                      <td>{formatMoney(item.total_price, selectedOrder.currency)}</td>
                     </tr>
                   ))}
                 </tbody>

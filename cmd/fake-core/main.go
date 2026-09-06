@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type storeData struct {
@@ -46,6 +47,23 @@ type fakeCoreServer struct {
 	callCounts          map[string]int64
 	stores              map[string]*storeData
 
+	// Test-double OIDC issuer and S3 media storage for the P5.8 seller flow.
+	oidc          *oidcAuthority
+	s3            *s3Media
+	sellerSubject string
+
+	// P5.8 in-memory seller catalog state. Guarded by mu.
+	sellerProducts   []*sellerProduct
+	sellerLocations  []*sellerLocation
+	sellerInventory  []*sellerInventorySnapshot
+	mediaIntents     map[string]*mediaIntent
+	sellerCategories []map[string]any
+	idSeq            atomic.Uint64
+	// revisionWatermark guarantees each reset hands out a strictly higher
+	// revision than any earlier test run, so stale storefront cache entries
+	// (keyed by revision) can never be served after a reset.
+	revisionWatermark atomic.Int64
+
 	cartSeq    atomic.Uint64
 	sessionSeq atomic.Uint64
 	orderSeq   atomic.Uint64
@@ -62,9 +80,10 @@ type fakeCoreServer struct {
 
 func newServer(token string) *fakeCoreServer {
 	s := &fakeCoreServer{
-		expectedTok: token,
-		callCounts:  make(map[string]int64),
-		stores:      make(map[string]*storeData),
+		expectedTok:   token,
+		callCounts:    make(map[string]int64),
+		stores:        make(map[string]*storeData),
+		sellerSubject: "usr_seller_dev",
 	}
 	s.resetDefaultState()
 	return s
@@ -73,6 +92,10 @@ func newServer(token string) *fakeCoreServer {
 func (s *fakeCoreServer) resetDefaultState() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Strictly increase the revision baseline so cached storefront entries
+	// keyed by an older (higher) revision can never be served after a reset.
+	s.revisionWatermark.Add(100)
 
 	s.unavailable.Store(false)
 	s.extraFieldsEnabled.Store(false)
@@ -85,6 +108,27 @@ func (s *fakeCoreServer) resetDefaultState() {
 	s.orders = make(map[string]map[string]any)
 	s.orderStores = make(map[string]string)
 	s.orderTokens = make(map[string]string)
+
+	// P5.8 seed: one seller with one store, a fulfillment location, and the
+	// global categories the product authoring category picker offers.
+	seedNow := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	s.sellerProducts = nil
+	s.sellerInventory = nil
+	s.mediaIntents = make(map[string]*mediaIntent)
+	s.sellerLocations = []*sellerLocation{{
+		id:        "loc-main",
+		code:      "main",
+		name:      "Main Warehouse",
+		locType:   "warehouse",
+		status:    "active",
+		createdAt: seedNow,
+		updatedAt: seedNow,
+	}}
+	s.sellerCategories = []map[string]any{
+		{"id": "cat-beverages", "parent_category_id": nil, "slug": "beverages", "status": "active", "created_at": seedNow, "updated_at": seedNow},
+		{"id": "cat-snacks", "parent_category_id": nil, "slug": "snacks", "status": "active", "created_at": seedNow, "updated_at": seedNow},
+	}
+
 	s.stores = map[string]*storeData{
 		"store-a.localhost": {
 			code:             "store-a",
@@ -114,7 +158,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 				"configuration_revision": 2,
 			},
 			previewToken: "valid-preview-token-store-a",
-			revision:     10,
+			revision:     10 + s.revisionWatermark.Load(),
 			categories: []map[string]any{
 				{
 					"slug":          "electronics",
@@ -227,7 +271,7 @@ func (s *fakeCoreServer) resetDefaultState() {
 				"configuration_revision": 2,
 			},
 			previewToken: "valid-preview-token-store-b",
-			revision:     20,
+			revision:     20 + s.revisionWatermark.Load(),
 			categories: []map[string]any{
 				{
 					"slug":          "fashion",
@@ -314,6 +358,60 @@ func (s *fakeCoreServer) resetDefaultState() {
 	}
 }
 
+// unitPriceForSKU resolves the current listing price of a SKU: first from the
+// P5.8 seller-authored catalog, then from the seeded storefront products. This
+// keeps cart pricing consistent with the published product price.
+func (s *fakeCoreServer) unitPriceForSKU(storeCode, skuID string) (int64, bool) {
+	price, _, _, found := s.skuInfoFor(storeCode, skuID)
+	return price, found
+}
+
+// skuInfoFor resolves the price, SKU code and product name for a SKU.
+func (s *fakeCoreServer) skuInfoFor(storeCode, skuID string) (int64, string, string, bool) {
+	// Seller-authored products (fake-core serves a single seeded store).
+	for _, p := range s.sellerProducts {
+		for _, v := range p.variants {
+			for _, sk := range v.skus {
+				if sk.id == skuID {
+					name := p.slug
+					for _, t := range p.translations {
+						if t["locale"] == "en" {
+							name, _ = t["name"].(string)
+						}
+					}
+					return p.priceAmount, sk.code, name, true
+				}
+			}
+		}
+	}
+	// Seeded storefront products.
+	if store, ok := s.stores[storeCode]; ok {
+		for _, pm := range store.products {
+			priceMap, _ := pm["price"].(map[string]any)
+			name, _ := pm["name"].(string)
+			variants, _ := pm["variants"].([]any)
+			for _, rv := range variants {
+				v, _ := rv.(map[string]any)
+				skus, _ := v["skus"].([]any)
+				for _, rs := range skus {
+					sku, _ := rs.(map[string]any)
+					if sku["id"] == skuID {
+						if priceMap != nil {
+							if amount, ok := priceMap["amount_minor"].(int64); ok {
+								return amount, fmt.Sprint(sku["id"]), name, true
+							}
+							if amount, ok := priceMap["amount_minor"].(float64); ok {
+								return int64(amount), fmt.Sprint(sku["id"]), name, true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0, "", "", false
+}
+
 func (s *fakeCoreServer) recordCall(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -321,6 +419,25 @@ func (s *fakeCoreServer) recordCall(key string) {
 }
 
 func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Public OIDC discovery endpoints (no auth: they are consumed by
+	// seller-api's verifier and the browser).
+	switch r.URL.Path {
+	case "/.well-known/openid-configuration":
+		if s.oidc != nil {
+			s.oidc.discovery(w, r)
+		} else {
+			writeCoreError(w, http.StatusServiceUnavailable, "unavailable", "oidc issuer not configured")
+		}
+		return
+	case "/jwks.json":
+		if s.oidc != nil {
+			s.oidc.jwks(w, r)
+		} else {
+			writeCoreError(w, http.StatusServiceUnavailable, "unavailable", "oidc issuer not configured")
+		}
+		return
+	}
+
 	// Control plane routes (do not require Core auth tokens)
 	if strings.HasPrefix(r.URL.Path, "/test-control/") {
 		s.handleControlPlane(w, r)
@@ -369,6 +486,12 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Matjero-Storefront-Host")))
 	if i := strings.IndexByte(host, ':'); i >= 0 {
 		host = host[:i]
+	}
+
+	// Seller internal routes (P5.8): host-independent, routed on the subject.
+	if strings.HasPrefix(r.URL.Path, "/internal/v1/") && !strings.HasPrefix(r.URL.Path, "/internal/v1/storefront/") {
+		s.handleSellerAPI(w, r)
+		return
 	}
 
 	s.recordCall(r.URL.Path + "|" + host)
@@ -616,11 +739,15 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			qty = 1
 		}
 		itemID := fmt.Sprintf("item-%d", s.itemSeq.Add(1))
+		unitPrice, found := s.unitPriceForSKU(store.code, skuID)
+		if !found {
+			unitPrice = 1000
+		}
 		newItem := map[string]any{
 			"id":                        itemID,
 			"sku_id":                    skuID,
 			"quantity":                  qty,
-			"expected_unit_price_minor": int64(1000),
+			"expected_unit_price_minor": unitPrice,
 			"expected_currency_code":    store.currencyCode,
 		}
 		items, _ := cart["items"].([]any)
@@ -724,6 +851,11 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 
+		contactEmail := req.ContactEmail
+		if contactEmail == "" {
+			contactEmail = "buyer@matjero.test"
+		}
+
 		seq := s.orderSeq.Add(1)
 		orderID := fmt.Sprintf("ord-%s-%d", store.code, seq)
 		orderNum := fmt.Sprintf("#10000%d", seq)
@@ -761,6 +893,60 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"created_at":     "2026-09-05T12:00:00Z",
 		}
 
+		// Compute the order from the cart items, priced from the catalog.
+		var subtotalMinor int64
+		orderItems := []any{}
+		if cartID, ok := sess["cart_id"].(string); ok {
+			if cart, ok := s.carts[cartID]; ok {
+				cartItems, _ := cart["items"].([]any)
+				for _, ri := range cartItems {
+					item, _ := ri.(map[string]any)
+					skuID, _ := item["sku_id"].(string)
+					qty, _ := item["quantity"].(int64)
+					if qty <= 0 {
+						qty = 1
+					}
+					var unitPrice int64
+					if up, ok := item["expected_unit_price_minor"].(int64); ok {
+						unitPrice = up
+					}
+					price, skuCode, productName, _ := s.skuInfoFor(store.code, skuID)
+					_ = price
+					if productName == "" {
+						productName = "Product"
+					}
+					lineTotal := unitPrice * qty
+					subtotalMinor += lineTotal
+					orderItems = append(orderItems, map[string]any{
+						"id":                     fmt.Sprintf("ord-item-%d", s.itemSeq.Add(1)),
+						"order_id":               orderID,
+						"product_title_snapshot": productName,
+						"sku_code_snapshot":      skuCode,
+						"sku_id":                 skuID,
+						"unit_price_minor":       unitPrice,
+						"currency_code":          store.currencyCode,
+						"quantity":               qty,
+						"line_total_minor":       lineTotal,
+						"created_at":             "2026-09-05T12:00:00Z",
+					})
+				}
+			}
+		}
+		if len(orderItems) == 0 {
+			subtotalMinor = 1000
+			orderItems = append(orderItems, map[string]any{
+				"id":                     fmt.Sprintf("ord-item-%d", s.itemSeq.Add(1)),
+				"order_id":               orderID,
+				"product_title_snapshot": "Test Product",
+				"sku_code_snapshot":      "SKU-1",
+				"unit_price_minor":       int64(1000),
+				"currency_code":          store.currencyCode,
+				"quantity":               int64(1),
+				"line_total_minor":       int64(1000),
+				"created_at":             "2026-09-05T12:00:00Z",
+			})
+		}
+
 		orderMap := map[string]any{
 			"id":                       orderID,
 			"order_number":             orderNum,
@@ -769,25 +955,22 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"checkout_session_id":      sessionID,
 			"status":                   "pending",
 			"currency_code":            store.currencyCode,
-			"subtotal_minor":           int64(1000),
-			"total_minor":              int64(1000),
+			"subtotal_minor":           subtotalMinor,
+			"total_minor":              subtotalMinor,
 			"confirmation_deadline_at": "2026-12-31T23:59:59Z",
 			"aggregate_version":        int64(1),
 			"created_at":               "2026-09-05T12:00:00Z",
 			"updated_at":               "2026-09-05T12:00:00Z",
-			"items": []any{
+			"contact_email":            contactEmail,
+			"timeline": []any{
 				map[string]any{
-					"id":                     fmt.Sprintf("ord-item-%d", seq),
-					"order_id":               orderID,
-					"product_title_snapshot": "Test Product",
-					"sku_code_snapshot":      "SKU-1",
-					"unit_price_minor":       int64(1000),
-					"currency_code":          store.currencyCode,
-					"quantity":               int64(1),
-					"line_total_minor":       int64(1000),
-					"created_at":             "2026-09-05T12:00:00Z",
+					"id":         fmt.Sprintf("tl-%d", s.idSeq.Add(1)),
+					"type":       "pending",
+					"detail":     "",
+					"created_at": "2026-09-05T12:00:00Z",
 				},
 			},
+			"items":   orderItems,
 			"address": addrMap,
 		}
 
@@ -988,6 +1171,32 @@ func (s *fakeCoreServer) handleControlPlane(w http.ResponseWriter, r *http.Reque
 		}
 		s.mu.Unlock()
 
+	case "/test-control/token":
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if s.oidc == nil {
+			writeCoreError(w, http.StatusServiceUnavailable, "unavailable", "oidc issuer not configured")
+			return
+		}
+		var req struct {
+			Subject string `json:"subject"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		token, err := s.oidc.mintToken(req.Subject)
+		if err != nil {
+			writeCoreError(w, http.StatusInternalServerError, "internal_error", fmt.Sprintf("mint token: %v", err))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"token":        token,
+			"access_token": token,
+			"token_type":   "Bearer",
+			"expires_in":   5 * 3600,
+			"subject":      req.Subject,
+		})
+
 	case "/test-control/status":
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -1023,7 +1232,32 @@ func main() {
 	}
 	token := os.Getenv("CORE_API_TOKEN")
 
+	issuer := strings.TrimRight(os.Getenv("FAKE_CORE_ISSUER_URL"), "/")
+	if issuer == "" {
+		issuer = "http://127.0.0.1:" + port
+	}
+	audience := os.Getenv("FAKE_CORE_OIDC_AUDIENCE")
+	if audience == "" {
+		audience = "seller-api"
+	}
+
+	authority, err := newOIDCAuthority(issuer, audience)
+	if err != nil {
+		log.Fatalf("Fake Core OIDC authority failed: %v", err)
+	}
+
+	subject := os.Getenv("FAKE_CORE_SELLER_SUBJECT")
+	if subject == "" {
+		subject = "usr_seller_dev"
+	}
+
 	server := newServer(token)
+	server.oidc = authority
+	server.s3 = newS3Media()
+	server.sellerSubject = subject
+
+	logS3Config(server.s3)
+	log.Printf("Fake Core OIDC issuer: %s (audience %s)", issuer, audience)
 	addr := "127.0.0.1:" + port
 	log.Printf("Fake Core listening on http://%s", addr)
 	if err := http.ListenAndServe(addr, server); err != nil {

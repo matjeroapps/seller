@@ -128,13 +128,26 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     # Seller owns no database and its E2E tests run against a local fake Core HTTP server
-    # (ADR-017). Redis is provided as a CI service container for storefront caching.
+    # (ADR-017). Redis backs storefront caching; MinIO backs the P5.8 media
+    # upload flow (real presigned PUT round trip).
     services:
       redis:
         image: redis:alpine
         ports:
           - 6379:6379
         options: --entrypoint redis-server
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -sf http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -146,7 +159,17 @@ jobs:
       - run: npm ci
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
+      - name: Create MinIO bucket
+        run: |
+          docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest mb --ignore-existing local/matjero-media
+          docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest anonymous set download local/matjero-media
       - name: Run E2E Test Suite
+        env:
+          # The MinIO service container occupies port 9000; run-e2e.sh reuses it
+          # instead of starting its own instance.
+          MINIO_PORT: 9000
+          MINIO_IMAGE: minio/minio:latest
+          MC_IMAGE: minio/mc:latest
         run: ./scripts/run-e2e.sh
       - name: Upload Playwright Test Artifacts
         if: failure() || always()

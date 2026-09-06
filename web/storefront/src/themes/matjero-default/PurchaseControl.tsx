@@ -98,7 +98,7 @@ export function PurchaseControl({
       }
 
       const data = await res.json();
-      window.location.href = `/${locale}/checkout?session_id=${encodeURIComponent(data.checkout_session_id)}`;
+      window.location.href = `/${locale}/checkout/${encodeURIComponent(data.checkout_session_id)}`;
     } catch (err: any) {
       setError(err.message || 'Buy Now failed');
       setLoading(false);
