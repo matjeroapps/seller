@@ -3577,6 +3577,16 @@
                           ],
                           "type": "object"
                         },
+                        "purchase_behavior": {
+                          "type": "string"
+                        },
+                        "sections": {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
                         "slug": {
                           "type": "string"
                         },
@@ -3624,6 +3634,7 @@
                         "images",
                         "name",
                         "price",
+                        "purchase_behavior",
                         "slug",
                         "variants"
                       ],
