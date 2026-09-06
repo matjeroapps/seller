@@ -125,17 +125,18 @@ ul {
   --radius-card: 10px;
 }
 
-/* ---------- Announcement ---------- */
-
-.announcement {
+.announcement,
+.boutique-announcement {
   padding: 0.55rem 1rem;
   font-size: 0.875rem;
   text-align: center;
 }
 
-.announcement__text {
+.announcement__text,
+.boutique-announcement p {
   margin-inline: auto;
   max-width: var(--shell);
+  margin: 0;
 }
 
 /* ---------- Header ---------- */

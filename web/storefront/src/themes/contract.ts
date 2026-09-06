@@ -223,15 +223,25 @@ export type ThemeComponents = {
   ErrorState: React.ComponentType<{ locale: Locale; copy: Dictionary; reset?: () => void }>;
 };
 
-/** A registered theme: an identity, the versions it serves, and its components. */
+export type ThemeCapabilities = {
+  supportsRTL: boolean;
+  supportsProductSections: boolean;
+  supportsSearch: boolean;
+  supportsCategories: boolean;
+};
+
+/** A registered theme: an identity, capability contract, versions it serves, and components. */
 export type ThemeDefinition = {
   key: string;
+  name: string;
   /**
    * Versions this component set is compatible with. A store pinned to a version
    * outside this list is not rendered by this theme, because pretending an
    * unknown version is compatible is how a storefront silently renders wrong.
    */
   versions: string[];
+  compatibilityVersion: string;
+  capabilities: ThemeCapabilities;
   components: ThemeComponents;
 };
 

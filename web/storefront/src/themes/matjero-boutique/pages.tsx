@@ -9,7 +9,7 @@ import type {
   ThemeContext
 } from '../contract';
 import { SharedProductSections } from '../shared/ProductSections';
-import { PurchaseControl } from '../matjero-default/PurchaseControl';
+import { PurchaseControl } from '../shared/PurchaseControl';
 
 /**
  * Boutique theme page components.

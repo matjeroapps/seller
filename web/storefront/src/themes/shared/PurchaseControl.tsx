@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ProductVariantModel } from '../contract';
 import type { Dictionary } from '../../i18n/locales';
-import { PURCHASE_CONTROL_ANCHOR } from '../shared/constants';
+import { PURCHASE_CONTROL_ANCHOR } from './constants';
 
 export function PurchaseControl({
   variants,
@@ -106,8 +106,6 @@ export function PurchaseControl({
     }
   }
 
-  // `id` lets structured page sections (final_cta) hand the customer to this
-  // existing control instead of any theme duplicating its purchase behaviour.
   return (
     <form className="purchase-control" id={PURCHASE_CONTROL_ANCHOR} onSubmit={handleAddToCart}>
       {variants.length > 0 ? (

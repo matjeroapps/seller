@@ -17,16 +17,11 @@ export function BoutiqueAnnouncement({ context }: { context: ThemeContext }) {
       className="boutique-announcement"
       style={{
         backgroundColor: announcement.backgroundColor,
-        color: announcement.textColor,
-        padding: '0.5rem 1rem',
-        textAlign: 'center',
-        fontSize: '0.875rem',
-        fontWeight: 500,
-        letterSpacing: '0.025em'
+        color: announcement.textColor
       }}
       role="note"
     >
-      <p style={{ margin: 0 }}>{announcement.text}</p>
+      <p>{announcement.text}</p>
     </div>
   );
 }
