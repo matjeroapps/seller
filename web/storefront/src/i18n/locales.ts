@@ -135,6 +135,7 @@ export type Dictionary = {
   cart: {
     title: string;
     addToCart: string;
+    buyNow: string;
     added: string;
     viewCart: string;
     quantity: string;
@@ -278,6 +279,7 @@ const en: Dictionary = {
   cart: {
     title: 'Cart',
     addToCart: 'Add to Cart',
+    buyNow: 'Buy Now',
     added: 'Added to cart',
     viewCart: 'View Cart',
     quantity: 'Quantity',
@@ -421,6 +423,7 @@ const ar: Dictionary = {
   cart: {
     title: 'سلة التسوق',
     addToCart: 'إضافة إلى السلة',
+    buyNow: 'اشتري الآن',
     added: 'تمت الإضافة إلى السلة',
     viewCart: 'عرض السلة',
     quantity: 'الكمية',
