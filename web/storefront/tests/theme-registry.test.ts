@@ -93,4 +93,25 @@ describe('theme registry', () => {
     expect(themeRegistry.has('matjero-default')).toBe(true);
     expect(themeRegistry.has('nothing-like-this')).toBe(false);
   });
+
+  it('rejects duplicate theme registration with identical key', () => {
+    const registry = new ThemeRegistry().register(matjeroDefaultTheme);
+    expect(() => registry.register(matjeroDefaultTheme)).toThrow(/already registered/);
+  });
+
+  it('rejects themes with invalid key or empty versions', () => {
+    const registry = new ThemeRegistry();
+    expect(() => registry.register({ ...stub, key: '' })).toThrow(/non-empty string/);
+    expect(() => registry.register({ ...stub, key: 'invalid-versions', versions: [] })).toThrow(/non-empty array/);
+  });
+
+  it('exposes capability contracts on registered themes', () => {
+    const theme = themeRegistry.default();
+    expect(theme.capabilities).toBeDefined();
+    expect(theme.capabilities.supportsRTL).toBe(true);
+    expect(theme.capabilities.supportsProductSections).toBe(true);
+    expect(theme.capabilities.supportsSearch).toBe(true);
+    expect(theme.capabilities.supportsCategories).toBe(true);
+    expect(theme.compatibilityVersion).toBe('1.0');
+  });
 });
