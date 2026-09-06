@@ -103,3 +103,36 @@ compatibilityVersion: "1.0"
 The Theme Registry and Capability Contracts provide the prerequisite safeguards for third-party theme support:
 - **Registry Validation**: Prevents key collisions, validates required capabilities, and rejects incompatible schema versions.
 - **Preview Contracts**: `ThemePreviewContext` defines token-driven, non-destructive preview rendering for seller dashboard theme customization.
+
+---
+
+## 8. Test Infrastructure Changes
+
+The storefront test suite support utilities were updated to conform to the extended `ThemeDefinition` contract:
+- **`web/storefront/tests/support/stub-theme.tsx`**: Updated `stubTheme` definition to include `name`, `compatibilityVersion: "1.0"`, and `capabilities` flags.
+
+---
+
+## Implementation Metadata
+
+- **Repository**: `matjeroapps/seller`
+- **PR**: `#17`
+- **Branch**: `feature/theme-platform-foundation-hardening`
+- **Final commit SHA**: `__FINAL_SHA__`
+- **Scope**: Phase T2.5 Theme Platform Foundation Hardening
+- **Verification commands**:
+  ```bash
+  npm run lint
+  npm run typecheck
+  npm test
+  npm run build
+  ```
+
+---
+
+## Verification Status
+
+- **Theme isolation tests**: Passed (`tests/theme-isolation.test.ts` verifies zero cross-theme imports from `matjero-default` in `matjero-boutique`).
+- **Token system tests**: Passed (`tests/theme-tokens.test.ts` verifies token definitions and CSS custom property generation).
+- **Registry validation tests**: Passed (`tests/theme-registry.test.ts` verifies duplicate key rejection, version constraints, and capability contracts).
+- **RTL tests**: Passed (`tests/localization.test.tsx` and theme component tests verify Arabic right-to-left layout rendering).
