@@ -239,7 +239,10 @@ type SellerOrderItem struct {
 	Quantity    int    `json:"quantity"`
 	UnitPrice   int64  `json:"unit_price"`
 	TotalPrice  int64  `json:"total_price"`
-	Source      string `json:"source"`
+	// Source documents the line item provenance. Core normalizes the value to
+	// seller_owned or supplier_backed; the openapi tag only documents the
+	// closed value set in the generated spec and never changes the wire shape.
+	Source string `json:"source" openapi:"enum=seller_owned|supplier_backed"`
 }
 
 type SellerOrderTimelineEvent struct {

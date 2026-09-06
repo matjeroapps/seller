@@ -590,10 +590,11 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		qCategory := r.URL.Query().Get("category")
 		qKeyword := strings.ToLower(r.URL.Query().Get("q"))
+		locale := r.URL.Query().Get("locale")
 
 		filtered := make([]map[string]any, 0)
 		for _, p := range store.products {
-			cleaned := s.cleanPublicProduct(p)
+			cleaned := s.cleanPublicProduct(p, locale)
 			if qCategory != "" {
 				cat, _ := cleaned["category"].(map[string]any)
 				if cat == nil || cat["slug"] != qCategory {
@@ -640,7 +641,7 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"product": s.cleanPublicProduct(found),
+			"product": s.cleanPublicProduct(found, r.URL.Query().Get("locale")),
 		})
 
 	case r.URL.Path == "/internal/v1/storefront/carts" && r.Method == http.MethodPost:
@@ -1054,13 +1055,22 @@ func (s *fakeCoreServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *fakeCoreServer) cleanPublicProduct(p map[string]any) map[string]any {
+// cleanPublicProduct strips the private "_"-prefixed state (including the
+// precomputed presentation sections) from a storefront product projection and
+// projects the structured page sections for the request locale: each section
+// becomes {id, type, sort_order, content} with the locale-projected content.
+func (s *fakeCoreServer) cleanPublicProduct(p map[string]any, locale string) map[string]any {
 	out := make(map[string]any)
 	for k, v := range p {
-		if strings.HasPrefix(k, "_forbidden") {
+		if strings.HasPrefix(k, "_") {
 			continue
 		}
 		out[k] = v
+	}
+	if raw, ok := p["_presentation_sections"].([]any); ok {
+		if sections := projectSectionsFor(raw, locale); len(sections) > 0 {
+			out["sections"] = sections
+		}
 	}
 	if s.extraFieldsEnabled.Load() {
 		s.extraFieldEmissions.Add(1)

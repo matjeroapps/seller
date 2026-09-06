@@ -796,6 +796,112 @@ ul {
   white-space: pre-line;
 }
 
+/* ---------- Structured product page sections ---------- */
+
+/*
+ * The structured sections a seller authors (description, highlights, image_text,
+ * specifications, faq, final_cta). Core serves them already locale-projected, so
+ * the theme only renders them.
+ */
+
+.product__page-sections {
+  display: grid;
+  gap: var(--spacing-section);
+  margin-block-start: var(--spacing-section);
+}
+
+.product-page-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.product-page-section__title {
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+}
+
+.product-page-section__text {
+  max-width: 66ch;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+.product-page-section__items {
+  display: grid;
+  gap: 0.4rem;
+  padding-inline-start: 1.2rem;
+  color: var(--muted);
+}
+
+.product-page-section__media {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-card);
+  background: var(--surface-muted);
+  object-fit: cover;
+}
+
+.product-page-section__image-text {
+  display: grid;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+@media (min-width: 48rem) {
+  .product-page-section__image-text {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* "Image right": the media moves to the second column via order. */
+  .product-page-section__image-text--right > .product-page-section__media {
+    order: 2;
+  }
+}
+
+.product-page-section__specs {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.product-page-section__spec-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 1.25rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.product-page-section__spec-row dt {
+  font-weight: 650;
+}
+
+.product-page-section__spec-row dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.product-page-section__faq {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.product-page-section__faq-question {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.product-page-section__faq-answer {
+  max-width: 66ch;
+  color: var(--muted);
+}
+
+.product-page-section__cta {
+  justify-self: start;
+}
+
 .variants {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));

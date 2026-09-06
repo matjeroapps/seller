@@ -553,7 +553,7 @@ func sellerRoutes() []RouteSpec {
 			Parameters: []ParameterSpec{
 				PathStringParam("store_id", "Store identifier"),
 				StringParam("status", "Filter by product status", false),
-				StringParam("source", "Filter by product source: seller_owned or supplier", false),
+				StringParam("source", "Filter by product source: seller_owned or supplier_backed", false),
 				StringParam("query", "Keyword matched against product name", false),
 				LimitParam(),
 				OffsetParam(),
@@ -818,29 +818,29 @@ func sellerRoutes() []RouteSpec {
 			Path:        "/v1/seller/stores/{store_id}/listings/{listing_id}/presentation",
 			OperationID: "getListingPresentation",
 			Summary:     "Get listing presentation",
-			Description: "Returns the seller listing presentation: seller_listing_id, schema_version, purchase_behavior, the localized content sections and timestamps.",
+			Description: "Returns the seller listing presentation: seller_listing_id, schema_version, purchase_behavior and the structured page sections. Each section is the canonical envelope {id, type, enabled, sort_order, content} where content mixes GLOBAL fields (image_text media_id + layout, final_cta action) with the localized en/ar objects; description, highlights, specifications and faq carry no global fields. Core accepts at most 20 sections with unique ids and rejects unknown top-level content keys and any url/href/link fields.",
 			Tags:        []string{"Seller Listings"},
 			Auth:        true,
 			Parameters: []ParameterSpec{
 				PathStringParam("store_id", "Store identifier"),
 				PathStringParam("listing_id", "Seller listing identifier"),
 			},
-			Responses: AuthReadResponses("Listing presentation", coreclient.SellerListingPresentation{}),
+			Responses: AuthReadResponses("Listing presentation", ListingPresentationPayload{}),
 		},
 		{
 			Method:      http.MethodPut,
 			Path:        "/v1/seller/stores/{store_id}/listings/{listing_id}/presentation",
 			OperationID: "updateListingPresentation",
 			Summary:     "Update listing presentation",
-			Description: "Replaces the presentation sections and purchase behavior, and returns the updated presentation.",
+			Description: "Replaces the presentation sections and purchase behavior, and returns the updated presentation. Sections follow the canonical per-type content schemas: description {heading, body}, highlights {title, items}, specifications {items: [{key, value}]}, faq {items: [{question, answer}]} localized under en/ar with no global fields; image_text requires the GLOBAL media_id (product media of the same product) and layout (left|right) beside {heading, body}; final_cta requires the GLOBAL action (add_to_cart|buy_now) beside {title, body} and accepts no url/href/link fields. At most 20 sections with unique ids; unknown top-level keys are rejected with 422.",
 			Tags:        []string{"Seller Listings"},
 			Auth:        true,
 			Parameters: []ParameterSpec{
 				PathStringParam("store_id", "Store identifier"),
 				PathStringParam("listing_id", "Seller listing identifier"),
 			},
-			RequestBody: coreclient.SellerListingPresentation{},
-			Responses:   AuthOKResponses("Listing presentation updated", coreclient.SellerListingPresentation{}),
+			RequestBody: ListingPresentationPayload{},
+			Responses:   AuthOKResponses("Listing presentation updated", ListingPresentationPayload{}),
 		},
 		{
 			Method:      http.MethodPost,
@@ -907,7 +907,7 @@ func sellerRoutes() []RouteSpec {
 			Path:        "/v1/seller/stores/{store_id}/orders/{order_id}",
 			OperationID: "getStoreOrderDetail",
 			Summary:     "Get store order detail",
-			Description: "Returns the safe seller order detail: order identity and status, order-level currency, minor-unit subtotal/total, item_count, confirmation_deadline_at, shipping_address, the buyer contact_email, line items (product_name, sku_code, quantity, minor-unit unit_price/total_price, source), the status timeline and the allowed_next_actions. Supplier fields are not exposed.",
+			Description: "Returns the safe seller order detail: order identity and status, order-level currency, minor-unit subtotal/total, item_count, confirmation_deadline_at, shipping_address, the buyer contact_email, line items (product_name, sku_code, quantity, minor-unit unit_price/total_price, source: seller_owned or supplier_backed), the status timeline and the allowed_next_actions. Supplier fields are not exposed.",
 			Tags:        []string{"Orders"},
 			Auth:        true,
 			Parameters: []ParameterSpec{
@@ -929,7 +929,13 @@ func sellerRoutes() []RouteSpec {
 				PathStringParam("order_id", "Order identifier"),
 			},
 			RequestBody: coreclient.OrderTransitionRequest{},
-			Responses:   AuthOKResponses("Order transitioned", coreclient.SellerOrderDetail{}),
+			Responses: append(
+				AuthOKResponses("Order transitioned", coreclient.SellerOrderDetail{}),
+				// Core rejects business-illegal transitions with 422 and the
+				// invalid_order_transition code, which the Seller API passes
+				// through unchanged.
+				ErrorResponse(http.StatusUnprocessableEntity, "Invalid order transition"),
+			),
 		},
 	}
 }

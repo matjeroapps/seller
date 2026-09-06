@@ -5228,7 +5228,7 @@
     },
     "/v1/seller/stores/{store_id}/listings/{listing_id}/presentation": {
       "get": {
-        "description": "Returns the seller listing presentation: seller_listing_id, schema_version, purchase_behavior, the localized content sections and timestamps.",
+        "description": "Returns the seller listing presentation: seller_listing_id, schema_version, purchase_behavior and the structured page sections. Each section is the canonical envelope {id, type, enabled, sort_order, content} where content mixes GLOBAL fields (image_text media_id + layout, final_cta action) with the localized en/ar objects; description, highlights, specifications and faq carry no global fields. Core accepts at most 20 sections with unique ids and rejects unknown top-level content keys and any url/href/link fields.",
         "operationId": "getListingPresentation",
         "parameters": [
           {
@@ -5279,8 +5279,204 @@
                       "items": {
                         "properties": {
                           "content": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "description": "Canonical per-type section content. GLOBAL fields (image_text media_id and layout, final_cta action) sit beside the localized en/ar objects and never inside them; no url/href/link fields exist anywhere.",
+                            "oneOf": [
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "heading": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "heading"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "items",
+                                    "title"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "ar": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "heading": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "heading"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "en": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "heading": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "heading"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "layout": {
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "media_id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "layout",
+                                  "media_id"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "properties": {
+                                          "key": {
+                                            "type": "string"
+                                          },
+                                          "value": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "key",
+                                          "value"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "items"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "properties": {
+                                          "answer": {
+                                            "type": "string"
+                                          },
+                                          "question": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "answer",
+                                          "question"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "items"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "action": {
+                                    "enum": [
+                                      "add_to_cart",
+                                      "buy_now"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "ar": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "title"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "en": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "title"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "action"
+                                ],
+                                "type": "object"
+                              }
+                            ]
                           },
                           "enabled": {
                             "type": "boolean"
@@ -5293,6 +5489,14 @@
                             "type": "integer"
                           },
                           "type": {
+                            "enum": [
+                              "description",
+                              "highlights",
+                              "image_text",
+                              "specifications",
+                              "faq",
+                              "final_cta"
+                            ],
                             "type": "string"
                           }
                         },
@@ -5461,7 +5665,7 @@
         ]
       },
       "put": {
-        "description": "Replaces the presentation sections and purchase behavior, and returns the updated presentation.",
+        "description": "Replaces the presentation sections and purchase behavior, and returns the updated presentation. Sections follow the canonical per-type content schemas: description {heading, body}, highlights {title, items}, specifications {items: [{key, value}]}, faq {items: [{question, answer}]} localized under en/ar with no global fields; image_text requires the GLOBAL media_id (product media of the same product) and layout (left|right) beside {heading, body}; final_cta requires the GLOBAL action (add_to_cart|buy_now) beside {title, body} and accepts no url/href/link fields. At most 20 sections with unique ids; unknown top-level keys are rejected with 422.",
         "operationId": "updateListingPresentation",
         "parameters": [
           {
@@ -5511,8 +5715,204 @@
                     "items": {
                       "properties": {
                         "content": {
-                          "additionalProperties": true,
-                          "type": "object"
+                          "description": "Canonical per-type section content. GLOBAL fields (image_text media_id and layout, final_cta action) sit beside the localized en/ar objects and never inside them; no url/href/link fields exist anywhere.",
+                          "oneOf": [
+                            {
+                              "additionalProperties": {
+                                "properties": {
+                                  "body": {
+                                    "type": "string"
+                                  },
+                                  "heading": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "body",
+                                  "heading"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": {
+                                "properties": {
+                                  "items": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "items",
+                                  "title"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "object"
+                            },
+                            {
+                              "properties": {
+                                "ar": {
+                                  "nullable": true,
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "heading": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "heading"
+                                  ],
+                                  "type": "object"
+                                },
+                                "en": {
+                                  "nullable": true,
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "heading": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "heading"
+                                  ],
+                                  "type": "object"
+                                },
+                                "layout": {
+                                  "enum": [
+                                    "left",
+                                    "right"
+                                  ],
+                                  "type": "string"
+                                },
+                                "media_id": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "layout",
+                                "media_id"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": {
+                                "properties": {
+                                  "items": {
+                                    "items": {
+                                      "properties": {
+                                        "key": {
+                                          "type": "string"
+                                        },
+                                        "value": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "key",
+                                        "value"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "items"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": {
+                                "properties": {
+                                  "items": {
+                                    "items": {
+                                      "properties": {
+                                        "answer": {
+                                          "type": "string"
+                                        },
+                                        "question": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "answer",
+                                        "question"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "items"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "object"
+                            },
+                            {
+                              "properties": {
+                                "action": {
+                                  "enum": [
+                                    "add_to_cart",
+                                    "buy_now"
+                                  ],
+                                  "type": "string"
+                                },
+                                "ar": {
+                                  "nullable": true,
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "title"
+                                  ],
+                                  "type": "object"
+                                },
+                                "en": {
+                                  "nullable": true,
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "title"
+                                  ],
+                                  "type": "object"
+                                }
+                              },
+                              "required": [
+                                "action"
+                              ],
+                              "type": "object"
+                            }
+                          ]
                         },
                         "enabled": {
                           "type": "boolean"
@@ -5525,6 +5925,14 @@
                           "type": "integer"
                         },
                         "type": {
+                          "enum": [
+                            "description",
+                            "highlights",
+                            "image_text",
+                            "specifications",
+                            "faq",
+                            "final_cta"
+                          ],
                           "type": "string"
                         }
                       },
@@ -5582,8 +5990,204 @@
                       "items": {
                         "properties": {
                           "content": {
-                            "additionalProperties": true,
-                            "type": "object"
+                            "description": "Canonical per-type section content. GLOBAL fields (image_text media_id and layout, final_cta action) sit beside the localized en/ar objects and never inside them; no url/href/link fields exist anywhere.",
+                            "oneOf": [
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "body": {
+                                      "type": "string"
+                                    },
+                                    "heading": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "body",
+                                    "heading"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "items",
+                                    "title"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "ar": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "heading": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "heading"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "en": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "heading": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "heading"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "layout": {
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "media_id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "layout",
+                                  "media_id"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "properties": {
+                                          "key": {
+                                            "type": "string"
+                                          },
+                                          "value": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "key",
+                                          "value"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "items"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": {
+                                  "properties": {
+                                    "items": {
+                                      "items": {
+                                        "properties": {
+                                          "answer": {
+                                            "type": "string"
+                                          },
+                                          "question": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "answer",
+                                          "question"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "items"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "action": {
+                                    "enum": [
+                                      "add_to_cart",
+                                      "buy_now"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "ar": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "title"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "en": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "body": {
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "body",
+                                      "title"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "action"
+                                ],
+                                "type": "object"
+                              }
+                            ]
                           },
                           "enabled": {
                             "type": "boolean"
@@ -5596,6 +6200,14 @@
                             "type": "integer"
                           },
                           "type": {
+                            "enum": [
+                              "description",
+                              "highlights",
+                              "image_text",
+                              "specifications",
+                              "faq",
+                              "final_cta"
+                            ],
                             "type": "string"
                           }
                         },
@@ -6608,7 +7220,7 @@
     },
     "/v1/seller/stores/{store_id}/orders/{order_id}": {
       "get": {
-        "description": "Returns the safe seller order detail: order identity and status, order-level currency, minor-unit subtotal/total, item_count, confirmation_deadline_at, shipping_address, the buyer contact_email, line items (product_name, sku_code, quantity, minor-unit unit_price/total_price, source), the status timeline and the allowed_next_actions. Supplier fields are not exposed.",
+        "description": "Returns the safe seller order detail: order identity and status, order-level currency, minor-unit subtotal/total, item_count, confirmation_deadline_at, shipping_address, the buyer contact_email, line items (product_name, sku_code, quantity, minor-unit unit_price/total_price, source: seller_owned or supplier_backed), the status timeline and the allowed_next_actions. Supplier fields are not exposed.",
         "operationId": "getStoreOrderDetail",
         "parameters": [
           {
@@ -6689,6 +7301,10 @@
                             "type": "string"
                           },
                           "source": {
+                            "enum": [
+                              "seller_owned",
+                              "supplier_backed"
+                            ],
                             "type": "string"
                           },
                           "total_price": {
@@ -7022,6 +7638,10 @@
                             "type": "string"
                           },
                           "source": {
+                            "enum": [
+                              "seller_owned",
+                              "supplier_backed"
+                            ],
                             "type": "string"
                           },
                           "total_price": {
@@ -7268,6 +7888,36 @@
             },
             "description": "Conflict"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invalid order transition"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -7342,7 +7992,7 @@
             }
           },
           {
-            "description": "Filter by product source: seller_owned or supplier",
+            "description": "Filter by product source: seller_owned or supplier_backed",
             "in": "query",
             "name": "source",
             "schema": {

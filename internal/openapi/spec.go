@@ -216,6 +216,10 @@ func schemaRefForType(t reflect.Type, cache map[reflect.Type]*openapi3.SchemaRef
 		return &openapi3.SchemaRef{Value: schema}, nil
 	}
 
+	if t == reflect.TypeOf(SectionContent{}) {
+		return sectionContentUnionSchema(cache)
+	}
+
 	switch t.Kind() {
 	case reflect.Bool:
 		return &openapi3.SchemaRef{Value: openapi3.NewBoolSchema()}, nil
@@ -286,6 +290,11 @@ func schemaRefForType(t reflect.Type, cache map[reflect.Type]*openapi3.SchemaRef
 			if err != nil {
 				return nil, err
 			}
+			if enum := openapiEnumFromTag(field.Tag.Get("openapi")); enum != nil {
+				clone := *fieldRef.Value
+				clone.Enum = enum
+				fieldRef = &openapi3.SchemaRef{Value: &clone}
+			}
 			schema.WithProperty(name, fieldRef.Value)
 			if !omitEmpty && field.Type.Kind() != reflect.Pointer {
 				required = append(required, name)
@@ -297,6 +306,48 @@ func schemaRefForType(t reflect.Type, cache map[reflect.Type]*openapi3.SchemaRef
 	default:
 		return nil, fmt.Errorf("unsupported schema type %s", t.String())
 	}
+}
+
+// sectionContentUnionSchema renders the canonical per-type section content as
+// a oneOf over the six content schemas: description, highlights, image_text,
+// specifications, faq and final_cta.
+func sectionContentUnionSchema(cache map[reflect.Type]*openapi3.SchemaRef) (*openapi3.SchemaRef, error) {
+	members := []reflect.Type{
+		reflect.TypeOf(SectionDescriptionContent{}),
+		reflect.TypeOf(SectionHighlightsContent{}),
+		reflect.TypeOf(SectionImageTextContent{}),
+		reflect.TypeOf(SectionSpecificationsContent{}),
+		reflect.TypeOf(SectionFAQContent{}),
+		reflect.TypeOf(SectionFinalCTAContent{}),
+	}
+	refs := make([]*openapi3.SchemaRef, 0, len(members))
+	for _, member := range members {
+		ref, err := schemaRefForType(member, cache)
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+	schema := openapi3.NewSchema()
+	schema.OneOf = refs
+	schema.Description = "Canonical per-type section content. GLOBAL fields (image_text media_id and layout, final_cta action) sit beside the localized en/ar objects and never inside them; no url/href/link fields exist anywhere."
+	return &openapi3.SchemaRef{Value: schema}, nil
+}
+
+// openapiEnumFromTag parses the optional documentation tag "enum=a|b|c" on a
+// struct field into the enumerated schema values, or nil when the tag is
+// absent. The tag documents closed value sets without changing the runtime
+// DTO types.
+func openapiEnumFromTag(tag string) []any {
+	if !strings.HasPrefix(tag, "enum=") {
+		return nil
+	}
+	parts := strings.Split(strings.TrimPrefix(tag, "enum="), "|")
+	values := make([]any, 0, len(parts))
+	for _, part := range parts {
+		values = append(values, part)
+	}
+	return values
 }
 
 func jsonFieldName(field reflect.StructField) (name string, omitempty bool, ok bool) {

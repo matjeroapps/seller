@@ -8,6 +8,7 @@ import type {
   ThemeContext
 } from '../contract';
 import { CategoryCard, EmptyState, ProductCard, SectionHeading } from './components';
+import { ProductSections } from './ProductSections';
 import { PurchaseControl } from './PurchaseControl';
 
 /**
@@ -356,24 +357,7 @@ export function ProductDetail({
       </div>
 
       {model.sections && model.sections.length > 0 ? (
-        <div className="product__page-sections">
-          {model.sections.filter((s) => s.enabled).map((sec) => {
-            const langContent = sec.content[context.locale] || sec.content['en'] || {};
-            return (
-              <section key={sec.id} className={`product-page-section product-page-section--${sec.type}`}>
-                {langContent.title && <h2 className="section__title">{langContent.title}</h2>}
-                {langContent.text && <p className="section__text">{langContent.text}</p>}
-                {Array.isArray(langContent.items) && (
-                  <ul className="section__items">
-                    {langContent.items.map((item: any, i: number) => (
-                      <li key={i}>{typeof item === 'string' ? item : item.question ? `${item.question}: ${item.answer}` : JSON.stringify(item)}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
-        </div>
+        <ProductSections sections={model.sections} context={context} />
       ) : null}
     </article>
   );

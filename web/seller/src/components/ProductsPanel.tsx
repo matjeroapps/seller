@@ -45,8 +45,12 @@ type SectionType = 'description' | 'highlights' | 'image_text' | 'specifications
 const SECTION_TYPES: SectionType[] = ['description', 'highlights', 'image_text', 'specifications', 'faq', 'final_cta'];
 
 /**
- * Empty localized content template for a newly added section of `type`.
- * Localized content always lives under `content: { en: {...}, ar: {...} }`.
+ * Empty content template for a newly added section of `type`.
+ *
+ * Localized content always lives under `content: { en: {...}, ar: {...} }`;
+ * GLOBAL fields (`media_id`, `layout`, `action`) live directly on `content`.
+ * These templates only emit the known keys of the section contract — the
+ * backend rejects unknown top-level keys, so no editor path may invent one.
  */
 function emptyContentFor(type: SectionType): Record<string, any> {
   switch (type) {
@@ -55,18 +59,28 @@ function emptyContentFor(type: SectionType): Record<string, any> {
     case 'highlights':
       return { en: { title: '', items: [] }, ar: { title: '', items: [] } };
     case 'image_text':
-      return { media_id: '', en: { heading: '', body: '' }, ar: { heading: '', body: '' } };
+      return { media_id: '', layout: 'left', en: { heading: '', body: '' }, ar: { heading: '', body: '' } };
     case 'specifications':
       return { en: { items: [{ key: '', value: '' }] }, ar: { items: [{ key: '', value: '' }] } };
     case 'faq':
       return { en: { items: [{ question: '', answer: '' }] }, ar: { items: [{ question: '', answer: '' }] } };
     case 'final_cta':
-      return { en: { title: '', body: '', action: 'add_to_cart' }, ar: { title: '', body: '' } };
+      return { action: 'add_to_cart', en: { title: '', body: '' }, ar: { title: '', body: '' } };
   }
 }
 
-/** Light client-side validation for enabled sections; returns an error message or null. */
-function validateSections(sections: PresentationSection[]): string | null {
+/**
+ * Client-side validation for enabled sections; returns an error message or null.
+ *
+ * Mirrors the backend section contract exactly (the backend remains authoritative —
+ * its errors surface through `readErrorMessage` on save):
+ * - image_text requires a GLOBAL media_id that references one of the product's
+ *   media and a GLOBAL layout of "left" or "right";
+ * - final_cta requires a GLOBAL action of "add_to_cart" or "buy_now";
+ * - localized content must exist under `content.en` / `content.ar` only, so the
+ *   editors' per-locale bounds checks below cover every key the backend accepts.
+ */
+function validateSections(sections: PresentationSection[], productMediaIds: string[]): string | null {
   for (let i = 0; i < sections.length; i++) {
     const sec = sections[i];
     if (!sec.enabled) continue;
@@ -82,10 +96,15 @@ function validateSections(sections: PresentationSection[]): string | null {
         if (!items.some((it) => String(it ?? '').trim())) return `${where}: at least one English highlight is required.`;
         break;
       }
-      case 'image_text':
-        if (!String(sec.content?.media_id ?? '').trim()) return `${where}: an image must be selected.`;
+      case 'image_text': {
+        const mediaId = String(sec.content?.media_id ?? '').trim();
+        if (!mediaId) return `${where}: an image must be selected.`;
+        if (!productMediaIds.includes(mediaId)) return `${where}: the selected image must be one of the product's uploaded images.`;
+        const layout = String(sec.content?.layout ?? '');
+        if (layout !== 'left' && layout !== 'right') return `${where}: the image layout must be left or right.`;
         if (!String(en.heading ?? '').trim()) return `${where}: English heading is required.`;
         break;
+      }
       case 'specifications': {
         const items = (en.items as Array<{ key?: string; value?: string }>) ?? [];
         if (items.length === 0 || !items.some((it) => String(it.key ?? '').trim())) {
@@ -100,9 +119,14 @@ function validateSections(sections: PresentationSection[]): string | null {
         }
         break;
       }
-      case 'final_cta':
+      case 'final_cta': {
+        const action = String(sec.content?.action ?? '');
+        if (action !== 'add_to_cart' && action !== 'buy_now') {
+          return `${where}: the call-to-action must be Add to Cart or Buy Now.`;
+        }
         if (!String(en.title ?? '').trim()) return `${where}: English title is required.`;
         break;
+      }
       default:
         break;
     }
@@ -703,7 +727,10 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
   const handleSavePresentation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productDetail || !editingProductId) return;
-    const validationError = validateSections(sections);
+    const validationError = validateSections(
+      sections,
+      productDetail.media.map((m) => m.id)
+    );
     if (validationError) {
       setError(validationError);
       return;
@@ -834,9 +861,12 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       case 'image_text':
         return (
           <div className="section-content">
+            {/* GLOBAL fields: one image and one layout for both locales. */}
             <div className="form-group">
-              <label>Image</label>
+              <label htmlFor={`section-${sec.id}-image`}>Image</label>
               <select
+                id={`section-${sec.id}-image`}
+                aria-label="Section image"
                 className="form-control"
                 value={(sec.content?.media_id as string) || ''}
                 onChange={(e) => updateSection(idx, (s) => ({ ...s, content: { ...s.content, media_id: e.target.value } }))}
@@ -847,6 +877,19 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                     {m.alt_text || m.uri}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor={`section-${sec.id}-layout`}>Image Layout</label>
+              <select
+                id={`section-${sec.id}-layout`}
+                aria-label="Image layout"
+                className="form-control"
+                value={(sec.content?.layout as string) || 'left'}
+                onChange={(e) => updateSection(idx, (s) => ({ ...s, content: { ...s.content, layout: e.target.value } }))}
+              >
+                <option value="left">Image Left</option>
+                <option value="right">Image Right</option>
               </select>
             </div>
             {(['en', 'ar'] as const).map((lang) => (
@@ -993,6 +1036,20 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
       case 'final_cta':
         return (
           <div className="section-content">
+            {/* GLOBAL field: one action for both locales. */}
+            <div className="form-group">
+              <label htmlFor={`section-${sec.id}-action`}>Action</label>
+              <select
+                id={`section-${sec.id}-action`}
+                aria-label="Call-to-action action"
+                className="form-control"
+                value={(sec.content?.action as string) || 'add_to_cart'}
+                onChange={(e) => updateSection(idx, (s) => ({ ...s, content: { ...s.content, action: e.target.value } }))}
+              >
+                <option value="add_to_cart">Add to Cart</option>
+                <option value="buy_now">Buy Now</option>
+              </select>
+            </div>
             {(['en', 'ar'] as const).map((lang) => (
               <div className="form-group" key={lang} dir={lang === 'ar' ? 'rtl' : undefined}>
                 <label>Title ({lang.toUpperCase()})</label>
@@ -1009,19 +1066,6 @@ export function ProductsPanel({ api, storeId, locale, copy }: ProductsPanelProps
                   value={(sec.content?.[lang]?.body as string) || ''}
                   onChange={(e) => setField(lang, { body: e.target.value })}
                 />
-                {lang === 'en' && (
-                  <>
-                    <label>Action</label>
-                    <select
-                      className="form-control"
-                      value={(sec.content?.en?.action as string) || 'add_to_cart'}
-                      onChange={(e) => setField('en', { action: e.target.value })}
-                    >
-                      <option value="add_to_cart">Add to Cart</option>
-                      <option value="buy_now">Buy Now</option>
-                    </select>
-                  </>
-                )}
               </div>
             ))}
           </div>

@@ -105,8 +105,10 @@ export function PurchaseControl({
     }
   }
 
+  // `id` lets structured page sections (final_cta) hand the customer to this
+  // existing control instead of any theme duplicating its purchase behaviour.
   return (
-    <form className="purchase-control" onSubmit={handleAddToCart}>
+    <form className="purchase-control" id="purchase-control" onSubmit={handleAddToCart}>
       {variants.length > 0 ? (
         <section className="product__section">
           <h2 className="product__heading">{copy.product.variants}</h2>

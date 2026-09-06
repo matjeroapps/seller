@@ -454,6 +454,31 @@ func TestSellerMapsCoreErrorsToPublicResponses(t *testing.T) {
 	}
 }
 
+// Core rejects business-illegal order transitions with 422 and the
+// invalid_order_transition code. The Seller API must surface that outcome
+// unchanged — never as a 500 internal_error — and pass Core's reason through.
+func TestSellerMapsInvalidOrderTransition(t *testing.T) {
+	core := &stubCore{err: &coreclient.Error{
+		Status:  http.StatusUnprocessableEntity,
+		Code:    coreclient.CodeInvalidOrderTransition,
+		Message: "cannot transition order from pending to shipped",
+	}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/orders/ord-1/transition", `{"target_status":"shipped"}`)
+	body := rec.Body.String()
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422 (body %q)", rec.Code, body)
+	}
+	if got := decodeError(t, rec); got != "invalid_order_transition" {
+		t.Errorf("error code = %q, want invalid_order_transition", got)
+	}
+	if !strings.Contains(body, "cannot transition order from pending to shipped") {
+		t.Errorf("Core message must be passed through, got: %s", body)
+	}
+}
+
 func TestSellerReturns503WhenCoreUnavailable(t *testing.T) {
 	core := &stubCore{err: coreclient.ErrUnavailable}
 	handler := newHandler(core, core)
