@@ -25,10 +25,25 @@ export class ThemeRegistry {
   private defaultKey: string | null = null;
 
   /**
-   * register adds a theme. The first registration becomes the default, which is
-   * what a store with no installed theme renders with.
+   * register adds a theme with key duplicate protection and version validation.
    */
   register(definition: ThemeDefinition, options: { asDefault?: boolean } = {}): this {
+    if (!definition || typeof definition.key !== 'string' || !definition.key.trim()) {
+      throw new Error('Invalid theme definition: key must be a non-empty string');
+    }
+
+    if (this.themes.has(definition.key)) {
+      throw new Error(`Theme registration conflict: Theme with key "${definition.key}" is already registered`);
+    }
+
+    if (!Array.isArray(definition.versions) || definition.versions.length === 0) {
+      throw new Error(`Invalid theme definition for "${definition.key}": versions must be a non-empty array`);
+    }
+
+    if (definition.compatibilityVersion && typeof definition.compatibilityVersion !== 'string') {
+      throw new Error(`Invalid theme definition for "${definition.key}": compatibilityVersion must be a string`);
+    }
+
     this.themes.set(definition.key, definition);
     if (options.asDefault || this.defaultKey === null) {
       this.defaultKey = definition.key;
@@ -49,7 +64,6 @@ export class ThemeRegistry {
     if (this.defaultKey === null) {
       throw new Error('theme registry has no registered theme');
     }
-    // Non-null: defaultKey is only ever set from a completed registration.
     return this.themes.get(this.defaultKey)!;
   }
 

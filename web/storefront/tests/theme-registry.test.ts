@@ -7,7 +7,15 @@ import type { ThemeDefinition } from '../src/themes/contract';
 
 const stub: ThemeDefinition = {
   key: 'stub-theme',
+  name: 'Stub Theme',
   versions: ['2.0.0', '2.1.0'],
+  compatibilityVersion: '1.0',
+  capabilities: {
+    supportsRTL: true,
+    supportsProductSections: true,
+    supportsSearch: true,
+    supportsCategories: true
+  },
   components: matjeroDefaultTheme.components
 };
 

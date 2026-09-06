@@ -134,7 +134,15 @@ function ErrorState({ copy }: { locale: Locale; copy: Dictionary; reset?: () => 
 
 export const stubTheme: ThemeDefinition = {
   key: MARKER,
+  name: 'Stub Theme',
   versions: ['1.0.0'],
+  compatibilityVersion: '1.0',
+  capabilities: {
+    supportsRTL: true,
+    supportsProductSections: true,
+    supportsSearch: true,
+    supportsCategories: true
+  },
   components: {
     Layout,
     Home,
