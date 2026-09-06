@@ -160,6 +160,82 @@ func (s *stubCore) CreateThemePreview(ctx context.Context, storeID, subject stri
 	return s.preview, s.err
 }
 
+func (s *stubCore) ListStoreProducts(ctx context.Context, subject, storeID, status, source, query string, limit, offset int) (*coreclient.SellerProductListResponse, error) {
+	return &coreclient.SellerProductListResponse{}, s.err
+}
+func (s *stubCore) CreateSellerProduct(ctx context.Context, subject, storeID string, draft coreclient.SellerProductDraft) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error) {
+	return &coreclient.SellerProductDetail{}, s.err
+}
+func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
+	return &coreclient.Variant{}, s.err
+}
+func (s *stubCore) UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error) {
+	return &coreclient.Variant{}, s.err
+}
+func (s *stubCore) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+	return &coreclient.SKU{}, s.err
+}
+func (s *stubCore) UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+	return &coreclient.SKU{}, s.err
+}
+func (s *stubCore) CreateMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.MediaUploadRequest) (*coreclient.MediaUploadResponse, error) {
+	return &coreclient.MediaUploadResponse{}, s.err
+}
+func (s *stubCore) CompleteMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.CompleteMediaUploadRequest) (*coreclient.MediaMetadata, error) {
+	return &coreclient.MediaMetadata{}, s.err
+}
+func (s *stubCore) UpdateMedia(ctx context.Context, subject, storeID, productID, mediaID, altText string, sortOrder int, isPrimary bool) (*coreclient.MediaMetadata, error) {
+	return &coreclient.MediaMetadata{}, s.err
+}
+func (s *stubCore) DeleteMedia(ctx context.Context, subject, storeID, productID, mediaID string) error {
+	return s.err
+}
+func (s *stubCore) ListStoreLocations(ctx context.Context, subject, storeID string) ([]coreclient.StoreLocation, error) {
+	return nil, s.err
+}
+func (s *stubCore) CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*coreclient.StoreLocation, error) {
+	return &coreclient.StoreLocation{}, s.err
+}
+func (s *stubCore) ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.SellerInventorySummary, error) {
+	return nil, s.err
+}
+func (s *stubCore) CreateInventorySnapshot(ctx context.Context, subject, storeID string, req coreclient.CreateSnapshotRequest) (*coreclient.InventorySnapshot, error) {
+	return &coreclient.InventorySnapshot{}, s.err
+}
+func (s *stubCore) AdjustInventory(ctx context.Context, subject, storeID, snapshotID string, req coreclient.AdjustInventoryRequest) (*coreclient.InventorySnapshot, error) {
+	return &coreclient.InventorySnapshot{}, s.err
+}
+func (s *stubCore) GetListingPresentation(ctx context.Context, subject, storeID, listingID string) (*coreclient.SellerListingPresentation, error) {
+	return &coreclient.SellerListingPresentation{}, s.err
+}
+func (s *stubCore) UpdateListingPresentation(ctx context.Context, subject, storeID, listingID string, pres coreclient.SellerListingPresentation) (*coreclient.SellerListingPresentation, error) {
+	return &coreclient.SellerListingPresentation{}, s.err
+}
+func (s *stubCore) PublishSellerProduct(ctx context.Context, subject, storeID, productID string) error {
+	return s.err
+}
+func (s *stubCore) UnpublishSellerProduct(ctx context.Context, subject, storeID, productID string) error {
+	return s.err
+}
+func (s *stubCore) ListStoreOrders(ctx context.Context, subject, storeID, status string, limit, offset int) (*coreclient.SellerOrderListResponse, error) {
+	return &coreclient.SellerOrderListResponse{}, s.err
+}
+func (s *stubCore) GetStoreOrderDetail(ctx context.Context, subject, storeID, orderID string) (*coreclient.SellerOrderDetail, error) {
+	return &coreclient.SellerOrderDetail{}, s.err
+}
+func (s *stubCore) TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error) {
+	return &coreclient.SellerOrderDetail{}, s.err
+}
+func (s *stubCore) ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error) {
+	return nil, s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()
@@ -375,6 +451,31 @@ func TestSellerMapsCoreErrorsToPublicResponses(t *testing.T) {
 				t.Errorf("error code = %q, want %q", got, tc.wantCode)
 			}
 		})
+	}
+}
+
+// Core rejects business-illegal order transitions with 422 and the
+// invalid_order_transition code. The Seller API must surface that outcome
+// unchanged — never as a 500 internal_error — and pass Core's reason through.
+func TestSellerMapsInvalidOrderTransition(t *testing.T) {
+	core := &stubCore{err: &coreclient.Error{
+		Status:  http.StatusUnprocessableEntity,
+		Code:    coreclient.CodeInvalidOrderTransition,
+		Message: "cannot transition order from pending to shipped",
+	}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/orders/ord-1/transition", `{"target_status":"shipped"}`)
+	body := rec.Body.String()
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422 (body %q)", rec.Code, body)
+	}
+	if got := decodeError(t, rec); got != "invalid_order_transition" {
+		t.Errorf("error code = %q, want invalid_order_transition", got)
+	}
+	if !strings.Contains(body, "cannot transition order from pending to shipped") {
+		t.Errorf("Core message must be passed through, got: %s", body)
 	}
 }
 

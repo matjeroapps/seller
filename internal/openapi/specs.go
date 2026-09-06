@@ -213,6 +213,23 @@ func storefrontRoutes() []RouteSpec {
 			Parameters:  []ParameterSpec{PathStringParam("orderID", "Order identifier")},
 			Responses:   storefrontResponses("Guest Order", storefrontapi.OrderResponse{}),
 		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/storefront/buy-now",
+			OperationID: "createStorefrontBuyNowSession",
+			Summary:     "Start a Buy Now checkout session",
+			Description: "Creates a dedicated Cart containing a single SKU and quantity, then creates a Checkout Session for it. Returns the session identity, status and expiry, and sets the guest session and buy-now marker cookies. Returns 404 when storefront checkout is disabled for the deployment.",
+			Tags:        []string{"Storefront", "Checkout"},
+			RequestBody: struct {
+				SKUID    string `json:"sku_id"`
+				Quantity int64  `json:"quantity"`
+			}{},
+			Responses: storefrontResponses("Buy Now session", struct {
+				CheckoutSessionID string `json:"checkout_session_id"`
+				Status            string `json:"status"`
+				ExpiresAt         string `json:"expires_at"`
+			}{}),
+		},
 	}
 }
 
@@ -510,6 +527,415 @@ func sellerRoutes() []RouteSpec {
 				PathStringParam("domain_id", "Domain identifier"),
 			},
 			Responses: AuthOKResponses("Custom domain activated", sellerapi.StoreDomainResponse{}),
+		},
+
+		// --- P5.8 Seller Catalog & Order Operations ---
+
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/categories",
+			OperationID: "listStoreCategories",
+			Summary:     "List platform categories for assignment",
+			Description: "Returns the platform categories as a bare JSON array of {id, slug, status} objects, sufficient for category pickers on the product form. Categories are platform-global records; the store path segment only namespaces the frontend route.",
+			Tags:        []string{"Categories"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier"), LimitParam(), OffsetParam()},
+			Responses:   AuthReadResponses("Category collection", []coreclient.SellerCategory{}),
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/products",
+			OperationID: "listStoreProducts",
+			Summary:     "List store products",
+			Description: "Returns a page of store products. Each row embeds the source product identity, the seller listing identity, the current price as a {amount, currency} money object (or null), the aggregate inventory summary (store-wide totals plus one entry per location), and publish readiness.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				StringParam("status", "Filter by product status", false),
+				StringParam("source", "Filter by product source: seller_owned or supplier_backed", false),
+				StringParam("query", "Keyword matched against product name", false),
+				LimitParam(),
+				OffsetParam(),
+			},
+			Responses: AuthReadResponses("Store product page", coreclient.SellerProductListResponse{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products",
+			OperationID: "createStoreProduct",
+			Summary:     "Create a store product",
+			Description: "Creates a seller-owned product with its default variant, SKU and listing, and returns the full product detail: embedded product, source, translations, category_ids, variants, skus, media, listing, current_price money object, aggregate inventory_summary, presentation, purchase_behavior and publish_readiness.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			RequestBody: coreclient.SellerProductDraft{},
+			Responses:   AuthCreatedResponses("Store product created", coreclient.SellerProductDetail{}),
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}",
+			OperationID: "getStoreProduct",
+			Summary:     "Get store product detail",
+			Description: "Returns the full product detail: embedded product, source, translations, category_ids (array of category identifiers), variants, skus, media, listing, current_price as a {amount, currency} minor-unit money object, aggregate inventory_summary ({total_on_hand, total_reserved, total_available, locations[]}), presentation, purchase_behavior and publish_readiness.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			Responses: AuthReadResponses("Store product detail", coreclient.SellerProductDetail{}),
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}",
+			OperationID: "updateStoreProduct",
+			Summary:     "Update store product",
+			Description: "Replaces the product slug, translations and category assignments, and returns the full product detail.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			RequestBody: struct {
+				Slug         string                                `json:"slug"`
+				Translations []coreclient.SellerProductTranslation `json:"translations"`
+				CategoryIDs  []string                              `json:"category_ids"`
+			}{},
+			Responses: AuthOKResponses("Store product updated", coreclient.SellerProductDetail{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants",
+			OperationID: "createProductVariant",
+			Summary:     "Create a product variant",
+			Tags:        []string{"Variants"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			RequestBody: struct {
+				Code   string `json:"code"`
+				Status string `json:"status"`
+			}{},
+			Responses: AuthCreatedResponses("Variant created", coreclient.Variant{}),
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}",
+			OperationID: "updateProductVariant",
+			Summary:     "Update a product variant",
+			Tags:        []string{"Variants"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("variant_id", "Variant identifier"),
+			},
+			RequestBody: struct {
+				Code   string `json:"code"`
+				Status string `json:"status"`
+			}{},
+			Responses: AuthOKResponses("Variant updated", coreclient.Variant{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus",
+			OperationID: "createProductSKU",
+			Summary:     "Create a variant SKU",
+			Tags:        []string{"SKUs"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("variant_id", "Variant identifier"),
+			},
+			RequestBody: struct {
+				Code    string  `json:"code"`
+				Barcode *string `json:"barcode"`
+				Status  string  `json:"status"`
+			}{},
+			Responses: AuthCreatedResponses("SKU created", coreclient.SKU{}),
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}",
+			OperationID: "updateProductSKU",
+			Summary:     "Update a variant SKU",
+			Tags:        []string{"SKUs"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("variant_id", "Variant identifier"),
+				PathStringParam("sku_id", "SKU identifier"),
+			},
+			RequestBody: struct {
+				Code    string  `json:"code"`
+				Barcode *string `json:"barcode"`
+				Status  string  `json:"status"`
+			}{},
+			Responses: AuthOKResponses("SKU updated", coreclient.SKU{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/media/uploads",
+			OperationID: "presignProductMediaUpload",
+			Summary:     "Presign a product media upload",
+			Description: "Returns a presigned upload_url, the storage_key the object will live under, an opaque upload_token that must be presented when completing the upload, and an expires_at deadline.",
+			Tags:        []string{"Product Media"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			RequestBody: coreclient.MediaUploadRequest{},
+			Responses:   AuthOKResponses("Upload presigned", coreclient.MediaUploadResponse{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/media",
+			OperationID: "completeProductMediaUpload",
+			Summary:     "Complete a product media upload",
+			Description: "Attaches an uploaded object to the product. The upload_token issued by the presign endpoint must be presented alongside the storage_key.",
+			Tags:        []string{"Product Media"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			RequestBody: coreclient.CompleteMediaUploadRequest{},
+			Responses:   AuthCreatedResponses("Media attached", coreclient.MediaMetadata{}),
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/media/{media_id}",
+			OperationID: "updateProductMedia",
+			Summary:     "Update product media metadata",
+			Tags:        []string{"Product Media"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("media_id", "Media identifier"),
+			},
+			RequestBody: struct {
+				AltText   string `json:"alt_text"`
+				SortOrder int    `json:"sort_order"`
+				IsPrimary bool   `json:"is_primary"`
+			}{},
+			Responses: AuthOKResponses("Media updated", coreclient.MediaMetadata{}),
+		},
+		{
+			Method:      http.MethodDelete,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/media/{media_id}",
+			OperationID: "deleteProductMedia",
+			Summary:     "Delete product media",
+			Tags:        []string{"Product Media"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("media_id", "Media identifier"),
+			},
+			Responses: []ResponseSpec{
+				{Status: http.StatusNoContent, Description: "Media deleted"},
+				ErrorResponse(http.StatusUnauthorized, "Unauthorized"),
+				ErrorResponse(http.StatusForbidden, "Forbidden"),
+				ErrorResponse(http.StatusNotFound, "Not found"),
+				ErrorResponse(http.StatusInternalServerError, "Internal error"),
+			},
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/locations",
+			OperationID: "listStoreLocations",
+			Summary:     "List store fulfillment locations",
+			Description: "Returns the store's fulfillment locations as a bare JSON array. Each entry carries the Core location identity (supplier_id, store_id, id, supplier_market_id, market_code, code, name, location_type, status and timestamps).",
+			Tags:        []string{"Fulfillment Locations"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthReadResponses("Fulfillment location collection", []coreclient.StoreLocation{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/locations",
+			OperationID: "createStoreLocation",
+			Summary:     "Create a store fulfillment location",
+			Tags:        []string{"Fulfillment Locations"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			RequestBody: struct {
+				Code         string `json:"code"`
+				Name         string `json:"name"`
+				LocationType string `json:"location_type"`
+				Status       string `json:"status"`
+			}{},
+			Responses: AuthCreatedResponses("Fulfillment location created", coreclient.StoreLocation{}),
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/inventory",
+			OperationID: "listStoreInventory",
+			Summary:     "List store inventory",
+			Description: "Returns the store's inventory rows as a bare JSON array. Each row is the enriched snapshot summary: id, fulfillment_location_id, resolved location_name, sku_id, on_hand_qty, reserved_qty, derived available_qty and the optimistic-concurrency version.",
+			Tags:        []string{"Inventory"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			Responses:   AuthReadResponses("Inventory collection", []coreclient.SellerInventorySummary{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/inventory/snapshots",
+			OperationID: "createInventorySnapshot",
+			Summary:     "Create an inventory snapshot",
+			Description: "Seeds the on-hand quantity of a SKU at a fulfillment location and returns the raw inventory snapshot record.",
+			Tags:        []string{"Inventory"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			RequestBody: coreclient.CreateSnapshotRequest{},
+			Responses:   AuthCreatedResponses("Inventory snapshot created", coreclient.InventorySnapshot{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/inventory/{snapshot_id}/adjustments",
+			OperationID: "adjustInventory",
+			Summary:     "Adjust an inventory snapshot",
+			Description: "Applies a signed quantity_delta to a snapshot with an optional reason, records an inventory movement, and returns the updated raw snapshot record with a bumped version.",
+			Tags:        []string{"Inventory"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("snapshot_id", "Inventory snapshot identifier"),
+			},
+			RequestBody: coreclient.AdjustInventoryRequest{},
+			Responses:   AuthOKResponses("Inventory adjusted", coreclient.InventorySnapshot{}),
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/listings/{listing_id}/presentation",
+			OperationID: "getListingPresentation",
+			Summary:     "Get listing presentation",
+			Description: "Returns the seller listing presentation: seller_listing_id, schema_version, purchase_behavior and the structured page sections. Each section is the canonical envelope {id, type, enabled, sort_order, content} where content mixes GLOBAL fields (image_text media_id + layout, final_cta action) with the localized en/ar objects; description, highlights, specifications and faq carry no global fields. Core accepts at most 20 sections with unique ids and rejects unknown top-level content keys and any url/href/link fields.",
+			Tags:        []string{"Seller Listings"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("listing_id", "Seller listing identifier"),
+			},
+			Responses: AuthReadResponses("Listing presentation", ListingPresentationPayload{}),
+		},
+		{
+			Method:      http.MethodPut,
+			Path:        "/v1/seller/stores/{store_id}/listings/{listing_id}/presentation",
+			OperationID: "updateListingPresentation",
+			Summary:     "Update listing presentation",
+			Description: "Replaces the presentation sections and purchase behavior, and returns the updated presentation. Sections follow the canonical per-type content schemas: description {heading, body}, highlights {title, items}, specifications {items: [{key, value}]}, faq {items: [{question, answer}]} localized under en/ar with no global fields; image_text requires the GLOBAL media_id (product media of the same product) and layout (left|right) beside {heading, body}; final_cta requires the GLOBAL action (add_to_cart|buy_now) beside {title, body} and accepts no url/href/link fields. At most 20 sections with unique ids; unknown top-level keys are rejected with 422.",
+			Tags:        []string{"Seller Listings"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("listing_id", "Seller listing identifier"),
+			},
+			RequestBody: ListingPresentationPayload{},
+			Responses:   AuthOKResponses("Listing presentation updated", ListingPresentationPayload{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/publish",
+			OperationID: "publishStoreProduct",
+			Summary:     "Publish a store product",
+			Description: "Validates publish readiness and activates the product and its listing. Returns 200 with no body.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			Responses: []ResponseSpec{
+				OKResponse("Product published", nil),
+				ErrorResponse(http.StatusBadRequest, "Validation error"),
+				ErrorResponse(http.StatusUnauthorized, "Unauthorized"),
+				ErrorResponse(http.StatusForbidden, "Forbidden"),
+				ErrorResponse(http.StatusNotFound, "Not found"),
+				ErrorResponse(http.StatusConflict, "Conflict"),
+				ErrorResponse(http.StatusInternalServerError, "Internal error"),
+			},
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/unpublish",
+			OperationID: "unpublishStoreProduct",
+			Summary:     "Unpublish a store product",
+			Description: "Deactivates the product and its listing. Returns 200 with no body.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			Responses: []ResponseSpec{
+				OKResponse("Product unpublished", nil),
+				ErrorResponse(http.StatusBadRequest, "Validation error"),
+				ErrorResponse(http.StatusUnauthorized, "Unauthorized"),
+				ErrorResponse(http.StatusForbidden, "Forbidden"),
+				ErrorResponse(http.StatusNotFound, "Not found"),
+				ErrorResponse(http.StatusConflict, "Conflict"),
+				ErrorResponse(http.StatusInternalServerError, "Internal error"),
+			},
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/orders",
+			OperationID: "listStoreOrders",
+			Summary:     "List store orders",
+			Description: "Returns a page of safe seller order rows: identity, status, order-level currency and totals, item count, recipient name, confirmation deadline and creation time. Supplier-side fields are never exposed.",
+			Tags:        []string{"Orders"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				StringParam("status", "Filter by order status", false),
+				LimitParam(),
+				OffsetParam(),
+			},
+			Responses: AuthReadResponses("Store order page", coreclient.SellerOrderListResponse{}),
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/v1/seller/stores/{store_id}/orders/{order_id}",
+			OperationID: "getStoreOrderDetail",
+			Summary:     "Get store order detail",
+			Description: "Returns the safe seller order detail: order identity and status, order-level currency, minor-unit subtotal/total, item_count, confirmation_deadline_at, shipping_address, the buyer contact_email, line items (product_name, sku_code, quantity, minor-unit unit_price/total_price, source: seller_owned or supplier_backed), the status timeline and the allowed_next_actions. Supplier fields are not exposed.",
+			Tags:        []string{"Orders"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("order_id", "Order identifier"),
+			},
+			Responses: AuthReadResponses("Store order detail", coreclient.SellerOrderDetail{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/orders/{order_id}/transition",
+			OperationID: "transitionStoreOrder",
+			Summary:     "Transition a store order",
+			Description: "Applies a seller-allowed status transition (one of allowed_next_actions, e.g. confirm or cancel) and returns the same safe order detail shape with the updated status, timeline and allowed_next_actions.",
+			Tags:        []string{"Orders", "Audit"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("order_id", "Order identifier"),
+			},
+			RequestBody: coreclient.OrderTransitionRequest{},
+			Responses: append(
+				AuthOKResponses("Order transitioned", coreclient.SellerOrderDetail{}),
+				// Core rejects business-illegal transitions with 422 and the
+				// invalid_order_transition code, which the Seller API passes
+				// through unchanged.
+				ErrorResponse(http.StatusUnprocessableEntity, "Invalid order transition"),
+			),
 		},
 	}
 }

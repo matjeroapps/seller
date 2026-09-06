@@ -194,6 +194,10 @@ export type ProductDetailViewModel = {
   categories: StoreLink[];
   variants: ProductVariantModel[];
   defaultSkuId?: string;
+  purchaseBehavior?: 'add_to_cart' | 'buy_now';
+  // Core serves the public projection already locale-projected and stripped to
+  // enabled sections, so `enabled` is absent on the wire.
+  sections?: Array<{ id: string; type: string; enabled?: boolean; sort_order: number; content: Record<string, any> }>;
 };
 
 export type SearchViewModel = {

@@ -8,6 +8,7 @@ import type {
   ThemeContext
 } from '../contract';
 import { CategoryCard, EmptyState, ProductCard, SectionHeading } from './components';
+import { ProductSections } from './ProductSections';
 import { PurchaseControl } from './PurchaseControl';
 
 /**
@@ -335,6 +336,7 @@ export function ProductDetail({
             available={model.available}
             copy={copy}
             locale={context.locale}
+            purchaseBehavior={model.purchaseBehavior}
           />
 
           {model.categories.length > 0 ? (
@@ -353,6 +355,10 @@ export function ProductDetail({
           ) : null}
         </div>
       </div>
+
+      {model.sections && model.sections.length > 0 ? (
+        <ProductSections sections={model.sections} context={context} />
+      ) : null}
     </article>
   );
 }

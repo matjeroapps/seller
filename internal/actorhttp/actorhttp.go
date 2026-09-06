@@ -149,6 +149,11 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 	case coreclient.CodeForbidden:
 		httpx.WriteError(w, http.StatusForbidden, "forbidden", "forbidden")
+	case coreclient.CodeInvalidOrderTransition:
+		// Core rejects business-illegal order transitions with 422. The code
+		// and the human-readable reason are passed through unchanged: a seller
+		// needs to know which transition was refused and why.
+		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodeInvalidOrderTransition, coreErr.Message)
 	case coreclient.CodeUnavailable:
 		httpx.WriteError(w, http.StatusServiceUnavailable, "service_unavailable", "service temporarily unavailable")
 	default:

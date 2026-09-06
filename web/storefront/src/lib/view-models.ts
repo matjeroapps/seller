@@ -271,7 +271,9 @@ export function toProductDetailModel(
     }),
     defaultSkuId:
       (product.variants ?? [])[0]?.skus?.find((s) => s.availability === 'in_stock')?.id ||
-      (product.variants ?? [])[0]?.skus?.[0]?.id
+      (product.variants ?? [])[0]?.skus?.[0]?.id,
+    purchaseBehavior: product.purchase_behavior || 'add_to_cart',
+    sections: product.sections || []
   };
 }
 

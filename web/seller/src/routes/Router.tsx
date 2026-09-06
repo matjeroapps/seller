@@ -4,9 +4,13 @@ import type { ApiClient } from '../lib/api';
 import { ThemeCatalog } from '../components/ThemeCatalog';
 import { ThemeEditorPanel } from '../components/ThemeEditorPanel';
 import { DomainManagementPanel } from '../components/DomainManagementPanel';
+import { ProductsPanel } from '../components/ProductsPanel';
+import { OrdersPanel } from '../components/OrdersPanel';
 
 type RouteLocation =
   | { path: '/'; params: {} }
+  | { path: '/products'; params: {} }
+  | { path: '/orders'; params: {} }
   | { path: '/themes'; params: {} }
   | { path: '/stores/theme'; params: { storeId: string } }
   | { path: '/stores/domains'; params: { storeId: string } }
@@ -147,6 +151,20 @@ export function Router({
           </button>
           <button
             type="button"
+            className={`nav-tab ${currentRoute.path === '/products' ? 'active' : ''}`}
+            onClick={() => navigate('#/products')}
+          >
+            {copy.productsNav || 'Products'}
+          </button>
+          <button
+            type="button"
+            className={`nav-tab ${currentRoute.path === '/orders' ? 'active' : ''}`}
+            onClick={() => navigate('#/orders')}
+          >
+            {copy.ordersNav || 'Orders'}
+          </button>
+          <button
+            type="button"
             className={`nav-tab ${currentRoute.path === '/themes' ? 'active' : ''}`}
             onClick={() => navigate('#/themes')}
           >
@@ -200,6 +218,20 @@ export function Router({
       <main className="route-content">
         {currentRoute.path === '/' ? (
           renderDashboard(selectedStoreId, setSelectedStoreId)
+        ) : currentRoute.path === '/products' ? (
+          <ProductsPanel
+            api={api}
+            storeId={selectedStoreId}
+            locale={locale}
+            copy={copy}
+          />
+        ) : currentRoute.path === '/orders' ? (
+          <OrdersPanel
+            api={api}
+            storeId={selectedStoreId}
+            locale={locale}
+            copy={copy}
+          />
         ) : currentRoute.path === '/themes' ? (
           <ThemeCatalog
             api={api}
@@ -237,6 +269,12 @@ export function parseLocation(hash: string = window.location.hash, pathname: str
   const cleanHash = hash.replace(/^#/, '').replace(/\/$/, '');
   if (cleanHash === '/auth/callback') {
     return { path: '/auth/callback', params: {} };
+  }
+  if (cleanHash === '/products') {
+    return { path: '/products', params: {} };
+  }
+  if (cleanHash === '/orders') {
+    return { path: '/orders', params: {} };
   }
   if (cleanHash === '/themes') {
     return { path: '/themes', params: {} };

@@ -128,7 +128,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     # Seller owns no database and its E2E tests run against a local fake Core HTTP server
-    # (ADR-017). Redis is provided as a CI service container for storefront caching.
+    # (ADR-017). Redis backs storefront caching; MinIO backs the P5.8 media
+    # upload flow (real presigned PUT round trip).
     services:
       redis:
         image: redis:alpine

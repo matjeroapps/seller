@@ -109,6 +109,10 @@ export type ProductDetail = {
   images: ProductImage[];
   categories: CategoryRef[];
   variants: PublicVariant[];
+  purchase_behavior?: 'add_to_cart' | 'buy_now';
+  // The public projection serves only enabled sections, so `enabled` is absent
+  // from the payload; the field stays optional purely for defensive rendering.
+  sections?: Array<{ id: string; type: string; enabled?: boolean; sort_order: number; content: Record<string, any> }>;
 };
 
 export type Pagination = {
