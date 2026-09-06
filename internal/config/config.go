@@ -108,7 +108,7 @@ func Load(serviceName string) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{
+	cfg := Config{
 		ServiceName:          serviceName,
 		Environment:          stringEnv("APP_ENV", "development"),
 		HTTPAddr:             stringEnv("HTTP_ADDR", ":8080"),
@@ -137,7 +137,32 @@ func Load(serviceName string) (Config, error) {
 
 		StorefrontCheckoutEnabled: boolEnv("STOREFRONT_CHECKOUT_ENABLED", false),
 		StorefrontCookieSecure:    boolEnv("STOREFRONT_COOKIE_SECURE", stringEnv("APP_ENV", "development") == "production"),
-	}, nil
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return Config{}, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func (c Config) Validate() error {
+	if strings.ToLower(c.Environment) != "production" {
+		return nil
+	}
+	if c.CoreAPIBaseURL == "" || strings.Contains(c.CoreAPIBaseURL, "localhost") {
+		return fmt.Errorf("production CORE_API_BASE_URL must be explicitly configured")
+	}
+	if c.CoreAPIToken == "" {
+		return fmt.Errorf("production CORE_API_TOKEN is required")
+	}
+	if c.ZitadelIssuer == "" || strings.Contains(c.ZitadelIssuer, "localhost") {
+		return fmt.Errorf("production ZITADEL_ISSUER must be explicitly configured with a non-localhost URL")
+	}
+	if !c.StorefrontCookieSecure {
+		return fmt.Errorf("production STOREFRONT_COOKIE_SECURE must be true")
+	}
+	return nil
 }
 
 // stringSliceEnv reads a comma-separated environment variable, trimming
