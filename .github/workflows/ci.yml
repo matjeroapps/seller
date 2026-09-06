@@ -136,13 +136,6 @@ jobs:
         ports:
           - 6379:6379
         options: --entrypoint redis-server
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -154,27 +147,7 @@ jobs:
       - run: npm ci
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
-      - name: Create MinIO bucket
-        run: |
-          # `mc ready local` retries internally forever when the server is
-          # down, so poll the health endpoint from the runner instead.
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:9000/minio/health/live; then
-              echo "MinIO is ready (attempt $i)."
-              break
-            fi
-            echo "MinIO not ready yet (attempt $i)..."; sleep 5
-          done
-          curl -sf http://127.0.0.1:9000/minio/health/live
-          docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest mb --ignore-existing local/matjero-media
-          docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 minio/mc:latest anonymous set download local/matjero-media
       - name: Run E2E Test Suite
-        env:
-          # The MinIO service container occupies port 9000; run-e2e.sh reuses it
-          # instead of starting its own instance.
-          MINIO_PORT: 9000
-          MINIO_IMAGE: minio/minio:latest
-          MC_IMAGE: minio/mc:latest
         run: ./scripts/run-e2e.sh
       - name: Upload Playwright Test Artifacts
         if: failure() || always()
