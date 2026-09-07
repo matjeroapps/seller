@@ -193,8 +193,8 @@ function App() {
         <Card variant="glass">
           <CardTitle>Seller Profile</CardTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            <Input label="Seller Name" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
-            <Input label="Status" value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} />
+            <Input label="Seller Name" value={profileName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileName(e.target.value)} />
+            <Input label="Status" value={profileStatus} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileStatus(e.target.value)} />
             <Button onClick={() => void submitProfile()}>Save Profile</Button>
           </div>
         </Card>
@@ -202,8 +202,8 @@ function App() {
         <Card variant="glass">
           <CardTitle>Create Store</CardTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            <Input label="Market Code" value={storeForm.market_code} onChange={(e) => setStoreForm({ ...storeForm, market_code: e.target.value })} />
-            <Input label="Store Name" value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} />
+            <Input label="Market Code" value={storeForm.market_code} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStoreForm({ ...storeForm, market_code: e.target.value })} />
+            <Input label="Store Name" value={storeForm.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStoreForm({ ...storeForm, name: e.target.value })} />
             <Button onClick={() => void submitStore()}>Create Store</Button>
           </div>
         </Card>
@@ -227,7 +227,7 @@ function App() {
       appTitle="MatjerHub Seller"
       navItems={sellerNavigation}
       currentPath={currentPath}
-      onNavigate={(path) => {
+      onNavigate={(path: string) => {
         setCurrentPath(path);
         window.history.pushState({}, '', path);
       }}
