@@ -4,7 +4,7 @@ import { createOidcAuthClient, type AuthState } from './auth/oidc';
 import { createApiClient } from './lib/api';
 import { directionFor, messages, type Locale } from './i18n/locales';
 import { Router } from './routes/Router';
-import '@matjerhub/ui/styles.css';
+import '@matjerhub/ui-sdk/styles.css';
 import {
   DashboardLayout,
   sellerNavigation,
@@ -15,7 +15,7 @@ import {
   CardTitle,
   Button,
   Input,
-} from '@matjerhub/ui';
+} from '@matjerhub/ui-sdk';
 import './styles.css';
 
 type Bootstrap = {
