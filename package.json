@@ -10,8 +10,9 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:e2e": "playwright test",
-    "test:e2e:ci": "playwright test"
+    "build": "npm run build --workspaces --if-present",
+    "test:e2e": "./scripts/run-e2e.sh",
+    "test:e2e:ci": "./scripts/run-e2e.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

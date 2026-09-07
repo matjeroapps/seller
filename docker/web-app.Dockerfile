@@ -24,32 +24,29 @@ COPY scripts ./scripts
 ARG WORKSPACE=@commerce/seller-web
 RUN npm run build --workspace ${WORKSPACE}
 
-# Seller dashboard runtime.
-#
-# Serves the built Vite static SPA bundle with path-based callback SPA routing fallback (/auth/callback).
+# Seller portal runtime.
 FROM node:24-alpine AS seller
 
 ENV NODE_ENV=production \
-    PORT=5174 \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
     HOSTNAME=0.0.0.0
 
 WORKDIR /app
 
-COPY --from=build --chown=node:node /src/web/seller/dist ./dist
-COPY --from=build --chown=node:node /src/web/seller/server.js ./server.js
+COPY --from=build --chown=node:node /src/web/seller/.next/standalone ./
+COPY --from=build --chown=node:node /src/web/seller/.next/static ./web/seller/.next/static
 
 USER node
 
-EXPOSE 5174
+EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "web/seller/server.js"]
 
 # Storefront runtime.
 #
 # `output: "standalone"` produces a self-contained server plus exactly the dependencies
-# it traced, so this stage installs nothing and carries no source tree. It is only used
-# when the image is built for the storefront workspace; the seller dashboard is a static
-# bundle and stops at the build stage above.
+# it traced, so this stage installs nothing and carries no source tree.
 FROM node:24-alpine AS storefront
 
 ENV NODE_ENV=production \

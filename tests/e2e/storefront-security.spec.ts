@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   STORE_A_BASE_URL,
+  STORE_A_HOST,
   STORE_B_BASE_URL,
+  STORE_B_HOST,
   STORE_A_MARKER,
   STORE_B_MARKER,
   STOREFRONT_API_URL,
@@ -21,8 +23,8 @@ test.describe('Storefront Security & Privacy Regression', () => {
   test('Host spoofing via X-Forwarded-Host is rejected when not explicitly trusted', async ({ request }) => {
     const res = await request.get(`${STORE_A_BASE_URL}/en`, {
       headers: {
-        'X-Forwarded-Host': 'store-b.localhost:3000',
-        'Forwarded': 'host=store-b.localhost:3000',
+        'X-Forwarded-Host': STORE_B_HOST,
+        'Forwarded': `host=${STORE_B_HOST}`,
         'X-Matjero-Storefront-Host': 'store-b.localhost',
       },
     });
@@ -35,14 +37,14 @@ test.describe('Storefront Security & Privacy Regression', () => {
 
   test('Host normalization proof: uppercase, port handling, and malformed host handling', async ({ request }) => {
     // 1. Uppercase host
-    const resUpper = await request.get(`http://STORE-A.LOCALHOST:3000/en`);
+    const resUpper = await request.get(`http://${STORE_A_HOST.toUpperCase()}/en`);
     expect(resUpper.status()).toBe(200);
     const textUpper = await resUpper.text();
     expect(textUpper).toContain('Store A');
 
     // 2. Direct storefront-api host normalization unit check via router
     const resApi = await request.get(`${STOREFRONT_API_URL}/v1/storefront/store`, {
-      headers: { Host: 'STORE-A.LOCALHOST:8080' },
+      headers: { Host: STORE_A_HOST.toUpperCase() },
     });
     expect(resApi.status()).toBe(200);
     const jsonApi = await resApi.json();
@@ -50,11 +52,8 @@ test.describe('Storefront Security & Privacy Regression', () => {
   });
 
   test('Unknown or malformed host returns safe generic 404 without leaking topology', async ({ request }) => {
-    const res = await request.get('http://127.0.0.1:3000/en', {
-      headers: {
-        'Host': 'nonexistent-store.localhost:3000',
-      },
-    });
+    const storefrontPort = STORE_A_HOST.split(':')[1] || '3000';
+    const res = await request.get(`http://nonexistent-store.localhost:${storefrontPort}/en`);
     expect(res.status()).toBe(404);
     const text = await res.text();
     expect(text).not.toContain('PostgreSQL');
