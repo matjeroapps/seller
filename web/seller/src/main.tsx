@@ -4,6 +4,18 @@ import { createOidcAuthClient, type AuthState } from './auth/oidc';
 import { createApiClient } from './lib/api';
 import { directionFor, messages, type Locale } from './i18n/locales';
 import { Router } from './routes/Router';
+import '@matjerhub/ui/styles.css';
+import {
+  DashboardLayout,
+  sellerNavigation,
+  AnonymousState,
+  LoadingState,
+  ErrorState,
+  Card,
+  CardTitle,
+  Button,
+  Input,
+} from '@matjerhub/ui';
 import './styles.css';
 
 type Bootstrap = {
@@ -45,7 +57,6 @@ function App() {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  // Existing Seller Form States
   const [profileName, setProfileName] = React.useState('');
   const [profileStatus, setProfileStatus] = React.useState('active');
   const [profileSettings, setProfileSettings] = React.useState('{"channel":"retail"}');
@@ -53,6 +64,7 @@ function App() {
   const [catalogForm, setCatalogForm] = React.useState({ store_id: '', market_code: 'EG', supplier_id: '', category_id: '', search: '' });
   const [listingForm, setListingForm] = React.useState({ store_id: '', product_id: '', supplier_offer_id: '', market_code: 'EG', status: 'draft' });
   const [priceForm, setPriceForm] = React.useState({ amount_minor: 0, currency: 'EGP' });
+  const [currentPath, setCurrentPath] = React.useState(window.location.pathname || '/dashboard');
 
   React.useEffect(() => {
     return authClient.subscribe((state) => {
@@ -99,13 +111,6 @@ function App() {
   React.useEffect(() => {
     void loadSellerData();
   }, [loadSellerData]);
-
-  const toggleLocale = () => {
-    const nextLocale = locale === 'ar' ? 'en' : 'ar';
-    const params = new URLSearchParams(window.location.search);
-    params.set('locale', nextLocale);
-    window.location.search = params.toString();
-  };
 
   async function submitProfile() {
     try {
@@ -170,163 +175,73 @@ function App() {
     }
   }
 
+  if (!authState.isAuthenticated) {
+    return (
+      <AnonymousState
+        appName="Seller Portal"
+        onSignIn={() => void authClient.login()}
+      />
+    );
+  }
+
   const renderDashboardContent = (_selectedStoreId: string, _onSelectStore: (id: string) => void) => (
-    <div>
-      {error ? <div className="notice notice-error">{error}</div> : null}
-      {loading ? <div className="notice">{copy.status || 'Loading...'}</div> : null}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {error ? <ErrorState message={error} onRetry={() => void loadSellerData()} /> : null}
+      {loading ? <LoadingState title={copy.status || 'Loading...'} /> : null}
 
-      <section className="panel-grid">
-        <Panel title="Seller Profile">
-          <FormGrid>
-            <input value={profileName} onChange={(e) => setProfileName(e.target.value)} placeholder="seller name" />
-            <input value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} placeholder="status" />
-            <textarea value={profileSettings} onChange={(e) => setProfileSettings(e.target.value)} rows={3} placeholder="JSON settings" />
-            <button type="button" onClick={() => void submitProfile()}>
-              Save profile
-            </button>
-          </FormGrid>
-          {seller ? <div className="hint">{seller.code}</div> : null}
-        </Panel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        <Card variant="glass">
+          <CardTitle>Seller Profile</CardTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <Input label="Seller Name" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+            <Input label="Status" value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} />
+            <Button onClick={() => void submitProfile()}>Save Profile</Button>
+          </div>
+        </Card>
 
-        <Panel title="Stores">
-          <Stack>
-            {stores.map((store) => (
-              <Row key={store.id} title={store.name} meta={`${store.code} · ${store.market_code}`} status={store.status} />
-            ))}
-          </Stack>
-          <FormGrid>
-            <input value={storeForm.market_code} onChange={(e) => setStoreForm({ ...storeForm, market_code: e.target.value })} placeholder="market code" />
-            <input value={storeForm.code} onChange={(e) => setStoreForm({ ...storeForm, code: e.target.value })} placeholder="code" />
-            <input value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} placeholder="name" />
-            <input value={storeForm.status} onChange={(e) => setStoreForm({ ...storeForm, status: e.target.value })} placeholder="status" />
-            <button type="button" onClick={() => void submitStore()}>
-              Create store
-            </button>
-          </FormGrid>
-        </Panel>
-      </section>
-
-      <section className="panel-grid">
-        <Panel title="Supplier Catalog Discovery">
-          <FormGrid>
-            <input value={catalogForm.store_id} onChange={(e) => setCatalogForm({ ...catalogForm, store_id: e.target.value })} placeholder="store id" />
-            <input value={catalogForm.supplier_id} onChange={(e) => setCatalogForm({ ...catalogForm, supplier_id: e.target.value })} placeholder="supplier id" />
-            <input value={catalogForm.category_id} onChange={(e) => setCatalogForm({ ...catalogForm, category_id: e.target.value })} placeholder="category id" />
-            <input value={catalogForm.search} onChange={(e) => setCatalogForm({ ...catalogForm, search: e.target.value })} placeholder="search" />
-            <button type="button" onClick={() => void loadOffers()}>
-              Browse offers
-            </button>
-          </FormGrid>
-          <Stack>
-            {offers.map((offer) => (
-              <Row
-                key={offer.id ?? offer.offer_id ?? `${offer.market_code}-${offer.product_name}`}
-                title={offer.product_name ?? 'Offer'}
-                meta={`${offer.supplier_name ?? offer.supplier_code ?? 'supplier'} · ${offer.market_code}`}
-                status={offer.status}
-              />
-            ))}
-          </Stack>
-        </Panel>
-      </section>
-
-      <section className="panel-grid">
-        <Panel title="Listings">
-          <Stack>
-            {listings.map((listing) => (
-              <Row key={listing.id} title={listing.id} meta={`${listing.store_id} · ${listing.market_code}`} status={listing.status} />
-            ))}
-          </Stack>
-          <FormGrid>
-            <input value={listingForm.store_id} onChange={(e) => setListingForm({ ...listingForm, store_id: e.target.value })} placeholder="store id" />
-            <input value={listingForm.product_id} onChange={(e) => setListingForm({ ...listingForm, product_id: e.target.value })} placeholder="product id" />
-            <input value={listingForm.supplier_offer_id} onChange={(e) => setListingForm({ ...listingForm, supplier_offer_id: e.target.value })} placeholder="supplier offer id" />
-            <input value={listingForm.market_code} onChange={(e) => setListingForm({ ...listingForm, market_code: e.target.value })} placeholder="market code" />
-            <input value={listingForm.status} onChange={(e) => setListingForm({ ...listingForm, status: e.target.value })} placeholder="status" />
-            <button type="button" onClick={() => void importListing()}>
-              Import listing
-            </button>
-          </FormGrid>
-          <FormGrid>
-            <input type="number" value={priceForm.amount_minor} onChange={(e) => setPriceForm({ ...priceForm, amount_minor: Number(e.target.value) })} placeholder="amount minor" />
-            <input value={priceForm.currency} onChange={(e) => setPriceForm({ ...priceForm, currency: e.target.value })} placeholder="currency" />
-          </FormGrid>
-          {listings[0] ? (
-            <button type="button" onClick={() => void updatePrice(listings[0].id)}>
-              Update first listing price
-            </button>
-          ) : null}
-        </Panel>
-      </section>
-    </div>
-  );
-
-  return (
-    <main className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">{bootstrap?.actor ?? 'seller'}</p>
-          <h1>{copy.appName || 'Seller Dashboard'}</h1>
-          <p className="lede">Create stores, browse supplier offers in-market, and manage seller themes.</p>
-        </div>
-        <div className="hero-meta">
-          <button type="button" className="pill" onClick={toggleLocale}>
-            {locale === 'ar' ? 'English (LTR)' : 'العربية (RTL)'}
-          </button>
-          <span className="pill">
-            {authState.user?.preferred_username || bootstrap?.principal?.preferred_username || bootstrap?.principal?.subject || 'anonymous'}
-          </span>
-          {authState.isAuthenticated ? (
-            <button type="button" className="btn btn-sm btn-secondary" onClick={() => void authClient.logout()}>
-              {copy.signOut || 'Sign Out'}
-            </button>
-          ) : null}
-        </div>
-      </header>
+        <Card variant="glass">
+          <CardTitle>Create Store</CardTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <Input label="Market Code" value={storeForm.market_code} onChange={(e) => setStoreForm({ ...storeForm, market_code: e.target.value })} />
+            <Input label="Store Name" value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} />
+            <Button onClick={() => void submitStore()}>Create Store</Button>
+          </div>
+        </Card>
+      </div>
 
       <Router
         authClient={authClient}
         api={api}
         locale={locale}
         copy={copy}
-        renderDashboard={renderDashboardContent}
+        renderDashboard={() => null}
         stores={stores}
       />
-    </main>
+    </div>
   );
-}
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  const workspaces = stores.map((s) => ({ id: s.id, name: s.name, type: 'seller' as const }));
+
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <div>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      {children}
-    </section>
+    <DashboardLayout
+      appTitle="MatjerHub Seller"
+      navItems={sellerNavigation}
+      currentPath={currentPath}
+      onNavigate={(path) => {
+        setCurrentPath(path);
+        window.history.pushState({}, '', path);
+      }}
+      workspaces={workspaces.length ? workspaces : [{ id: 'default', name: seller?.name || 'Seller Store', type: 'seller' }]}
+      user={{
+        name: authState.user?.preferred_username || bootstrap?.principal?.preferred_username || 'Seller User',
+        email: authState.user?.email || 'seller@matjerhub.com',
+        role: bootstrap?.actor || 'Seller Admin',
+      }}
+      onSignOut={() => void authClient.logout()}
+    >
+      {renderDashboardContent('', () => {})}
+    </DashboardLayout>
   );
-}
-
-function Stack({ children }: { children: React.ReactNode }) {
-  return <div className="stack">{children}</div>;
-}
-
-function Row({ title, meta, status }: { title: string; meta: string; status: string }) {
-  return (
-    <article className="row-card">
-      <div className="row-copy">
-        <strong>{title}</strong>
-        <span>{meta}</span>
-      </div>
-      <span className={`badge badge-${status.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>{status}</span>
-    </article>
-  );
-}
-
-function FormGrid({ children }: { children: React.ReactNode }) {
-  return <div className="form-grid">{children}</div>;
 }
 
 createRoot(document.getElementById('root')!).render(
