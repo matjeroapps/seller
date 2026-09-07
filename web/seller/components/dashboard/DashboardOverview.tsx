@@ -50,9 +50,9 @@ export function DashboardOverview() {
               <Card key={metric.title} padding="lg">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-600">{metric.title}</p>
-                    <p className="mt-2 text-3xl font-bold text-slate-950">{metric.value}</p>
-                    <p className="mt-2 text-sm text-slate-500">{metric.note}</p>
+                    <p className="text-sm font-semibold text-[var(--color-muted-foreground)]">{metric.title}</p>
+                    <p className="mt-2 text-3xl font-bold text-[var(--color-foreground)]">{metric.value}</p>
+                    <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">{metric.note}</p>
                   </div>
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${metric.tone}`}>
                     <Icon aria-hidden="true" className="h-5 w-5" />
@@ -65,10 +65,10 @@ export function DashboardOverview() {
         <section aria-labelledby="foundation-readiness" className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Card padding="lg">
             <div className="space-y-3">
-              <h2 id="foundation-readiness" className="text-lg font-bold text-slate-950">
+              <h2 id="foundation-readiness" className="text-lg font-bold text-[var(--color-foreground)]">
                 Workflow Readiness
               </h2>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-[var(--color-muted-foreground)]">
                 Navigation, authentication, responsive shell, and shared UI SDK composition are in place. Business screens and API-backed behavior remain intentionally deferred.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -82,8 +82,8 @@ export function DashboardOverview() {
           </Card>
           <Card padding="lg">
             <div className="space-y-3">
-              <h2 className="text-lg font-bold text-slate-950">Empty State Pattern</h2>
-              <p className="text-sm text-slate-600">
+              <h2 className="text-lg font-bold text-[var(--color-foreground)]">Empty State Pattern</h2>
+              <p className="text-sm text-[var(--color-muted-foreground)]">
                 Future workflow pages should use shared empty, loading, and error states from the UI SDK and stay scoped to seller presentation.
               </p>
             </div>

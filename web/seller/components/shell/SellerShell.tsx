@@ -23,22 +23,24 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
     .find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
 
   return (
-    <DashboardLayout
-      appTitle="MatjerHub Seller"
-      navItems={navItems}
-      currentPath={pathname}
-      onNavigate={(path) => router.push(path)}
-      breadcrumbsItems={[
-        { label: 'Dashboard', href: '/dashboard' },
-        ...(activeItem && activeItem.path !== '/dashboard' ? [{ label: activeItem.label, href: activeItem.path }] : [])
-      ]}
-      workspaces={[{ id: 'seller', name: 'Seller Workspace', type: 'seller' }]}
-      activeWorkspaceId="seller"
-      user={menuUser}
-      onSignOut={() => router.push('/logout')}
-      onSettingsClick={() => router.push('/dashboard/settings')}
-    >
-      <div id="main-content">{children}</div>
-    </DashboardLayout>
+    <div className="seller-shell-frame">
+      <DashboardLayout
+        appTitle="MatjerHub Seller"
+        navItems={navItems}
+        currentPath={pathname}
+        onNavigate={(path) => router.push(path)}
+        breadcrumbsItems={[
+          { label: 'Dashboard', href: '/dashboard' },
+          ...(activeItem && activeItem.path !== '/dashboard' ? [{ label: activeItem.label, href: activeItem.path }] : [])
+        ]}
+        workspaces={[{ id: 'seller', name: 'Seller Workspace', type: 'seller' }]}
+        activeWorkspaceId="seller"
+        user={menuUser}
+        onSignOut={() => router.push('/logout')}
+        onSettingsClick={() => router.push('/dashboard/settings')}
+      >
+        <div id="main-content">{children}</div>
+      </DashboardLayout>
+    </div>
   );
 }

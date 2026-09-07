@@ -84,3 +84,70 @@ a {
     transition-duration: 1ms !important;
   }
 }
+
+@media (max-width: 767px) {
+  .seller-shell-frame > div[dir][data-theme] {
+    display: block !important;
+    min-height: 100svh !important;
+  }
+
+  .seller-shell-frame aside {
+    position: relative !important;
+    top: auto !important;
+    z-index: 850 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--color-border) !important;
+  }
+
+  .seller-shell-frame aside > div:first-child {
+    height: auto !important;
+    min-height: 56px !important;
+    padding: 12px 16px !important;
+  }
+
+  .seller-shell-frame aside nav {
+    padding: 8px 12px 12px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: thin;
+  }
+
+  .seller-shell-frame aside nav ul {
+    flex-direction: row !important;
+    gap: 8px !important;
+    width: max-content !important;
+  }
+
+  .seller-shell-frame aside nav li {
+    flex: 0 0 auto !important;
+  }
+
+  .seller-shell-frame aside nav button {
+    min-height: 44px !important;
+    width: auto !important;
+    white-space: nowrap !important;
+  }
+
+  .seller-shell-frame header {
+    position: relative !important;
+    top: auto !important;
+    height: auto !important;
+    min-height: 56px !important;
+    padding: 10px 12px !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    justify-content: flex-start !important;
+  }
+
+  .seller-shell-frame header > div {
+    flex: 0 0 auto !important;
+  }
+
+  .seller-shell-frame main {
+    padding: 16px !important;
+    overflow-x: hidden !important;
+  }
+}
