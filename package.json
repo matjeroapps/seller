@@ -2,7 +2,7 @@
   "name": "matjero-seller",
   "private": true,
   "workspaces": [
-    "packages/ui",
+    
     "web/seller",
     "web/storefront"
   ],

@@ -11,3 +11,4 @@ go.work.sum
 test-results/
 playwright-report/
 fake-core
+ui-sdk
