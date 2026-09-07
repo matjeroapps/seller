@@ -1,7 +1,7 @@
-export const STORE_A_HOST = 'store-a.localhost:3000';
-export const STORE_B_HOST = 'store-b.localhost:3000';
-export const STORE_A_BASE_URL = 'http://store-a.localhost:3000';
-export const STORE_B_BASE_URL = 'http://store-b.localhost:3000';
+export const STORE_A_HOST = process.env.STORE_A_HOST || 'store-a.localhost:3000';
+export const STORE_B_HOST = process.env.STORE_B_HOST || 'store-b.localhost:3000';
+export const STORE_A_BASE_URL = process.env.STORE_A_BASE_URL || `http://${STORE_A_HOST}`;
+export const STORE_B_BASE_URL = process.env.STORE_B_BASE_URL || `http://${STORE_B_HOST}`;
 
 export const STORE_A_MARKER = 'STORE_A_ONLY_MARKER';
 export const STORE_B_MARKER = 'STORE_B_ONLY_MARKER';
@@ -81,7 +81,7 @@ import http from 'node:http';
 export function httpGetStorefrontApi(path: string, host: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      `http://127.0.0.1:8080${path}`,
+      `${STOREFRONT_API_URL}${path}`,
       {
         method: 'GET',
         headers: {

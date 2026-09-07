@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Deterministic E2E Test Harness for the Seller platform
-# Spawns fake-core, storefront-api, seller-api, the seller dashboard dev
+# Spawns fake-core, storefront-api, seller-api, the seller portal dev
 # server, MinIO, and the Next.js storefront server, runs Playwright, and cleans
 # up everything afterwards.
 
@@ -14,7 +14,7 @@ CORE_PORT=${FAKE_CORE_PORT:-18080}
 STOREFRONT_API_PORT=${STOREFRONT_API_PORT:-8080}
 NEXT_PORT=${NEXT_PORT:-3000}
 SELLER_API_PORT=${SELLER_API_PORT:-18081}
-SELLER_WEB_PORT=${SELLER_WEB_PORT:-5173}
+SELLER_WEB_PORT=${SELLER_WEB_PORT:-3001}
 MINIO_PORT=${MINIO_PORT:-19000}
 REDIS_HOST=${REDIS_ADDR:-127.0.0.1:6379}
 
@@ -30,9 +30,10 @@ export FAKE_CORE_PORT=$CORE_PORT
 export FAKE_CORE_CONTROL_URL="http://127.0.0.1:$CORE_PORT"
 
 # Test-double OIDC issuer served by fake-core itself. seller-api discovers the
-# JWKS from it and the seller dashboard's dev-auth tokens are minted against it.
+# JWKS from it for backend E2E contracts.
 export FAKE_CORE_ISSUER_URL=${FAKE_CORE_ISSUER_URL:-"http://127.0.0.1:$CORE_PORT"}
 export FAKE_CORE_SELLER_SUBJECT=${FAKE_CORE_SELLER_SUBJECT:-"usr_seller_dev"}
+export SELLER_SESSION_SECRET=${SELLER_SESSION_SECRET:-"seller-e2e-session-secret"}
 
 # S3-compatible media storage (MinIO) backing the P5.8 media flow.
 export S3_ENDPOINT=${S3_ENDPOINT:-"http://127.0.0.1:$MINIO_PORT"}
@@ -49,13 +50,18 @@ export REDIS_ADDR=$REDIS_HOST
 export HTTP_ADDR=":$STOREFRONT_API_PORT"
 export PORT=$NEXT_PORT
 export HOSTNAME="0.0.0.0"
+export SELLER_APP_URL="http://127.0.0.1:$SELLER_WEB_PORT"
+export STORE_A_HOST="store-a.localhost:$NEXT_PORT"
+export STORE_B_HOST="store-b.localhost:$NEXT_PORT"
+export STORE_A_BASE_URL="http://$STORE_A_HOST"
+export STORE_B_BASE_URL="http://$STORE_B_HOST"
 
 # Flush local Redis if present to prevent stale cache entries
 docker exec seller-redis-test redis-cli flushall 2>/dev/null || redis-cli flushall 2>/dev/null || true
 
 PIDS=()
 MINIO_STARTED_BY_US=0
-VITE_PID=""
+SELLER_WEB_PID=""
 
 cleanup() {
   echo "Cleaning up background services..."
@@ -64,9 +70,9 @@ cleanup() {
       kill "$pid" 2>/dev/null || true
     fi
   done
-  if [ -n "$VITE_PID" ] && kill -0 "$VITE_PID" 2>/dev/null; then
-    # vite runs in its own session so the whole process group dies with it.
-    kill -TERM -- -"$VITE_PID" 2>/dev/null || kill "$VITE_PID" 2>/dev/null || true
+  if [ -n "$SELLER_WEB_PID" ] && kill -0 "$SELLER_WEB_PID" 2>/dev/null; then
+    # The seller web server runs in its own session so the whole tree dies with it.
+    kill -TERM -- -"$SELLER_WEB_PID" 2>/dev/null || kill "$SELLER_WEB_PID" 2>/dev/null || true
   fi
   if [ "$MINIO_STARTED_BY_US" = "1" ]; then
     docker rm -f "$MINIO_CONTAINER" >/dev/null 2>&1 || true
@@ -144,15 +150,15 @@ PIDS+=($!)
 
 wait_for_url "http://127.0.0.1:$SELLER_API_PORT/healthz" "Seller API" 15
 
-echo "5. Starting seller dashboard (vite dev server, dev auth enabled)..."
-# setsid gives vite its own process group so cleanup can kill the whole tree.
+echo "5. Starting seller portal (Next.js dev server)..."
+# setsid gives Next.js its own process group so cleanup can kill the whole tree.
 setsid env \
-  VITE_SELLER_DEV_AUTH=true \
-  SELLER_API_PROXY_TARGET="http://127.0.0.1:$SELLER_API_PORT" \
-  npm run dev --workspace=@commerce/seller-web -- --port "$SELLER_WEB_PORT" --strictPort \
+  NEXT_PUBLIC_SELLER_APP_URL="$SELLER_APP_URL" \
+  SELLER_SESSION_SECRET="$SELLER_SESSION_SECRET" \
+  npm run dev --workspace=@commerce/seller-web \
   >/tmp/seller-web-e2e.log 2>&1 &
-VITE_PID=$!
-PIDS+=("$VITE_PID")
+SELLER_WEB_PID=$!
+PIDS+=("$SELLER_WEB_PID")
 
 wait_for_url "http://127.0.0.1:$SELLER_WEB_PORT/" "Seller Web" 60
 
@@ -165,7 +171,7 @@ cp -r web/storefront/public web/storefront/.next/standalone/web/storefront/publi
 NODE_ENV=production STOREFRONT_API_BASE_URL="http://127.0.0.1:$STOREFRONT_API_PORT" PORT=$NEXT_PORT HOSTNAME="0.0.0.0" node web/storefront/.next/standalone/web/storefront/server.js &
 PIDS+=($!)
 
-wait_for_url "http://store-a.localhost:$NEXT_PORT/en" "Next.js Storefront" 30
+wait_for_url "$STORE_A_BASE_URL/en" "Next.js Storefront" 30
 
 echo "6. Running Playwright E2E Tests..."
 npx playwright test "$@"
