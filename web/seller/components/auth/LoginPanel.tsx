@@ -16,7 +16,7 @@ export function LoginPanel({ error, redirectTo }: { error?: string; redirectTo: 
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-600">MatjerHub Seller Portal</p>
             <h1 className="text-2xl font-bold text-slate-950">Sign in to manage your commerce workspace</h1>
-            <p className="text-sm text-slate-600">Use Zitadel single sign-on to continue to the seller application shell.</p>
+            <p className="text-sm text-slate-600">Use MatjerHub SSO to continue to the seller application shell.</p>
           </div>
           {error ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
@@ -26,7 +26,7 @@ export function LoginPanel({ error, redirectTo }: { error?: string; redirectTo: 
           <form action={startLogin} className="space-y-4">
             <input type="hidden" name="redirect" value={redirectTo} />
             <Button type="submit" size="lg" className="w-full">
-              Continue with Zitadel
+              Continue with MatjerHub SSO
             </Button>
           </form>
         </div>
