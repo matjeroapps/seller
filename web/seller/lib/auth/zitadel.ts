@@ -1,7 +1,7 @@
 import type { SellerUser } from './session-cookie';
 
 export interface ZitadelConfig {
-  domain: string;
+  issuer: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
@@ -17,13 +17,13 @@ export interface ZitadelEndpoints {
 }
 
 export function getZitadelConfig(): ZitadelConfig {
-  const domain = process.env.ZITADEL_DOMAIN || process.env.NEXT_PUBLIC_ZITADEL_DOMAIN || 'matjerhub.zitadel.cloud';
+  const issuer = (process.env.ZITADEL_ISSUER || process.env.NEXT_PUBLIC_ZITADEL_ISSUER || 'http://localhost:8081').replace(/\/$/, '');
   const clientId = process.env.ZITADEL_CLIENT_ID || process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || '';
   const clientSecret = process.env.ZITADEL_CLIENT_SECRET || '';
   const baseUrl = process.env.NEXT_PUBLIC_SELLER_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
 
   return {
-    domain,
+    issuer,
     clientId,
     clientSecret,
     redirectUri: `${baseUrl}/auth/callback`,
@@ -33,7 +33,7 @@ export function getZitadelConfig(): ZitadelConfig {
 }
 
 export function getZitadelEndpoints(config: ZitadelConfig): ZitadelEndpoints {
-  const base = `https://${config.domain}`;
+  const base = config.issuer;
   return {
     authorization: `${base}/oauth/v2/authorize`,
     token: `${base}/oauth/v2/token`,

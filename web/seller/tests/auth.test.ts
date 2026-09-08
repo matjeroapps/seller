@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createCodeChallenge, createCodeVerifier } from '../lib/auth/pkce';
 import { createEmptySession, parseSessionCookie, serializeSessionCookie } from '../lib/auth/session-cookie';
+import { getZitadelConfig, getZitadelEndpoints } from '../lib/auth/zitadel';
 
 describe('seller auth foundation', () => {
   it('round trips authenticated session cookies without token material', async () => {
@@ -42,5 +43,16 @@ describe('seller auth foundation', () => {
 
     expect(verifier.length).toBeGreaterThan(32);
     expect(challenge).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it('uses the configured local issuer without converting it to https', () => {
+    const previousIssuer = process.env.ZITADEL_ISSUER;
+    process.env.ZITADEL_ISSUER = 'http://localhost:8081/';
+
+    const config = getZitadelConfig();
+    expect(getZitadelEndpoints(config).authorization).toBe('http://localhost:8081/oauth/v2/authorize');
+
+    if (previousIssuer === undefined) delete process.env.ZITADEL_ISSUER;
+    else process.env.ZITADEL_ISSUER = previousIssuer;
   });
 });
