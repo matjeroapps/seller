@@ -79,6 +79,16 @@ type CoreCapabilities interface {
 	GetStoreOrderDetail(ctx context.Context, subject, storeID, orderID string) (*coreclient.SellerOrderDetail, error)
 	TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error)
 	ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error)
+
+	CreateOrderShipment(ctx context.Context, subject, orderID string, req coreclient.CreateShipmentRequest) (*coreclient.ShipmentResponse, error)
+	GetShipment(ctx context.Context, subject, shipmentID string) (*coreclient.ShipmentResponse, error)
+	UpdateShipmentStatus(ctx context.Context, subject, shipmentID string, req coreclient.UpdateShipmentStatusRequest) (*coreclient.ShipmentResponse, error)
+	ListOrderShipments(ctx context.Context, subject, orderID string) ([]coreclient.ShipmentResponse, error)
+
+	InitializeOrderPayment(ctx context.Context, subject, orderID string, req coreclient.InitializePaymentRequest) (*coreclient.PaymentResponse, error)
+	GetPayment(ctx context.Context, subject, paymentID string) (*coreclient.PaymentResponse, error)
+	GetOrderPayment(ctx context.Context, subject, orderID string) (*coreclient.PaymentResponse, error)
+	UpdatePaymentStatus(ctx context.Context, subject, paymentID string, req coreclient.UpdatePaymentStatusRequest) (*coreclient.PaymentResponse, error)
 }
 
 // Dependencies wires the seller routes.
@@ -160,6 +170,18 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/seller/stores/{store_id}/orders", deps.handleListStoreOrders)
 		r.Get("/seller/stores/{store_id}/orders/{order_id}", deps.handleGetStoreOrderDetail)
 		r.Post("/seller/stores/{store_id}/orders/{order_id}/transition", deps.handleTransitionStoreOrder)
+
+		// Store-Scoped Shipping Operations
+		r.Post("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleCreateShipment)
+		r.Get("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleListOrderShipments)
+		r.Get("/seller/stores/{store_id}/shipments/{shipment_id}", deps.handleGetShipment)
+		r.Patch("/seller/stores/{store_id}/shipments/{shipment_id}/status", deps.handleUpdateShipmentStatus)
+
+		// Store-Scoped Payment Operations
+		r.Post("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleInitializePayment)
+		r.Get("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleGetOrderPayment)
+		r.Get("/seller/stores/{store_id}/payments/{payment_id}", deps.handleGetPayment)
+		r.Post("/seller/stores/{store_id}/payments/{payment_id}/status", deps.handleUpdatePaymentStatus)
 
 		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
 	}

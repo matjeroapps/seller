@@ -310,6 +310,42 @@ func (s *stubCore) TransitionStoreOrder(ctx context.Context, subject, storeID, o
 func (s *stubCore) ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error) {
 	return nil, s.err
 }
+func (s *stubCore) CreateOrderShipment(ctx context.Context, subject, orderID string, req coreclient.CreateShipmentRequest) (*coreclient.ShipmentResponse, error) {
+	s.subject = subject
+	return &coreclient.ShipmentResponse{ID: "shp_test_1", OrderID: orderID, Status: "PENDING"}, s.err
+}
+func (s *stubCore) GetShipment(ctx context.Context, subject, shipmentID string) (*coreclient.ShipmentResponse, error) {
+	s.subject = subject
+	return &coreclient.ShipmentResponse{ID: shipmentID, Status: "PENDING"}, s.err
+}
+func (s *stubCore) UpdateShipmentStatus(ctx context.Context, subject, shipmentID string, req coreclient.UpdateShipmentStatusRequest) (*coreclient.ShipmentResponse, error) {
+	s.subject = subject
+	return &coreclient.ShipmentResponse{ID: shipmentID, Status: req.Status}, s.err
+}
+func (s *stubCore) ListOrderShipments(ctx context.Context, subject, orderID string) ([]coreclient.ShipmentResponse, error) {
+	s.subject = subject
+	return []coreclient.ShipmentResponse{{ID: "shp_test_1", OrderID: orderID, Status: "PENDING"}}, s.err
+}
+
+func (s *stubCore) InitializeOrderPayment(ctx context.Context, subject, orderID string, req coreclient.InitializePaymentRequest) (*coreclient.PaymentResponse, error) {
+	s.subject = subject
+	return &coreclient.PaymentResponse{ID: "pay_test_1", OrderID: orderID, AmountMinor: req.AmountMinor, Currency: req.Currency, PaymentMethod: req.PaymentMethod, Status: "CREATED"}, s.err
+}
+
+func (s *stubCore) GetPayment(ctx context.Context, subject, paymentID string) (*coreclient.PaymentResponse, error) {
+	s.subject = subject
+	return &coreclient.PaymentResponse{ID: paymentID, OrderID: "ord_1", Status: "CREATED"}, s.err
+}
+
+func (s *stubCore) GetOrderPayment(ctx context.Context, subject, orderID string) (*coreclient.PaymentResponse, error) {
+	s.subject = subject
+	return &coreclient.PaymentResponse{ID: "pay_test_1", OrderID: orderID, Status: "CREATED"}, s.err
+}
+
+func (s *stubCore) UpdatePaymentStatus(ctx context.Context, subject, paymentID string, req coreclient.UpdatePaymentStatusRequest) (*coreclient.PaymentResponse, error) {
+	s.subject = subject
+	return &coreclient.PaymentResponse{ID: paymentID, Status: req.Status}, s.err
+}
 
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
@@ -793,4 +829,74 @@ func newHandlerWithRole(core CoreCapabilities, themes ThemeCapabilities, role st
 		RegisterSellerThemeRoutes(ThemeDependencies{Themes: themes})(r)
 	})
 	return router
+}
+
+func TestStoreShippingOperations(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	t.Run("create shipment for order", func(t *testing.T) {
+		body := `{"fulfillment_location_id":"loc-1","tracking_number":"TRACK123","shipping_cost_minor":1500,"cod_amount_minor":0,"currency":"SAR","items":[{"order_item_id":"item-1","quantity":2}]}`
+		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/orders/ord-1/shipments", body)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create shipment status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list shipments for order", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/orders/ord-1/shipments", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list order shipments status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get shipment detail", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/shipments/shp-1", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("get shipment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update shipment status", func(t *testing.T) {
+		body := `{"status":"SHIPPED","tracking_number":"TRACK123","notes":"Handed to courier"}`
+		rec := doRequest(t, handler, http.MethodPatch, "/v1/seller/stores/store-1/shipments/shp-1/status", body)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("update shipment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestStorePaymentOperations(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	t.Run("initialize payment for order", func(t *testing.T) {
+		body := `{"amount_minor":25000,"currency":"SAR","payment_method":"COD"}`
+		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/orders/ord-1/payments", body)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("initialize payment status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get order payment", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/orders/ord-1/payments", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("get order payment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get payment detail", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/payments/pay-1", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("get payment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("update payment status", func(t *testing.T) {
+		body := `{"status":"CAPTURED","provider":"manual","provider_reference":"COD-COLLECTED"}`
+		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/payments/pay-1/status", body)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("update payment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
 }
