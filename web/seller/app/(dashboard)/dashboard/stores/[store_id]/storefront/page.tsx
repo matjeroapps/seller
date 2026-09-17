@@ -46,43 +46,37 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
 
       {/* Canonical Storefront Access Card */}
       <div className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm space-y-4">
-        {loading ? (
-          <div className="text-xs text-slate-500 animate-pulse">Loading storefront settings...</div>
-        ) : (
-          <>
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
-                <Globe className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Canonical Storefront Host</h2>
-                <div className="text-xs text-slate-500">
-                  Resolved via Core domain host resolver: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">{canonicalStorefrontUrl}</code>
-                </div>
-              </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
+            <Globe className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Canonical Storefront Host</h2>
+            <div className="text-xs text-slate-500">
+              Resolved via Core domain host resolver: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">{canonicalStorefrontUrl}</code>
             </div>
+          </div>
+        </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700 space-y-1">
-              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" /> Multi-Tenant Host Resolution Active
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Core resolves trusted storefront hosts to active store domains. Published listings and store revision changes reflect directly on the canonical storefront.
-              </p>
-            </div>
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-700 space-y-1">
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" /> Multi-Tenant Host Resolution Active
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Core resolves trusted storefront hosts to active store domains. Published listings and store revision changes reflect directly on the canonical storefront.
+          </p>
+        </div>
 
-            <div className="pt-2">
-              <a
-                href={canonicalStorefrontUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm"
-              >
-                Open Canonical Customer Storefront <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
-          </>
-        )}
+        <div className="pt-2">
+          <a
+            href={canonicalStorefrontUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm"
+          >
+            Open Canonical Customer Storefront <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
       </div>
     </div>
   );

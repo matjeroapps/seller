@@ -88,7 +88,7 @@ export function StoreSwitcher({ currentStoreId }: { currentStoreId?: string }) {
       <button
         type="button"
         disabled
-        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 rounded border border-slate-200 opacity-60"
+        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 rounded border border-slate-200 animate-pulse cursor-not-allowed opacity-75"
       >
         <StoreIcon className="w-4 h-4" /> Loading stores...
       </button>
