@@ -96,12 +96,31 @@ type sellerProfileResponse struct {
 	Settings map[string]any `json:"settings"`
 }
 
+// SellerStoreListResponse contains seller stores and entitlement summary.
+type SellerStoreListResponse struct {
+	Items            []Store `json:"items"`
+	ActiveStoreLimit int     `json:"active_store_limit"`
+	ActiveStoreCount int     `json:"active_store_count"`
+}
+
 type collectionResponse[T any] struct {
 	Items []T `json:"items"`
 }
 
 type statusResponse struct {
 	Status string `json:"status"`
+}
+
+// StructuredReadinessReason describes a single publish readiness issue.
+type StructuredReadinessReason struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// StructuredPublishReadiness is Core's machine-readable readiness evaluation.
+type StructuredPublishReadiness struct {
+	IsReady bool                        `json:"is_ready"`
+	Reasons []StructuredReadinessReason `json:"reasons"`
 }
 
 // --- Seller capabilities ---
@@ -137,12 +156,15 @@ func (c *Client) UpdateSellerProfile(ctx context.Context, sellerID, subject stri
 	return payload.Status, err
 }
 
-// ListSellerStores lists the stores owned by a seller.
-func (c *Client) ListSellerStores(ctx context.Context, sellerID, subject string, page Page) ([]Store, error) {
-	var payload collectionResponse[Store]
+// ListSellerStores lists the stores owned by a seller along with active store entitlement bounds.
+func (c *Client) ListSellerStores(ctx context.Context, sellerID, subject string, page Page) (*SellerStoreListResponse, error) {
+	var payload SellerStoreListResponse
 	path := "/internal/v1/sellers/" + url.PathEscape(sellerID) + "/stores"
 	err := c.get(ctx, path, page.values(), requestOptions{Subject: subject}, &payload)
-	return payload.Items, err
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
 }
 
 // StoreCreate is the store creation payload.
@@ -172,10 +194,22 @@ func (c *Client) GetStore(ctx context.Context, storeID, subject string) (Store, 
 	return payload, err
 }
 
+// UpdateStoreStatus updates a store status through Core entitlement checks.
+func (c *Client) UpdateStoreStatus(ctx context.Context, storeID, subject, status string) (*Store, error) {
+	var payload Store
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/status"
+	err := c.post(ctx, path, map[string]string{"status": status}, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
 // SupplierCatalogFilter narrows the supplier catalog browse.
 type SupplierCatalogFilter struct {
 	SupplierID string
 	CategoryID string
+	Query      string
 	Page       Page
 }
 
@@ -190,9 +224,41 @@ func (c *Client) ListSupplierCatalog(ctx context.Context, storeID, subject strin
 	if filter.CategoryID != "" {
 		query.Set("category_id", filter.CategoryID)
 	}
+	if filter.Query != "" {
+		query.Set("query", filter.Query)
+	}
 	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/supplier-catalog"
 	err := c.get(ctx, path, query, requestOptions{Subject: subject}, &payload)
 	return payload.Items, err
+}
+
+// ListStoreSupplierOffers browses eligible supplier offers for a store.
+func (c *Client) ListStoreSupplierOffers(ctx context.Context, storeID, subject string, filter SupplierCatalogFilter) ([]SupplierCatalogItem, error) {
+	var payload collectionResponse[SupplierCatalogItem]
+	query := filter.Page.values()
+	if filter.SupplierID != "" {
+		query.Set("supplier_id", filter.SupplierID)
+	}
+	if filter.CategoryID != "" {
+		query.Set("category_id", filter.CategoryID)
+	}
+	if filter.Query != "" {
+		query.Set("query", filter.Query)
+	}
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/supplier-offers"
+	err := c.get(ctx, path, query, requestOptions{Subject: subject}, &payload)
+	return payload.Items, err
+}
+
+// ImportSupplierOffer idempotently creates a seller listing from a supplier offer.
+func (c *Client) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*SellerListing, error) {
+	var payload SellerListing
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/supplier-offers/" + url.PathEscape(offerID) + "/imports"
+	err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
 }
 
 // ListStoreListings lists a store's seller listings.
@@ -201,6 +267,17 @@ func (c *Client) ListStoreListings(ctx context.Context, storeID, subject string,
 	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings"
 	err := c.get(ctx, path, page.values(), requestOptions{Subject: subject}, &payload)
 	return payload.Items, err
+}
+
+// GetStoreListing fetches a specific store listing by ID.
+func (c *Client) GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*SellerListing, error) {
+	var payload SellerListing
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID)
+	err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
 }
 
 // ListingImport is the listing import payload. The target store is the
@@ -230,6 +307,56 @@ type PriceUpdate struct {
 func (c *Client) SetListingPrice(ctx context.Context, listingID, subject string, price PriceUpdate) error {
 	path := "/internal/v1/listings/" + url.PathEscape(listingID) + "/price"
 	return c.post(ctx, path, price, requestOptions{Subject: subject}, &statusResponse{})
+}
+
+// SetStoreListingPrice sets a store listing retail price.
+func (c *Client) SetStoreListingPrice(ctx context.Context, storeID, listingID, subject string, price PriceUpdate) error {
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/price"
+	return c.put(ctx, path, price, requestOptions{Subject: subject}, nil)
+}
+
+// GetStoreListingReadiness returns machine-readable publish readiness for a store listing.
+func (c *Client) GetStoreListingReadiness(ctx context.Context, storeID, listingID, subject string) (*StructuredPublishReadiness, error) {
+	var payload StructuredPublishReadiness
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/readiness"
+	err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+// PublishStoreListing publishes a store listing.
+func (c *Client) PublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*SellerListing, error) {
+	var payload SellerListing
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/publish"
+	err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+// UnpublishStoreListing unpublishes a store listing.
+func (c *Client) UnpublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*SellerListing, error) {
+	var payload SellerListing
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/unpublish"
+	err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+// ArchiveStoreListing archives a store listing.
+func (c *Client) ArchiveStoreListing(ctx context.Context, storeID, listingID, subject string) (*SellerListing, error) {
+	var payload SellerListing
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/archive"
+	err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
 }
 
 // StatusUpdate is a status mutation payload.

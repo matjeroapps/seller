@@ -24,21 +24,32 @@ type CoreCapabilities interface {
 	ResolveSeller(ctx context.Context, subject string) (string, error)
 	GetSeller(ctx context.Context, sellerID, subject string) (coreclient.Seller, map[string]any, error)
 	UpdateSellerProfile(ctx context.Context, sellerID, subject string, update coreclient.ProfileUpdate) (string, error)
-	ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) ([]coreclient.Store, error)
+	ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) (*coreclient.SellerStoreListResponse, error)
 	CreateSellerStore(ctx context.Context, sellerID, subject string, create coreclient.StoreCreate) (coreclient.Store, error)
 	GetStore(ctx context.Context, storeID, subject string) (coreclient.Store, error)
+	UpdateStoreStatus(ctx context.Context, storeID, subject, status string) (*coreclient.Store, error)
 	GetStorefrontHost(ctx context.Context, storeID, subject string) (string, error)
 	ListSupplierCatalog(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error)
+	ListStoreSupplierOffers(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error)
+	ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*coreclient.SellerListing, error)
 	ListStoreListings(ctx context.Context, storeID, subject string, page coreclient.Page) ([]coreclient.SellerListing, error)
+	GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
 	ImportListing(ctx context.Context, storeID, subject string, importReq coreclient.ListingImport) (coreclient.SellerListing, error)
 	SetListingPrice(ctx context.Context, listingID, subject string, price coreclient.PriceUpdate) error
+	SetStoreListingPrice(ctx context.Context, storeID, listingID, subject string, price coreclient.PriceUpdate) error
+	GetStoreListingReadiness(ctx context.Context, storeID, listingID, subject string) (*coreclient.StructuredPublishReadiness, error)
+	PublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
+	UnpublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
+	ArchiveStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
 	UpdateListingStatus(ctx context.Context, listingID, subject, status string) error
 
-	// P5.8 Catalog & Order Capabilities
+	// Catalog & Order Capabilities
 	ListStoreProducts(ctx context.Context, subject, storeID, status, source, query string, limit, offset int) (*coreclient.SellerProductListResponse, error)
 	CreateSellerProduct(ctx context.Context, subject, storeID string, draft coreclient.SellerProductDraft) (*coreclient.SellerProductDetail, error)
 	GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error)
 	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error)
+	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
+	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)
 	UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error)
 	CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error)
@@ -47,6 +58,14 @@ type CoreCapabilities interface {
 	CompleteMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.CompleteMediaUploadRequest) (*coreclient.MediaMetadata, error)
 	UpdateMedia(ctx context.Context, subject, storeID, productID, mediaID, altText string, sortOrder int, isPrimary bool) (*coreclient.MediaMetadata, error)
 	DeleteMedia(ctx context.Context, subject, storeID, productID, mediaID string) error
+	ListStoreMedia(ctx context.Context, subject, storeID, filename, contentType string, limit, offset int) (*coreclient.StoreMediaListResponse, error)
+	PresignStoreMediaUpload(ctx context.Context, subject, storeID string, req coreclient.PresignMediaUploadRequest) (*coreclient.PresignMediaUploadResponse, error)
+	CompleteStoreMediaUploadIntent(ctx context.Context, subject, storeID, intentID string, req coreclient.CompleteStoreMediaUploadRequest) (*coreclient.StoreMediaAsset, error)
+	DeleteStoreMediaAsset(ctx context.Context, subject, storeID, assetID string) error
+	ListProductMediaReferences(ctx context.Context, subject, storeID, productID string) ([]coreclient.ProductMediaReference, error)
+	AttachProductMediaReference(ctx context.Context, subject, storeID, productID string, req coreclient.AttachMediaReferenceRequest) (*coreclient.ProductMediaReference, error)
+	UpdateProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string, req coreclient.UpdateMediaReferenceRequest) (*coreclient.ProductMediaReference, error)
+	DetachProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string) error
 	ListStoreLocations(ctx context.Context, subject, storeID string) ([]coreclient.StoreLocation, error)
 	CreateStoreLocation(ctx context.Context, subject, storeID, code, name, locType, status string) (*coreclient.StoreLocation, error)
 	ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.SellerInventorySummary, error)
@@ -73,6 +92,7 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Put("/seller/profile", deps.handleSellerProfileUpdate)
 		r.Get("/seller/stores", deps.handleSellerStores)
 		r.Post("/seller/stores", deps.handleSellerStoreCreate)
+		r.Post("/seller/stores/{store_id}/status", deps.handleUpdateStoreStatus)
 		r.Get("/seller/stores/{store_id}/storefront-host", deps.handleGetStorefrontHost)
 		r.Get("/seller/catalog/offers", deps.handleSellerCatalogOffers)
 		r.Get("/seller/listings", deps.handleSellerListings)
@@ -80,11 +100,17 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Post("/seller/listings/{id}/price", deps.handleSellerListingPrice)
 		r.Post("/seller/listings/{id}/status", deps.handleSellerListingStatus)
 
-		// P5.8 Seller Product & Catalog Routes
+		// Store-Scoped Supplier Offers & Imports
+		r.Get("/seller/stores/{store_id}/supplier-offers", deps.handleListStoreSupplierOffers)
+		r.Post("/seller/stores/{store_id}/supplier-offers/{offer_id}/imports", deps.handleImportSupplierOffer)
+
+		// Store-Scoped Product & Listing Routes
 		r.Get("/seller/stores/{store_id}/products", deps.handleListStoreProducts)
 		r.Post("/seller/stores/{store_id}/products", deps.handleCreateStoreProduct)
 		r.Get("/seller/stores/{store_id}/products/{product_id}", deps.handleGetStoreProductDetail)
 		r.Put("/seller/stores/{store_id}/products/{product_id}", deps.handleUpdateStoreProduct)
+		r.Post("/seller/stores/{store_id}/products/{product_id}/status", deps.handleTransitionProductStatus)
+		r.Post("/seller/stores/{store_id}/products/{product_id}/archive", deps.handleArchiveProduct)
 
 		r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
 		r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)
@@ -92,10 +118,32 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus", deps.handleCreateSKU)
 		r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}", deps.handleUpdateSKU)
 
+		// Legacy Product Media Routes
 		r.Post("/seller/stores/{store_id}/products/{product_id}/media/uploads", deps.handleCreateMediaUpload)
 		r.Post("/seller/stores/{store_id}/products/{product_id}/media", deps.handleCompleteMediaUpload)
 		r.Put("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleUpdateMedia)
 		r.Delete("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleDeleteMedia)
+
+		// Store Media Asset Library
+		r.Get("/seller/stores/{store_id}/media", deps.handleListStoreMedia)
+		r.Post("/seller/stores/{store_id}/media/uploads", deps.handlePresignStoreMediaUpload)
+		r.Post("/seller/stores/{store_id}/media/uploads/{intent_id}/complete", deps.handleCompleteStoreMediaUploadIntent)
+		r.Delete("/seller/stores/{store_id}/media/{asset_id}", deps.handleDeleteStoreMediaAsset)
+
+		// Product Media References
+		r.Get("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleListProductMediaReferences)
+		r.Post("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleAttachProductMediaReference)
+		r.Put("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleUpdateProductMediaReference)
+		r.Delete("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleDetachProductMediaReference)
+
+		// Store-Scoped Listings
+		r.Get("/seller/stores/{store_id}/listings", deps.handleListStoreListings)
+		r.Get("/seller/stores/{store_id}/listings/{listing_id}", deps.handleGetStoreListing)
+		r.Put("/seller/stores/{store_id}/listings/{listing_id}/price", deps.handleSetStoreListingPrice)
+		r.Get("/seller/stores/{store_id}/listings/{listing_id}/readiness", deps.handleGetStoreListingReadiness)
+		r.Post("/seller/stores/{store_id}/listings/{listing_id}/publish", deps.handlePublishStoreListing)
+		r.Post("/seller/stores/{store_id}/listings/{listing_id}/unpublish", deps.handleUnpublishStoreListing)
+		r.Post("/seller/stores/{store_id}/listings/{listing_id}/archive", deps.handleArchiveStoreListing)
 
 		r.Get("/seller/stores/{store_id}/locations", deps.handleListStoreLocations)
 		r.Post("/seller/stores/{store_id}/locations", deps.handleCreateStoreLocation)
@@ -173,12 +221,12 @@ func (deps Dependencies) handleSellerStores(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	items, err := deps.Core.ListSellerStores(r.Context(), sellerID, subject, pageFrom(r))
+	res, err := deps.Core.ListSellerStores(r.Context(), sellerID, subject, pageFrom(r))
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+	httpx.WriteJSON(w, http.StatusOK, res)
 }
 
 func (deps Dependencies) handleSellerStoreCreate(w http.ResponseWriter, r *http.Request) {

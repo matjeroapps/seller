@@ -13,25 +13,32 @@ import (
 // side is a contract change; unknown codes collapse to internal_error so a new
 // Core release can never make the Seller API leak an unmapped failure.
 const (
-	CodeNotFound               = "not_found"
-	CodeInvalidArgument        = "invalid_argument"
-	CodeValidationError        = "validation_error"
-	CodeUnauthorized           = "unauthorized"
-	CodeForbidden              = "forbidden"
-	CodeConflict               = "conflict"
-	CodeMarketMismatch         = "market_mismatch"
-	CodeInsufficientInventory  = "insufficient_inventory"
-	CodeSchemaMismatch         = "schema_mismatch"
-	CodeUnsafeContent          = "unsafe_content"
-	CodePreviewUnavailable     = "preview_unavailable"
-	CodeStorefrontUnavailable  = "storefront_unavailable"
-	CodeCheckoutExpired        = "checkout_expired"
-	CodeIdempotencyConflict    = "idempotency_conflict"
-	CodeInvalidOrderTransition = "invalid_order_transition"
-	CodePriceChanged           = "price_changed"
-	CodeListingUnavailable     = "listing_unavailable"
-	CodeUnavailable            = "unavailable"
-	CodeInternalError          = "internal_error"
+	CodeNotFound                 = "not_found"
+	CodeInvalidArgument          = "invalid_argument"
+	CodeValidationError          = "validation_error"
+	CodeUnauthorized             = "unauthorized"
+	CodeForbidden                = "forbidden"
+	CodeConflict                 = "conflict"
+	CodeMarketMismatch           = "market_mismatch"
+	CodeInsufficientInventory    = "insufficient_inventory"
+	CodeSchemaMismatch           = "schema_mismatch"
+	CodeUnsafeContent            = "unsafe_content"
+	CodePreviewUnavailable       = "preview_unavailable"
+	CodeStorefrontUnavailable    = "storefront_unavailable"
+	CodeCheckoutExpired          = "checkout_expired"
+	CodeIdempotencyConflict      = "idempotency_conflict"
+	CodeInvalidOrderTransition   = "invalid_order_transition"
+	CodePriceChanged             = "price_changed"
+	CodeListingUnavailable       = "listing_unavailable"
+	CodeStoreEntitlementExceeded = "store_entitlement_exceeded"
+	CodeUploadInProgress         = "upload_in_progress"
+	CodeChecksumMismatch         = "checksum_mismatch"
+	CodeMediaInUse               = "media_in_use"
+	CodePublishNotReady          = "publish_not_ready"
+	CodeOfferUnavailable         = "offer_unavailable"
+	CodeResourceInUse            = "resource_in_use"
+	CodeUnavailable              = "unavailable"
+	CodeInternalError            = "internal_error"
 )
 
 // ErrUnavailable is returned when Core cannot be reached at all: connection
@@ -87,8 +94,10 @@ func statusForCode(code string) int {
 		return http.StatusUnauthorized
 	case CodeForbidden:
 		return http.StatusForbidden
-	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory, CodeCheckoutExpired, CodeIdempotencyConflict, CodeInvalidOrderTransition, CodePriceChanged, CodeListingUnavailable:
+	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory, CodeCheckoutExpired, CodeIdempotencyConflict, CodeInvalidOrderTransition, CodePriceChanged, CodeListingUnavailable, CodeStoreEntitlementExceeded, CodeUploadInProgress, CodeMediaInUse, CodeOfferUnavailable, CodeResourceInUse:
 		return http.StatusConflict
+	case CodeChecksumMismatch, CodePublishNotReady:
+		return http.StatusUnprocessableEntity
 	case CodeUnavailable, CodePreviewUnavailable:
 		return http.StatusServiceUnavailable
 	default:
