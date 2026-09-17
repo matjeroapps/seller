@@ -36,10 +36,6 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
     return true;
   });
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-500 animate-pulse">Loading store listings...</div>;
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -80,7 +76,9 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
 
       {/* Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-        {filteredListings.length === 0 ? (
+        {loading ? (
+          <div className="p-8 text-center text-xs text-slate-500 animate-pulse">Loading store listings...</div>
+        ) : filteredListings.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
             <Boxes className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             No store listings found matching status filter.
