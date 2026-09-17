@@ -18,9 +18,8 @@ SELLER_WEB_PORT=${SELLER_WEB_PORT:-3001}
 MINIO_PORT=${MINIO_PORT:-19000}
 REDIS_HOST=${REDIS_ADDR:-127.0.0.1:6379}
 
-# MinIO images: the local default is a pinned release already present in the
-# developer machine's image cache; CI overrides both to :latest (see ci.yml).
-MINIO_IMAGE=${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
+# MinIO images: defaults to minio/minio:latest and minio/mc:latest.
+MINIO_IMAGE=${MINIO_IMAGE:-minio/minio:latest}
 MC_IMAGE=${MC_IMAGE:-minio/mc:latest}
 MINIO_CONTAINER=${MINIO_CONTAINER:-matjero-minio-e2e}
 

@@ -148,6 +148,9 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
       - name: Run E2E Test Suite
+        env:
+          MINIO_IMAGE: minio/minio:latest
+          MC_IMAGE: minio/mc:latest
         run: ./scripts/run-e2e.sh
       - name: Upload Playwright Test Artifacts
         if: failure() || always()
