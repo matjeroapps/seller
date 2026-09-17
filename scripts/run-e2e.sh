@@ -18,9 +18,9 @@ SELLER_WEB_PORT=${SELLER_WEB_PORT:-3001}
 MINIO_PORT=${MINIO_PORT:-19000}
 REDIS_HOST=${REDIS_ADDR:-127.0.0.1:6379}
 
-# MinIO images: defaults to minio/minio:latest and minio/mc:latest.
-MINIO_IMAGE=${MINIO_IMAGE:-minio/minio:latest}
-MC_IMAGE=${MC_IMAGE:-minio/mc:latest}
+# MinIO images: defaults to official Quay.io images.
+MINIO_IMAGE=${MINIO_IMAGE:-quay.io/minio/minio:latest}
+MC_IMAGE=${MC_IMAGE:-quay.io/minio/mc:latest}
 MINIO_CONTAINER=${MINIO_CONTAINER:-matjero-minio-e2e}
 
 # Ephemeral service token
