@@ -34,17 +34,13 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
   const canonicalStorefrontUrl =
     process.env.NEXT_PUBLIC_STOREFRONT_APP_URL || `http://store-a.localhost:3000`;
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-500 animate-pulse">Loading storefront settings...</div>;
-  }
-
   return (
     <div className="max-w-3xl space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-slate-900">Canonical Storefront Settings</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Preview and manage customer-facing storefront presentation for {currentStore?.name}
+          Preview and manage customer-facing storefront presentation for {currentStore?.name || 'this store'}
         </p>
       </div>
 
