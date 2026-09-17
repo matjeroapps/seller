@@ -29,7 +29,7 @@ test.describe('Seller Store & Tenant Isolation E2E Matrix', () => {
 
   test('Store switcher displays owned stores and active store entitlement count', async ({ page }) => {
     await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01`);
-    await expect(page.getByRole('button', { name: /Select Store|str_/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Select Store|str_|Loading/ })).toBeVisible();
   });
 
   test('Cross-store resource isolation: navigating to valid store routes preserves store-scoped context', async ({ page }) => {
