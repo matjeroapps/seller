@@ -38,10 +38,6 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
     return true;
   });
 
-  if (loading) {
-    return <div className="p-6 text-sm text-slate-500 animate-pulse">Loading products catalog...</div>;
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -104,7 +100,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
 
       {/* Products Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-        {filteredProducts.length === 0 ? (
+        {loading ? (
+          <div className="p-8 text-center text-slate-500 text-xs animate-pulse">Loading products catalog...</div>
+        ) : filteredProducts.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-xs">
             <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             No products found matching filters.
