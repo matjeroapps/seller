@@ -38,7 +38,6 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
   await expect(page.getByText('Inventory Alerts')).toBeVisible();
   await expect(page.getByRole('button', { name: /Catalog/ })).toBeVisible();
 
-  await page.goto(`${SELLER_APP_URL}/dashboard/catalog`);
-  await expect(page.getByRole('heading', { name: 'Catalog foundation' })).toBeVisible();
-  await expect(page.getByText('Business workflows and API-backed behavior are deferred beyond Phase UI-5.')).toBeVisible();
+  await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/catalog/products`);
+  await expect(page.getByRole('heading', { name: 'Store Products Catalog' })).toBeVisible();
 });

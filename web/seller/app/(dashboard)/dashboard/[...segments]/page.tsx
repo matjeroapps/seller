@@ -28,7 +28,7 @@ export default async function FoundationDestinationPage({ params }: { params: Pr
   return (
     <FoundationDestination
       title={`${label} foundation`}
-      description="This destination is reserved in the Seller Portal information architecture. Business workflows and API-backed behavior are deferred beyond Phase UI-5."
+      description="This destination is reserved in the Seller Portal information architecture."
     />
   );
 }
