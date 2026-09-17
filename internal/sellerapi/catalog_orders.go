@@ -6,9 +6,459 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/matjeroapps/seller/internal/actorhttp"
+	"github.com/matjeroapps/seller/internal/auth"
 	"github.com/matjeroapps/seller/internal/coreclient"
 	"github.com/matjeroapps/seller/internal/httpx"
+	"github.com/matjeroapps/seller/internal/money"
 )
+
+const (
+	roleOwner   = auth.RoleSellerOwner
+	roleManager = auth.RoleSellerManager
+	roleStaff   = auth.RoleSellerStaff
+)
+
+func requireRoles(w http.ResponseWriter, r *http.Request, roles ...string) bool {
+	principal, ok := auth.PrincipalFrom(r.Context())
+	if !ok || principal.Subject == "" {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return false
+	}
+	if !principal.HasAnyRole(roles...) {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden", "operation requires higher privileges")
+		return false
+	}
+	return true
+}
+
+func (deps Dependencies) handleUpdateStoreStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	var body struct {
+		Status string `json:"status"`
+	}
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	store, err := deps.Core.UpdateStoreStatus(r.Context(), storeID, subject, body.Status)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, store)
+}
+
+func (deps Dependencies) handleListStoreSupplierOffers(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	filter := coreclient.SupplierCatalogFilter{
+		SupplierID: r.URL.Query().Get("supplier_id"),
+		CategoryID: r.URL.Query().Get("category_id"),
+		Query:      r.URL.Query().Get("query"),
+		Page:       pageFrom(r),
+	}
+	items, err := deps.Core.ListStoreSupplierOffers(r.Context(), storeID, subject, filter)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (deps Dependencies) handleImportSupplierOffer(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	offerID := chi.URLParam(r, "offer_id")
+
+	listing, err := deps.Core.ImportSupplierOffer(r.Context(), storeID, offerID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, listing)
+}
+
+func (deps Dependencies) handleListStoreListings(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+
+	items, err := deps.Core.ListStoreListings(r.Context(), storeID, subject, pageFrom(r))
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (deps Dependencies) handleGetStoreListing(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	listing, err := deps.Core.GetStoreListing(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, listing)
+}
+
+func (deps Dependencies) handleSetStoreListingPrice(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	var body SellerListingPriceRequest
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	if _, err := money.New(body.AmountMinor, body.Currency); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+	err := deps.Core.SetStoreListingPrice(r.Context(), storeID, listingID, subject, coreclient.PriceUpdate{
+		AmountMinor: body.AmountMinor,
+		Currency:    body.Currency,
+	})
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (deps Dependencies) handleGetStoreListingReadiness(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	readiness, err := deps.Core.GetStoreListingReadiness(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, readiness)
+}
+
+func (deps Dependencies) handlePublishStoreListing(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	listing, err := deps.Core.PublishStoreListing(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, listing)
+}
+
+func (deps Dependencies) handleUnpublishStoreListing(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	listing, err := deps.Core.UnpublishStoreListing(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, listing)
+}
+
+func (deps Dependencies) handleArchiveStoreListing(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	listing, err := deps.Core.ArchiveStoreListing(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, listing)
+}
+
+func (deps Dependencies) handleTransitionProductStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+
+	var body struct {
+		Status string `json:"status"`
+	}
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	status, err := deps.Core.TransitionProductStatus(r.Context(), subject, storeID, productID, body.Status)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": status})
+}
+
+func (deps Dependencies) handleArchiveProduct(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+
+	if err := deps.Core.ArchiveProduct(r.Context(), subject, storeID, productID); err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "archived"})
+}
+
+func (deps Dependencies) handleListStoreMedia(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	filename := r.URL.Query().Get("filename")
+	contentType := r.URL.Query().Get("content_type")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	res, err := deps.Core.ListStoreMedia(r.Context(), subject, storeID, filename, contentType, limit, offset)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, res)
+}
+
+func (deps Dependencies) handlePresignStoreMediaUpload(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+
+	var req coreclient.PresignMediaUploadRequest
+	if !actorhttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	res, err := deps.Core.PresignStoreMediaUpload(r.Context(), subject, storeID, req)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if res.Mode == "upload" {
+		status = http.StatusCreated
+	}
+	httpx.WriteJSON(w, status, res)
+}
+
+func (deps Dependencies) handleCompleteStoreMediaUploadIntent(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	intentID := chi.URLParam(r, "intent_id")
+
+	var req coreclient.CompleteStoreMediaUploadRequest
+	if !actorhttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	asset, err := deps.Core.CompleteStoreMediaUploadIntent(r.Context(), subject, storeID, intentID, req)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, asset)
+}
+
+func (deps Dependencies) handleDeleteStoreMediaAsset(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	assetID := chi.URLParam(r, "asset_id")
+
+	if err := deps.Core.DeleteStoreMediaAsset(r.Context(), subject, storeID, assetID); err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (deps Dependencies) handleListProductMediaReferences(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+
+	refs, err := deps.Core.ListProductMediaReferences(r.Context(), subject, storeID, productID)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"references": refs})
+}
+
+func (deps Dependencies) handleAttachProductMediaReference(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+
+	var req coreclient.AttachMediaReferenceRequest
+	if !actorhttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	ref, err := deps.Core.AttachProductMediaReference(r.Context(), subject, storeID, productID, req)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, ref)
+}
+
+func (deps Dependencies) handleUpdateProductMediaReference(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+	referenceID := chi.URLParam(r, "reference_id")
+
+	var req coreclient.UpdateMediaReferenceRequest
+	if !actorhttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	ref, err := deps.Core.UpdateProductMediaReference(r.Context(), subject, storeID, productID, referenceID, req)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, ref)
+}
+
+func (deps Dependencies) handleDetachProductMediaReference(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	productID := chi.URLParam(r, "product_id")
+	referenceID := chi.URLParam(r, "reference_id")
+
+	if err := deps.Core.DetachProductMediaReference(r.Context(), subject, storeID, productID, referenceID); err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
 
 // Handlers for Catalog, Inventory, Media, Presentation, Publish, and Order operations
 

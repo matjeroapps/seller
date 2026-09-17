@@ -576,3 +576,187 @@ func (c *Client) ListCategories(ctx context.Context, subject string, limit, offs
 	}
 	return res.Items, nil
 }
+
+// TransitionProductStatus transitions seller-owned product status (draft -> active).
+func (c *Client) TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/status", url.PathEscape(storeID), url.PathEscape(productID))
+	body := map[string]string{"status": status}
+	var res statusResponse
+	if err := c.post(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
+		return "", err
+	}
+	return res.Status, nil
+}
+
+// ArchiveProduct archives a seller-owned product.
+func (c *Client) ArchiveProduct(ctx context.Context, subject, storeID, productID string) error {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/archive", url.PathEscape(storeID), url.PathEscape(productID))
+	return c.post(ctx, path, nil, requestOptions{Subject: subject}, nil)
+}
+
+// StoreMediaAsset is an immutable store-owned binary media asset.
+type StoreMediaAsset struct {
+	ID               string    `json:"id"`
+	StoreID          string    `json:"store_id"`
+	ChecksumSHA256   string    `json:"checksum_sha256"`
+	StorageKey       string    `json:"storage_key,omitempty"`
+	ContentType      string    `json:"content_type"`
+	ByteSize         int64     `json:"byte_size"`
+	OriginalFilename string    `json:"original_filename"`
+	Status           string    `json:"status"`
+	URL              string    `json:"url"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// StoreMediaListResponse is the paginated response for ready store media assets.
+type StoreMediaListResponse struct {
+	Assets []StoreMediaAsset `json:"assets"`
+	Total  int               `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
+}
+
+// ListStoreMedia lists ready media assets owned by a store.
+func (c *Client) ListStoreMedia(ctx context.Context, subject, storeID, filename, contentType string, limit, offset int) (*StoreMediaListResponse, error) {
+	values := make(url.Values)
+	if filename != "" {
+		values.Set("filename", filename)
+	}
+	if contentType != "" {
+		values.Set("content_type", contentType)
+	}
+	if limit > 0 {
+		values.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		values.Set("offset", strconv.Itoa(offset))
+	}
+	path := fmt.Sprintf("/internal/v1/stores/%s/media", url.PathEscape(storeID))
+	var res StoreMediaListResponse
+	if err := c.get(ctx, path, values, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// PresignMediaUploadRequest is the payload to request an upload intent or asset reuse.
+type PresignMediaUploadRequest struct {
+	ClientUploadID string `json:"client_upload_id"`
+	Filename       string `json:"filename"`
+	ContentType    string `json:"content_type"`
+	SizeBytes      int64  `json:"size_bytes"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+}
+
+// PresignMediaUploadResponse is Core's discriminated upload/reuse response.
+type PresignMediaUploadResponse struct {
+	Mode            string            `json:"mode"`
+	IntentID        string            `json:"intent_id,omitempty"`
+	UploadURL       string            `json:"upload_url,omitempty"`
+	UploadToken     string            `json:"upload_token,omitempty"`
+	RequiredHeaders map[string]string `json:"required_headers,omitempty"`
+	ExpiresAt       *time.Time        `json:"expires_at,omitempty"`
+	Asset           *StoreMediaAsset  `json:"asset,omitempty"`
+}
+
+// PresignStoreMediaUpload requests asset reuse or a presigned upload URL for a store media file.
+func (c *Client) PresignStoreMediaUpload(ctx context.Context, subject, storeID string, req PresignMediaUploadRequest) (*PresignMediaUploadResponse, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/media/uploads", url.PathEscape(storeID))
+	var res PresignMediaUploadResponse
+	if err := c.post(ctx, path, req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// CompleteStoreMediaUploadRequest is the completion payload for an upload intent.
+type CompleteStoreMediaUploadRequest struct {
+	UploadToken string `json:"upload_token"`
+}
+
+// CompleteStoreMediaUploadIntent verifies and accepts an uploaded object as a store media asset.
+func (c *Client) CompleteStoreMediaUploadIntent(ctx context.Context, subject, storeID, intentID string, req CompleteStoreMediaUploadRequest) (*StoreMediaAsset, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/media/uploads/%s/complete", url.PathEscape(storeID), url.PathEscape(intentID))
+	var res StoreMediaAsset
+	if err := c.post(ctx, path, req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// DeleteStoreMediaAsset enqueues safe permanent deletion for an unreferenced store asset.
+func (c *Client) DeleteStoreMediaAsset(ctx context.Context, subject, storeID, assetID string) error {
+	path := fmt.Sprintf("/internal/v1/stores/%s/media/%s", url.PathEscape(storeID), url.PathEscape(assetID))
+	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
+}
+
+// ProductMediaReference represents a product's reference to a store media asset.
+type ProductMediaReference struct {
+	ID        string    `json:"id"`
+	StoreID   string    `json:"store_id"`
+	ProductID string    `json:"product_id"`
+	AssetID   string    `json:"asset_id"`
+	AltText   string    `json:"alt_text"`
+	SortOrder int       `json:"sort_order"`
+	IsPrimary bool      `json:"is_primary"`
+	URL       string    `json:"url,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ProductMediaReferenceListResponse is the list envelope for product media references.
+type ProductMediaReferenceListResponse struct {
+	References []ProductMediaReference `json:"references"`
+}
+
+// ListProductMediaReferences lists media references attached to a product.
+func (c *Client) ListProductMediaReferences(ctx context.Context, subject, storeID, productID string) ([]ProductMediaReference, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/media-references", url.PathEscape(storeID), url.PathEscape(productID))
+	var res ProductMediaReferenceListResponse
+	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return res.References, nil
+}
+
+// AttachMediaReferenceRequest payload to attach a store asset to a product.
+type AttachMediaReferenceRequest struct {
+	AssetID   string `json:"asset_id"`
+	AltText   string `json:"alt_text"`
+	SortOrder int    `json:"sort_order"`
+	IsPrimary bool   `json:"is_primary"`
+}
+
+// AttachProductMediaReference attaches a store asset as a reference to a product.
+func (c *Client) AttachProductMediaReference(ctx context.Context, subject, storeID, productID string, req AttachMediaReferenceRequest) (*ProductMediaReference, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/media-references", url.PathEscape(storeID), url.PathEscape(productID))
+	var res ProductMediaReference
+	if err := c.post(ctx, path, req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// UpdateMediaReferenceRequest payload to edit reference metadata.
+type UpdateMediaReferenceRequest struct {
+	AltText   string `json:"alt_text"`
+	SortOrder int    `json:"sort_order"`
+	IsPrimary bool   `json:"is_primary"`
+}
+
+// UpdateProductMediaReference updates reference alt text, sort order, or primary flag.
+func (c *Client) UpdateProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string, req UpdateMediaReferenceRequest) (*ProductMediaReference, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/media-references/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(referenceID))
+	var res ProductMediaReference
+	if err := c.put(ctx, path, req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+// DetachProductMediaReference detaches a media reference from a product.
+func (c *Client) DetachProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string) error {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/media-references/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(referenceID))
+	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
+}

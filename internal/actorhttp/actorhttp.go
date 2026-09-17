@@ -145,6 +145,26 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 		httpx.WriteError(w, http.StatusConflict, "insufficient_inventory", "insufficient inventory")
 	case coreclient.CodeConflict:
 		httpx.WriteError(w, http.StatusConflict, "conflict", "conflict")
+	case coreclient.CodeStoreEntitlementExceeded:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeStoreEntitlementExceeded, "active store entitlement exceeded")
+	case coreclient.CodeUploadInProgress:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeUploadInProgress, "upload already in progress for this file")
+	case coreclient.CodeMediaInUse:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeMediaInUse, "media asset is currently referenced by a product")
+	case coreclient.CodeOfferUnavailable:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeOfferUnavailable, "supplier offer is unavailable")
+	case coreclient.CodeResourceInUse:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeResourceInUse, "resource is in use and cannot be modified or archived")
+	case coreclient.CodeIdempotencyConflict:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeIdempotencyConflict, "idempotency key conflict")
+	case coreclient.CodeChecksumMismatch:
+		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodeChecksumMismatch, "uploaded file checksum mismatch")
+	case coreclient.CodePublishNotReady:
+		msg := "listing publish readiness failed"
+		if coreErr.Message != "" {
+			msg = coreErr.Message
+		}
+		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodePublishNotReady, msg)
 	case coreclient.CodeUnauthorized:
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 	case coreclient.CodeForbidden:

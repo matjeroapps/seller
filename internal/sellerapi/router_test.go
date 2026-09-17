@@ -70,9 +70,9 @@ func (s *stubCore) UpdateSellerProfile(ctx context.Context, sellerID, subject st
 	return s.status, s.err
 }
 
-func (s *stubCore) ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) ([]coreclient.Store, error) {
+func (s *stubCore) ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) (*coreclient.SellerStoreListResponse, error) {
 	s.sellerID, s.subject, s.page = sellerID, subject, page
-	return s.stores, s.err
+	return &coreclient.SellerStoreListResponse{Items: s.stores, ActiveStoreLimit: 1, ActiveStoreCount: 1}, s.err
 }
 
 func (s *stubCore) CreateSellerStore(ctx context.Context, sellerID, subject string, create coreclient.StoreCreate) (coreclient.Store, error) {
@@ -85,14 +85,34 @@ func (s *stubCore) GetStore(ctx context.Context, storeID, subject string) (corec
 	return s.store, s.err
 }
 
+func (s *stubCore) UpdateStoreStatus(ctx context.Context, storeID, subject, status string) (*coreclient.Store, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.store, s.err
+}
+
 func (s *stubCore) ListSupplierCatalog(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error) {
 	s.storeID, s.subject, s.page = storeID, subject, filter.Page
 	return s.catalog, s.err
 }
 
+func (s *stubCore) ListStoreSupplierOffers(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error) {
+	s.storeID, s.subject, s.page = storeID, subject, filter.Page
+	return s.catalog, s.err
+}
+
+func (s *stubCore) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*coreclient.SellerListing, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.listing, s.err
+}
+
 func (s *stubCore) ListStoreListings(ctx context.Context, storeID, subject string, page coreclient.Page) ([]coreclient.SellerListing, error) {
 	s.storeID, s.subject, s.page = storeID, subject, page
 	return s.listings, s.err
+}
+
+func (s *stubCore) GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.listing, s.err
 }
 
 func (s *stubCore) ImportListing(ctx context.Context, storeID, subject string, importReq coreclient.ListingImport) (coreclient.SellerListing, error) {
@@ -103,6 +123,31 @@ func (s *stubCore) ImportListing(ctx context.Context, storeID, subject string, i
 func (s *stubCore) SetListingPrice(ctx context.Context, listingID, subject string, price coreclient.PriceUpdate) error {
 	s.subject = subject
 	return s.err
+}
+
+func (s *stubCore) SetStoreListingPrice(ctx context.Context, storeID, listingID, subject string, price coreclient.PriceUpdate) error {
+	s.storeID, s.subject = storeID, subject
+	return s.err
+}
+
+func (s *stubCore) GetStoreListingReadiness(ctx context.Context, storeID, listingID, subject string) (*coreclient.StructuredPublishReadiness, error) {
+	s.storeID, s.subject = storeID, subject
+	return &coreclient.StructuredPublishReadiness{IsReady: true}, s.err
+}
+
+func (s *stubCore) PublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.listing, s.err
+}
+
+func (s *stubCore) UnpublishStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.listing, s.err
+}
+
+func (s *stubCore) ArchiveStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.listing, s.err
 }
 
 func (s *stubCore) UpdateListingStatus(ctx context.Context, listingID, subject, status string) error {
@@ -172,6 +217,12 @@ func (s *stubCore) GetSellerProductDetail(ctx context.Context, subject, storeID,
 func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error) {
 	return &coreclient.SellerProductDetail{}, s.err
 }
+func (s *stubCore) TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error) {
+	return status, s.err
+}
+func (s *stubCore) ArchiveProduct(ctx context.Context, subject, storeID, productID string) error {
+	return s.err
+}
 func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }
@@ -194,6 +245,30 @@ func (s *stubCore) UpdateMedia(ctx context.Context, subject, storeID, productID,
 	return &coreclient.MediaMetadata{}, s.err
 }
 func (s *stubCore) DeleteMedia(ctx context.Context, subject, storeID, productID, mediaID string) error {
+	return s.err
+}
+func (s *stubCore) ListStoreMedia(ctx context.Context, subject, storeID, filename, contentType string, limit, offset int) (*coreclient.StoreMediaListResponse, error) {
+	return &coreclient.StoreMediaListResponse{}, s.err
+}
+func (s *stubCore) PresignStoreMediaUpload(ctx context.Context, subject, storeID string, req coreclient.PresignMediaUploadRequest) (*coreclient.PresignMediaUploadResponse, error) {
+	return &coreclient.PresignMediaUploadResponse{Mode: "upload"}, s.err
+}
+func (s *stubCore) CompleteStoreMediaUploadIntent(ctx context.Context, subject, storeID, intentID string, req coreclient.CompleteStoreMediaUploadRequest) (*coreclient.StoreMediaAsset, error) {
+	return &coreclient.StoreMediaAsset{}, s.err
+}
+func (s *stubCore) DeleteStoreMediaAsset(ctx context.Context, subject, storeID, assetID string) error {
+	return s.err
+}
+func (s *stubCore) ListProductMediaReferences(ctx context.Context, subject, storeID, productID string) ([]coreclient.ProductMediaReference, error) {
+	return nil, s.err
+}
+func (s *stubCore) AttachProductMediaReference(ctx context.Context, subject, storeID, productID string, req coreclient.AttachMediaReferenceRequest) (*coreclient.ProductMediaReference, error) {
+	return &coreclient.ProductMediaReference{}, s.err
+}
+func (s *stubCore) UpdateProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string, req coreclient.UpdateMediaReferenceRequest) (*coreclient.ProductMediaReference, error) {
+	return &coreclient.ProductMediaReference{}, s.err
+}
+func (s *stubCore) DetachProductMediaReference(ctx context.Context, subject, storeID, productID, referenceID string) error {
 	return s.err
 }
 func (s *stubCore) ListStoreLocations(ctx context.Context, subject, storeID string) ([]coreclient.StoreLocation, error) {
@@ -627,4 +702,95 @@ func TestGetSellerStorefrontHost(t *testing.T) {
 			t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
 		}
 	})
+}
+
+func TestStoreScopedCatalogAndRoleAuthorization(t *testing.T) {
+	t.Run("store status transition role check", func(t *testing.T) {
+		core := &stubCore{store: coreclient.Store{ID: "store-1", Status: "active"}}
+		handlerOwner := newHandlerWithRole(core, core, auth.RoleSellerOwner)
+		handlerStaff := newHandlerWithRole(core, core, auth.RoleSellerStaff)
+
+		recStaff := doRequest(t, handlerStaff, http.MethodPost, "/v1/seller/stores/store-1/status", `{"status":"active"}`)
+		if recStaff.Code != http.StatusForbidden {
+			t.Errorf("staff status change status = %d, want 403", recStaff.Code)
+		}
+
+		recOwner := doRequest(t, handlerOwner, http.MethodPost, "/v1/seller/stores/store-1/status", `{"status":"active"}`)
+		if recOwner.Code != http.StatusOK {
+			t.Errorf("owner status change status = %d, want 200", recOwner.Code)
+		}
+	})
+
+	t.Run("supplier offer browsing and import", func(t *testing.T) {
+		core := &stubCore{
+			catalog: []coreclient.SupplierCatalogItem{{OfferID: "offer-1"}},
+			listing: coreclient.SellerListing{ID: "lst-1"},
+		}
+		handler := newHandler(core, core)
+
+		recBrowse := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/supplier-offers", "")
+		if recBrowse.Code != http.StatusOK {
+			t.Errorf("browse status = %d, want 200", recBrowse.Code)
+		}
+
+		recImport := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/supplier-offers/offer-1/imports", "")
+		if recImport.Code != http.StatusCreated {
+			t.Errorf("import status = %d, want 201", recImport.Code)
+		}
+	})
+
+	t.Run("store listing publish unpublish and readiness", func(t *testing.T) {
+		core := &stubCore{listing: coreclient.SellerListing{ID: "lst-100", Status: "published"}}
+		handler := newHandler(core, core)
+
+		recReadiness := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/listings/lst-100/readiness", "")
+		if recReadiness.Code != http.StatusOK {
+			t.Errorf("readiness status = %d, want 200", recReadiness.Code)
+		}
+
+		recPub := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/listings/lst-100/publish", "")
+		if recPub.Code != http.StatusOK {
+			t.Errorf("publish status = %d, want 200", recPub.Code)
+		}
+
+		recUnpub := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/listings/lst-100/unpublish", "")
+		if recUnpub.Code != http.StatusOK {
+			t.Errorf("unpublish status = %d, want 200", recUnpub.Code)
+		}
+	})
+
+	t.Run("store media asset library presign and complete", func(t *testing.T) {
+		core := &stubCore{}
+		handler := newHandler(core, core)
+
+		presignBody := `{"client_upload_id":"u-1","filename":"test.jpg","content_type":"image/jpeg","size_bytes":100,"checksum_sha256":"1234567890123456789012345678901234567890123456789012345678901234"}`
+		recPresign := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/media/uploads", presignBody)
+		if recPresign.Code != http.StatusCreated {
+			t.Errorf("presign status = %d, want 201 (body %q)", recPresign.Code, recPresign.Body.String())
+		}
+
+		compBody := `{"upload_token":"token-1"}`
+		recComplete := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/media/uploads/intent-1/complete", compBody)
+		if recComplete.Code != http.StatusCreated {
+			t.Errorf("complete status = %d, want 201 (body %q)", recComplete.Code, recComplete.Body.String())
+		}
+	})
+}
+
+func newHandlerWithRole(core CoreCapabilities, themes ThemeCapabilities, role string) http.Handler {
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), auth.Principal{
+				Subject: testSubject,
+				Roles:   []string{role},
+			})))
+		})
+	})
+	router.Route("/v1", func(r chi.Router) {
+		RegisterSellerRoutes(Dependencies{Core: core})(r)
+		RegisterSellerThemeRoutes(ThemeDependencies{Themes: themes})(r)
+	})
+	return router
 }
