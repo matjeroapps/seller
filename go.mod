@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/chi/v5 v5.2.4
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	go.opentelemetry.io/otel v1.41.0
