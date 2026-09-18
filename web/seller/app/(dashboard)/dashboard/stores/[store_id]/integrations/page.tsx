@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
-import type { IntegrationConnection, ExternalEntityMapping } from '@/lib/api/types';
+import type { IntegrationConnection, ExternalEntityMapping, SellerSyncJob } from '@/lib/api/types';
 
 export default function StoreIntegrationsPage({
   params
@@ -14,8 +14,9 @@ export default function StoreIntegrationsPage({
 
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const [mappings, setMappings] = useState<ExternalEntityMapping[]>([]);
+  const [syncJobs, setSyncJobs] = useState<SellerSyncJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'CONNECTIONS' | 'MAPPINGS'>('CONNECTIONS');
+  const [activeTab, setActiveTab] = useState<'CONNECTIONS' | 'MAPPINGS' | 'SYNC_JOBS'>('CONNECTIONS');
   const [selectedConnection, setSelectedConnection] = useState<string>('');
   const [selectedEntityType, setSelectedEntityType] = useState<string>('product');
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -51,13 +52,27 @@ export default function StoreIntegrationsPage({
       });
   };
 
+  const fetchSyncJobs = () => {
+    sellerApi
+      .listStoreSyncJobs(store_id)
+      .then((res) => {
+        setSyncJobs(res.items || []);
+      })
+      .catch(() => {
+        setSyncJobs([]);
+      });
+  };
+
   useEffect(() => {
     fetchConnections();
+    fetchSyncJobs();
   }, [store_id]);
 
   useEffect(() => {
     if (activeTab === 'MAPPINGS' && selectedConnection) {
       fetchMappings();
+    } else if (activeTab === 'SYNC_JOBS') {
+      fetchSyncJobs();
     }
   }, [activeTab, selectedConnection, selectedEntityType]);
 
@@ -76,6 +91,15 @@ export default function StoreIntegrationsPage({
       });
   };
 
+  const handleTriggerSyncJob = (connectionId: string) => {
+    sellerApi
+      .createStoreSyncJob(store_id, { connection_id: connectionId, sync_type: 'full' })
+      .then(() => {
+        fetchSyncJobs();
+        setActiveTab('SYNC_JOBS');
+      });
+  };
+
   return (
     <div className="max-w-5xl space-y-6">
       {/* Header */}
@@ -83,7 +107,7 @@ export default function StoreIntegrationsPage({
         <div>
           <h1 className="text-xl font-bold text-slate-900">External Integration Foundation</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage provider sync connections (Salla, Shopify, WooCommerce, EasyOrders, Custom API) and inspect entity mapping status.
+            Manage provider sync connections (Salla, Shopify, WooCommerce, EasyOrders, Custom API), trigger channel sync jobs, and inspect entity mapping status.
           </p>
         </div>
         <button
@@ -98,7 +122,7 @@ export default function StoreIntegrationsPage({
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        {(['CONNECTIONS', 'MAPPINGS'] as const).map((tab) => (
+        {(['CONNECTIONS', 'MAPPINGS', 'SYNC_JOBS'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -109,7 +133,7 @@ export default function StoreIntegrationsPage({
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {tab}
+            {tab.replace('_', ' ')}
           </button>
         ))}
       </div>
@@ -155,13 +179,20 @@ export default function StoreIntegrationsPage({
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                   <span>Provider: <strong className="text-slate-700 uppercase">{conn.provider}</strong></span>
-                  <span>Connected: {new Date(conn.created_at).toLocaleDateString()}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerSyncJob(conn.id)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-medium transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Trigger Sync Job
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )
-      ) : (
+      ) : activeTab === 'MAPPINGS' ? (
         /* MAPPINGS TAB */
         <div className="space-y-4">
           <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-4 text-xs">
@@ -248,6 +279,73 @@ export default function StoreIntegrationsPage({
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        /* SYNC JOBS TAB */
+        <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-slate-600" />
+              Channel Sync Job Log
+            </h2>
+            <button
+              type="button"
+              onClick={fetchSyncJobs}
+              className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh Jobs
+            </button>
+          </div>
+
+          {syncJobs.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500">
+              No channel sync jobs recorded yet for this store.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 text-slate-700 font-medium">
+                  <tr>
+                    <th className="p-2.5">Job ID</th>
+                    <th className="p-2.5">Connection ID</th>
+                    <th className="p-2.5">Sync Type</th>
+                    <th className="p-2.5">Status</th>
+                    <th className="p-2.5">Processed / Total</th>
+                    <th className="p-2.5">Created At</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {syncJobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-slate-50">
+                      <td className="p-2.5 font-mono text-[11px] text-slate-900 font-semibold">{job.id}</td>
+                      <td className="p-2.5 font-mono text-[11px] text-slate-500">{job.connection_id}</td>
+                      <td className="p-2.5 uppercase text-slate-700">{job.sync_type || 'FULL'}</td>
+                      <td className="p-2.5">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                            job.status === 'COMPLETED'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : job.status === 'RUNNING'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+                              : job.status === 'FAILED'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {job.status}
+                        </span>
+                      </td>
+                      <td className="p-2.5 font-mono text-[11px]">
+                        {job.processed_items} / {job.total_items} {job.failed_items > 0 && <span className="text-rose-600">({job.failed_items} failed)</span>}
+                      </td>
+                      <td className="p-2.5 text-slate-400">{new Date(job.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
