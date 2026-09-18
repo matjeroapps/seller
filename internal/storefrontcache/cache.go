@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/i18n"
+	"seller/internal/coreclient"
+	"seller/internal/i18n"
 )
 
 // schemaVersion namespaces every key produced by this package.

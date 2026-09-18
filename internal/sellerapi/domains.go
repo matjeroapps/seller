@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/actorhttp"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/actorhttp"
+	"seller/internal/coreclient"
+	"seller/internal/httpx"
 )
 
 // DomainCapabilities describes the Core domain operations required by seller routes.

@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/matjeroapps/seller/internal/config"
+	"seller/internal/config"
 )
 
 type Shutdown func(context.Context) error

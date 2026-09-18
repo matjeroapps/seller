@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matjeroapps/seller/internal/money"
+	"seller/internal/money"
 )
 
 // Seller DTOs. These are Seller-owned wire shapes for Core-owned business data.

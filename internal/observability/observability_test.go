@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/matjeroapps/seller/internal/config"
-	"github.com/matjeroapps/seller/internal/observability"
+	"seller/internal/config"
+	"seller/internal/observability"
 )
 
 func TestInit(t *testing.T) {

@@ -7,7 +7,7 @@
 package markets
 
 import (
-	"github.com/matjeroapps/seller/internal/i18n"
+	"seller/internal/i18n"
 )
 
 // Country is a market's country reference data.

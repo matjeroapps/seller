@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/i18n"
+	"seller/internal/coreclient"
+	"seller/internal/i18n"
 )
 
 // mockStore is a simple in-memory store for testing.

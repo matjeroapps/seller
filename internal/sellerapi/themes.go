@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/actorhttp"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/actorhttp"
+	"seller/internal/coreclient"
+	"seller/internal/httpx"
 )
 
 // ThemeCapabilities are the Core theme calls the seller routes depend on. The

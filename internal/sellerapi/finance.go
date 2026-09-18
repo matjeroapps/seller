@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/httpx"
 )
 
 func (deps Dependencies) handleGetStoreBalance(w http.ResponseWriter, r *http.Request) {

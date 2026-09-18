@@ -1,7 +1,7 @@
 package sellerapi
 
 import (
-	"github.com/matjeroapps/seller/internal/coreclient"
+	"seller/internal/coreclient"
 )
 
 // Public request and response contracts for the Seller API.

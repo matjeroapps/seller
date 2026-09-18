@@ -17,9 +17,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/auth"
+	"seller/internal/coreclient"
+	"seller/internal/httpx"
 )
 
 // Page carries the normalised pagination window parsed from a request.

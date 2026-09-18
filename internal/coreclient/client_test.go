@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/httpx"
 )
 
 // These tests exercise the client against a local stub Core server. They need no
