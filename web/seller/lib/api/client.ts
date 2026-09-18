@@ -1,6 +1,8 @@
 import type {
   CreateShipmentPayload,
+  ExternalEntityMapping,
   InitializePaymentPayload,
+  IntegrationConnection,
   InventorySnapshot,
   LedgerEntry,
   MediaPresignResponse,
@@ -321,6 +323,25 @@ export const sellerApi = {
 
   async listStorePayouts(storeId: string): Promise<{ items: Payout[] }> {
     return request<{ items: Payout[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/payouts`);
+  },
+
+  // Integrations
+  async listStoreConnections(storeId: string): Promise<{ items: IntegrationConnection[] }> {
+    return request<{ items: IntegrationConnection[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/connections`);
+  },
+
+  async createStoreConnection(storeId: string, data: { provider: string; name: string; credentials_vault_ref?: string; settings?: Record<string, unknown> }): Promise<IntegrationConnection> {
+    return request<IntegrationConnection>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/connections`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async listStoreEntityMappings(storeId: string, connectionId: string, entityType: string): Promise<{ items: ExternalEntityMapping[] }> {
+    return request<{ items: ExternalEntityMapping[] }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/mappings?connection_id=${encodeURIComponent(connectionId)}&entity_type=${encodeURIComponent(entityType)}`
+    );
   }
 };
+
 
