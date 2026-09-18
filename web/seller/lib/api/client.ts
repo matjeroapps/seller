@@ -2,14 +2,18 @@ import type {
   CreateShipmentPayload,
   InitializePaymentPayload,
   InventorySnapshot,
+  LedgerEntry,
   MediaPresignResponse,
   Payment,
+  Payout,
   Product,
   ProductMediaReference,
   SellerListing,
   SellerStoreListResponse,
+  Settlement,
   Shipment,
   Store,
+  StoreBalance,
   StoreMediaAsset,
   StructuredPublishReadiness,
   SupplierCatalogItem,
@@ -300,5 +304,23 @@ export const sellerApi = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  // Finance & Ledger
+  async getStoreBalance(storeId: string): Promise<StoreBalance> {
+    return request<StoreBalance>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/balance`);
+  },
+
+  async listStoreLedgerEntries(storeId: string): Promise<{ items: LedgerEntry[] }> {
+    return request<{ items: LedgerEntry[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/ledger`);
+  },
+
+  async listStoreSettlements(storeId: string): Promise<{ items: Settlement[] }> {
+    return request<{ items: Settlement[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/settlements`);
+  },
+
+  async listStorePayouts(storeId: string): Promise<{ items: Payout[] }> {
+    return request<{ items: Payout[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/payouts`);
   }
 };
+

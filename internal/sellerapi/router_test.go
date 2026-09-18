@@ -347,6 +347,26 @@ func (s *stubCore) UpdatePaymentStatus(ctx context.Context, subject, paymentID s
 	return &coreclient.PaymentResponse{ID: paymentID, Status: req.Status}, s.err
 }
 
+func (s *stubCore) GetStoreBalance(ctx context.Context, subject, storeID string) (*coreclient.StoreBalanceResponse, error) {
+	s.subject = subject
+	return &coreclient.StoreBalanceResponse{AvailableMinor: 150000, PendingMinor: 25000, Currency: "SAR"}, s.err
+}
+
+func (s *stubCore) ListStoreLedgerEntries(ctx context.Context, subject, storeID string) ([]coreclient.LedgerEntryResponse, error) {
+	s.subject = subject
+	return []coreclient.LedgerEntryResponse{{ID: "ent-1", ReferenceType: "ORDER", ReferenceID: "ord-1", Currency: "SAR"}}, s.err
+}
+
+func (s *stubCore) ListStoreSettlements(ctx context.Context, subject, storeID string) ([]coreclient.SettlementResponse, error) {
+	s.subject = subject
+	return []coreclient.SettlementResponse{{ID: "stl-1", AccountID: storeID, NetAmountMinor: 145000, Currency: "SAR", Status: "CALCULATED"}}, s.err
+}
+
+func (s *stubCore) ListStorePayouts(ctx context.Context, subject, storeID string) ([]coreclient.PayoutResponse, error) {
+	s.subject = subject
+	return []coreclient.PayoutResponse{{ID: "po-1", StoreID: storeID, AmountMinor: 100000, Currency: "SAR", Status: "DISBURSED"}}, s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()
@@ -897,6 +917,39 @@ func TestStorePaymentOperations(t *testing.T) {
 		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/payments/pay-1/status", body)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("update payment status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestStoreFinancialOperations(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	t.Run("get store balance", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/finance/balance", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("get store balance status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list store ledger entries", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/finance/ledger", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store ledger entries status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list store settlements", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/finance/settlements", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store settlements status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list store payouts", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/finance/payouts", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store payouts status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
 		}
 	})
 }
