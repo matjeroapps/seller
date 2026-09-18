@@ -387,6 +387,21 @@ func (s *stubCore) ListEntityMappings(ctx context.Context, subject, connectionID
 	return []coreclient.EntityMappingResponse{{ID: "map_test_1", ConnectionID: connectionID, EntityType: entityType, InternalID: "int_1", ExternalID: "ext_1", MappingStatus: "synced"}}, s.err
 }
 
+func (s *stubCore) CreateSellerSyncJob(ctx context.Context, subject, connectionID, storeID, syncType string) (*coreclient.SellerSyncJobResponse, error) {
+	s.storeID, s.subject = storeID, subject
+	return &coreclient.SellerSyncJobResponse{ID: "job_test_1", StoreID: storeID, ConnectionID: connectionID, SyncType: syncType, Status: "PENDING"}, s.err
+}
+
+func (s *stubCore) GetSellerSyncJob(ctx context.Context, subject, jobID string) (*coreclient.SellerSyncJobResponse, error) {
+	s.subject = subject
+	return &coreclient.SellerSyncJobResponse{ID: jobID, StoreID: "store-1", ConnectionID: "conn-1", SyncType: "full", Status: "COMPLETED"}, s.err
+}
+
+func (s *stubCore) ListSellerSyncJobs(ctx context.Context, subject, storeID string) ([]coreclient.SellerSyncJobResponse, error) {
+	s.storeID, s.subject = storeID, subject
+	return []coreclient.SellerSyncJobResponse{{ID: "job_test_1", StoreID: storeID, ConnectionID: "conn-1", SyncType: "full", Status: "PENDING"}}, s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()
@@ -997,6 +1012,28 @@ func TestStoreIntegrationOperations(t *testing.T) {
 		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/mappings?connection_id=conn-1&entity_type=product", "")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("list store entity mappings status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list store sync jobs", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/sync-jobs", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store sync jobs status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("create store sync job", func(t *testing.T) {
+		body := `{"connection_id":"conn-1","sync_type":"full"}`
+		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/integrations/sync-jobs", body)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create store sync job status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("get store sync job", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/sync-jobs/job-1", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("get store sync job status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
 		}
 	})
 }

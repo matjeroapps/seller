@@ -91,3 +91,59 @@ func (c *Client) ListEntityMappings(ctx context.Context, subject, connectionID, 
 	}
 	return res.Items, nil
 }
+
+type SellerSyncJobResponse struct {
+	ID             string     `json:"id"`
+	StoreID        string     `json:"store_id"`
+	ConnectionID   string     `json:"connection_id"`
+	SyncType       string     `json:"sync_type"`
+	Status         string     `json:"status"`
+	TotalItems     int        `json:"total_items"`
+	ProcessedItems int        `json:"processed_items"`
+	FailedItems    int        `json:"failed_items"`
+	ErrorSummary   string     `json:"error_summary,omitempty"`
+	StartedAt      *time.Time `json:"started_at,omitempty"`
+	CompletedAt    *time.Time `json:"completed_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type CreateSellerSyncJobPayload struct {
+	ConnectionID string `json:"connection_id"`
+	StoreID      string `json:"store_id"`
+	SyncType     string `json:"sync_type,omitempty"`
+}
+
+func (c *Client) CreateSellerSyncJob(ctx context.Context, subject, connectionID, storeID, syncType string) (*SellerSyncJobResponse, error) {
+	req := CreateSellerSyncJobPayload{
+		ConnectionID: connectionID,
+		StoreID:      storeID,
+		SyncType:     syncType,
+	}
+	var res SellerSyncJobResponse
+	if err := c.post(ctx, "/internal/v1/integrations/sellers/sync-jobs", req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, fmt.Errorf("create seller sync job: %w", err)
+	}
+	return &res, nil
+}
+
+func (c *Client) GetSellerSyncJob(ctx context.Context, subject, jobID string) (*SellerSyncJobResponse, error) {
+	path := fmt.Sprintf("/internal/v1/integrations/sellers/sync-jobs/%s", url.PathEscape(jobID))
+	var res SellerSyncJobResponse
+	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, fmt.Errorf("get seller sync job: %w", err)
+	}
+	return &res, nil
+}
+
+func (c *Client) ListSellerSyncJobs(ctx context.Context, subject, storeID string) ([]SellerSyncJobResponse, error) {
+	query := url.Values{}
+	if storeID != "" {
+		query.Set("store_id", storeID)
+	}
+	var res CoreCollectionResponse[SellerSyncJobResponse]
+	if err := c.get(ctx, "/internal/v1/integrations/sellers/sync-jobs", query, requestOptions{Subject: subject}, &res); err != nil {
+		return []SellerSyncJobResponse{}, nil
+	}
+	return res.Items, nil
+}

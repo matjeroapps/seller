@@ -88,3 +88,71 @@ func (deps Dependencies) handleListStoreEntityMappings(w http.ResponseWriter, r 
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": mappings})
 }
+
+type createStoreSyncJobPayload struct {
+	ConnectionID string `json:"connection_id"`
+	SyncType     string `json:"sync_type,omitempty"`
+}
+
+func (deps Dependencies) handleCreateStoreSyncJob(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+
+	var body createStoreSyncJobPayload
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+
+	job, err := deps.Core.CreateSellerSyncJob(r.Context(), subject, body.ConnectionID, storeID, body.SyncType)
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusCreated, job)
+}
+
+func (deps Dependencies) handleGetStoreSyncJob(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	jobID := chi.URLParam(r, "id")
+
+	job, err := deps.Core.GetSellerSyncJob(r.Context(), subject, jobID)
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"error": "sync job not found"})
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, job)
+}
+
+func (deps Dependencies) handleListStoreSyncJobs(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+
+	jobs, err := deps.Core.ListSellerSyncJobs(r.Context(), subject, storeID)
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": jobs})
+}

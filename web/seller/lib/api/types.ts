@@ -298,4 +298,21 @@ export interface ExternalEntityMapping {
   updated_at: string;
 }
 
+export interface SellerSyncJob {
+  id: string;
+  store_id: string;
+  connection_id: string;
+  sync_type: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  total_items: number;
+  processed_items: number;
+  failed_items: number;
+  error_summary?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+
 

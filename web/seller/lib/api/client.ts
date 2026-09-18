@@ -12,6 +12,7 @@ import type {
   ProductMediaReference,
   SellerListing,
   SellerStoreListResponse,
+  SellerSyncJob,
   Settlement,
   Shipment,
   Store,
@@ -341,7 +342,19 @@ export const sellerApi = {
     return request<{ items: ExternalEntityMapping[] }>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/mappings?connection_id=${encodeURIComponent(connectionId)}&entity_type=${encodeURIComponent(entityType)}`
     );
+  },
+
+  async listStoreSyncJobs(storeId: string): Promise<{ items: SellerSyncJob[] }> {
+    return request<{ items: SellerSyncJob[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/sync-jobs`);
+  },
+
+  async createStoreSyncJob(storeId: string, data: { connection_id: string; sync_type?: string }): Promise<SellerSyncJob> {
+    return request<SellerSyncJob>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/sync-jobs`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 };
+
 
 
