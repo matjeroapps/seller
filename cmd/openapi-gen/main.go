@@ -7,7 +7,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/matjeroapps/seller/internal/openapi"
+	"seller/internal/openapi"
 )
 
 func main() {

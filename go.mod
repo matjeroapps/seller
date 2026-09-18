@@ -1,4 +1,4 @@
-module github.com/matjeroapps/seller
+module seller
 
 go 1.26
 

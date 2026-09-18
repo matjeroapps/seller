@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/i18n"
-	"github.com/matjeroapps/seller/internal/markets"
+	"seller/internal/auth"
+	"seller/internal/coreclient"
+	"seller/internal/i18n"
+	"seller/internal/markets"
 )
 
 func TestRouterBootstrapIncludesPrincipalAndLocale(t *testing.T) {

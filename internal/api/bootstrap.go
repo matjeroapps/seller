@@ -1,9 +1,9 @@
 package api
 
 import (
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/i18n"
-	"github.com/matjeroapps/seller/internal/markets"
+	"seller/internal/auth"
+	"seller/internal/i18n"
+	"seller/internal/markets"
 )
 
 type Bootstrap struct {

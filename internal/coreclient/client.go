@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matjeroapps/seller/internal/httpx"
+	"seller/internal/httpx"
 )
 
 // Header names of the internal service contract. The client sets them on every

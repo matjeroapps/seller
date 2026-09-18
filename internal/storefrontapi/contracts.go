@@ -1,7 +1,7 @@
 package storefrontapi
 
 import (
-	"github.com/matjeroapps/seller/internal/coreclient"
+	"seller/internal/coreclient"
 )
 
 // Public API response contracts. They are declared here rather than reusing Core

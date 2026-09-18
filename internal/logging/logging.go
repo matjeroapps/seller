@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/matjeroapps/seller/internal/config"
+	"seller/internal/config"
 )
 
 func New(cfg config.Config) *slog.Logger {

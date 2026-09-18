@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/matjeroapps/seller/internal/i18n"
-	"github.com/matjeroapps/seller/internal/money"
+	"seller/internal/i18n"
+	"seller/internal/money"
 )
 
 // Storefront DTOs.

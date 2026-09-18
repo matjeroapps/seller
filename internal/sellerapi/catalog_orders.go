@@ -5,11 +5,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/matjeroapps/seller/internal/actorhttp"
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/httpx"
-	"github.com/matjeroapps/seller/internal/money"
+	"seller/internal/actorhttp"
+	"seller/internal/auth"
+	"seller/internal/coreclient"
+	"seller/internal/httpx"
+	"seller/internal/money"
 )
 
 const (

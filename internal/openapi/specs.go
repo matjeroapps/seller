@@ -5,10 +5,10 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/matjeroapps/seller/internal/contracts"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/sellerapi"
-	"github.com/matjeroapps/seller/internal/storefrontapi"
+	"seller/internal/contracts"
+	"seller/internal/coreclient"
+	"seller/internal/sellerapi"
+	"seller/internal/storefrontapi"
 )
 
 func BuildSellerSpec() (*openapi3.T, error) {

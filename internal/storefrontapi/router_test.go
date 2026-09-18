@@ -10,11 +10,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/config"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/i18n"
-	"github.com/matjeroapps/seller/internal/money"
-	"github.com/matjeroapps/seller/internal/storefrontcache"
+	"seller/internal/config"
+	"seller/internal/coreclient"
+	"seller/internal/i18n"
+	"seller/internal/money"
+	"seller/internal/storefrontcache"
 )
 
 // These tests prove the Seller storefront's transport and BFF behaviour against a

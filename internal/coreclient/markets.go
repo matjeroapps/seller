@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/matjeroapps/seller/internal/i18n"
-	"github.com/matjeroapps/seller/internal/markets"
+	"seller/internal/i18n"
+	"seller/internal/markets"
 )
 
 // MarketsResponse is the Core market collection envelope.

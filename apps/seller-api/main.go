@@ -12,15 +12,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/actorapi"
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/config"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/httpx"
-	"github.com/matjeroapps/seller/internal/logging"
-	"github.com/matjeroapps/seller/internal/observability"
-	"github.com/matjeroapps/seller/internal/openapi"
-	"github.com/matjeroapps/seller/internal/sellerapi"
+	"seller/internal/actorapi"
+	"seller/internal/auth"
+	"seller/internal/config"
+	"seller/internal/coreclient"
+	"seller/internal/httpx"
+	"seller/internal/logging"
+	"seller/internal/observability"
+	"seller/internal/openapi"
+	"seller/internal/sellerapi"
 )
 
 func main() {

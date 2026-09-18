@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/matjeroapps/seller/internal/auth"
-	"github.com/matjeroapps/seller/internal/coreclient"
-	"github.com/matjeroapps/seller/internal/i18n"
+	"seller/internal/auth"
+	"seller/internal/coreclient"
+	"seller/internal/i18n"
 )
 
 type stubDomainsCore struct {
