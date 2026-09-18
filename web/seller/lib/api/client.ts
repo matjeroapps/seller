@@ -1,15 +1,21 @@
 import type {
   CreateShipmentPayload,
+  ExternalEntityMapping,
   InitializePaymentPayload,
+  IntegrationConnection,
   InventorySnapshot,
+  LedgerEntry,
   MediaPresignResponse,
   Payment,
+  Payout,
   Product,
   ProductMediaReference,
   SellerListing,
   SellerStoreListResponse,
+  Settlement,
   Shipment,
   Store,
+  StoreBalance,
   StoreMediaAsset,
   StructuredPublishReadiness,
   SupplierCatalogItem,
@@ -300,5 +306,42 @@ export const sellerApi = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  // Finance & Ledger
+  async getStoreBalance(storeId: string): Promise<StoreBalance> {
+    return request<StoreBalance>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/balance`);
+  },
+
+  async listStoreLedgerEntries(storeId: string): Promise<{ items: LedgerEntry[] }> {
+    return request<{ items: LedgerEntry[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/ledger`);
+  },
+
+  async listStoreSettlements(storeId: string): Promise<{ items: Settlement[] }> {
+    return request<{ items: Settlement[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/settlements`);
+  },
+
+  async listStorePayouts(storeId: string): Promise<{ items: Payout[] }> {
+    return request<{ items: Payout[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/payouts`);
+  },
+
+  // Integrations
+  async listStoreConnections(storeId: string): Promise<{ items: IntegrationConnection[] }> {
+    return request<{ items: IntegrationConnection[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/connections`);
+  },
+
+  async createStoreConnection(storeId: string, data: { provider: string; name: string; credentials_vault_ref?: string; settings?: Record<string, unknown> }): Promise<IntegrationConnection> {
+    return request<IntegrationConnection>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/connections`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async listStoreEntityMappings(storeId: string, connectionId: string, entityType: string): Promise<{ items: ExternalEntityMapping[] }> {
+    return request<{ items: ExternalEntityMapping[] }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/mappings?connection_id=${encodeURIComponent(connectionId)}&entity_type=${encodeURIComponent(entityType)}`
+    );
   }
 };
+
+

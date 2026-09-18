@@ -89,6 +89,16 @@ type CoreCapabilities interface {
 	GetPayment(ctx context.Context, subject, paymentID string) (*coreclient.PaymentResponse, error)
 	GetOrderPayment(ctx context.Context, subject, orderID string) (*coreclient.PaymentResponse, error)
 	UpdatePaymentStatus(ctx context.Context, subject, paymentID string, req coreclient.UpdatePaymentStatusRequest) (*coreclient.PaymentResponse, error)
+
+	GetStoreBalance(ctx context.Context, subject, storeID string) (*coreclient.StoreBalanceResponse, error)
+	ListStoreLedgerEntries(ctx context.Context, subject, storeID string) ([]coreclient.LedgerEntryResponse, error)
+	ListStoreSettlements(ctx context.Context, subject, storeID string) ([]coreclient.SettlementResponse, error)
+	ListStorePayouts(ctx context.Context, subject, storeID string) ([]coreclient.PayoutResponse, error)
+
+	CreateConnection(ctx context.Context, subject string, req coreclient.CreateConnectionPayload) (*coreclient.ConnectionResponse, error)
+	ListConnections(ctx context.Context, subject, actorType, actorID string) ([]coreclient.ConnectionResponse, error)
+	UpsertEntityMapping(ctx context.Context, subject string, req coreclient.UpsertEntityMappingPayload) (*coreclient.EntityMappingResponse, error)
+	ListEntityMappings(ctx context.Context, subject, connectionID, entityType string) ([]coreclient.EntityMappingResponse, error)
 }
 
 // Dependencies wires the seller routes.
@@ -182,6 +192,17 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleGetOrderPayment)
 		r.Get("/seller/stores/{store_id}/payments/{payment_id}", deps.handleGetPayment)
 		r.Post("/seller/stores/{store_id}/payments/{payment_id}/status", deps.handleUpdatePaymentStatus)
+
+		// Store-Scoped Financial Operations
+		r.Get("/seller/stores/{store_id}/finance/balance", deps.handleGetStoreBalance)
+		r.Get("/seller/stores/{store_id}/finance/ledger", deps.handleListStoreLedgerEntries)
+		r.Get("/seller/stores/{store_id}/finance/settlements", deps.handleListStoreSettlements)
+		r.Get("/seller/stores/{store_id}/finance/payouts", deps.handleListStorePayouts)
+
+		// Store-Scoped Integration Operations
+		r.Get("/seller/stores/{store_id}/integrations/connections", deps.handleListStoreConnections)
+		r.Post("/seller/stores/{store_id}/integrations/connections", deps.handleCreateStoreConnection)
+		r.Get("/seller/stores/{store_id}/integrations/mappings", deps.handleListStoreEntityMappings)
 
 		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
 	}

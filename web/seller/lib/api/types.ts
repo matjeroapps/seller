@@ -216,3 +216,86 @@ export interface ApiErrorResponse {
     message: string;
   };
 }
+
+export interface StoreBalance {
+  available_minor: number;
+  pending_minor: number;
+  currency: string;
+  updated_at: string;
+}
+
+export interface JournalLine {
+  id: string;
+  journal_entry_id: string;
+  account_id: string;
+  debit_amount_minor: number;
+  credit_amount_minor: number;
+  created_at: string;
+}
+
+export interface LedgerEntry {
+  id: string;
+  reference_type: string;
+  reference_id: string;
+  description?: string;
+  currency: string;
+  posted_at: string;
+  created_at: string;
+  lines?: JournalLine[];
+}
+
+export interface Settlement {
+  id: string;
+  settlement_period_id: string;
+  account_id: string;
+  currency: string;
+  gross_amount_minor: number;
+  adjustment_amount_minor: number;
+  net_amount_minor: number;
+  status: string;
+  created_at: string;
+  calculated_at?: string;
+  finalized_at?: string;
+}
+
+export interface Payout {
+  id: string;
+  store_id: string;
+  amount_minor: number;
+  currency: string;
+  status: string;
+  payout_method: string;
+  reference?: string;
+  created_at: string;
+}
+
+export interface IntegrationConnection {
+  id: string;
+  actor_type: string;
+  actor_id: string;
+  provider: 'salla' | 'shopify' | 'woocommerce' | 'easyorders' | 'custom_api';
+  name: string;
+  status: 'active' | 'paused' | 'error' | 'disconnected';
+  credentials_vault_ref?: string;
+  settings?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalEntityMapping {
+  id: string;
+  connection_id: string;
+  entity_type: 'product' | 'variant' | 'inventory' | 'order' | 'fulfillment' | 'customer';
+  internal_id: string;
+  external_id: string;
+  external_version?: string;
+  mapping_status: 'synced' | 'pending' | 'conflict' | 'error';
+  sync_direction: 'inbound' | 'outbound' | 'bidirectional';
+  conflict_status?: string;
+  metadata?: Record<string, unknown>;
+  last_synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+
