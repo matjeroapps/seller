@@ -1,14 +1,20 @@
 import type {
+  CreateShipmentPayload,
+  InitializePaymentPayload,
   InventorySnapshot,
   MediaPresignResponse,
+  Payment,
   Product,
   ProductMediaReference,
   SellerListing,
   SellerStoreListResponse,
+  Shipment,
   Store,
   StoreMediaAsset,
   StructuredPublishReadiness,
-  SupplierCatalogItem
+  SupplierCatalogItem,
+  UpdatePaymentStatusPayload,
+  UpdateShipmentStatusPayload
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
@@ -245,6 +251,52 @@ export const sellerApi = {
     data: { fulfillment_location_id: string; sku_id: string; qty_delta: number; idempotency_key?: string }
   ): Promise<InventorySnapshot> {
     return request<InventorySnapshot>(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory/adjustments`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  // Shipping
+  async createShipment(storeId: string, orderId: string, data: CreateShipmentPayload): Promise<Shipment> {
+    return request<Shipment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/shipments`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async listOrderShipments(storeId: string, orderId: string): Promise<{ shipments: Shipment[] }> {
+    return request<{ shipments: Shipment[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/shipments`);
+  },
+
+  async getShipment(storeId: string, shipmentId: string): Promise<Shipment> {
+    return request<Shipment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/shipments/${encodeURIComponent(shipmentId)}`);
+  },
+
+  async updateShipmentStatus(storeId: string, shipmentId: string, data: UpdateShipmentStatusPayload): Promise<Shipment> {
+    return request<Shipment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/shipments/${encodeURIComponent(shipmentId)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
+  // Payments
+  async initializeOrderPayment(storeId: string, orderId: string, data: InitializePaymentPayload): Promise<Payment> {
+    return request<Payment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getOrderPayment(storeId: string, orderId: string): Promise<Payment> {
+    return request<Payment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/payments`);
+  },
+
+  async getPayment(storeId: string, paymentId: string): Promise<Payment> {
+    return request<Payment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/payments/${encodeURIComponent(paymentId)}`);
+  },
+
+  async updatePaymentStatus(storeId: string, paymentId: string, data: UpdatePaymentStatusPayload): Promise<Payment> {
+    return request<Payment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/payments/${encodeURIComponent(paymentId)}/status`, {
       method: 'POST',
       body: JSON.stringify(data)
     });

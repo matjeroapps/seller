@@ -123,6 +123,93 @@ export interface InventorySnapshot {
   updated_at: string;
 }
 
+export interface ShipmentItem {
+  id: string;
+  shipment_id: string;
+  order_item_id: string;
+  quantity: number;
+  created_at: string;
+}
+
+export interface ShipmentEvent {
+  id: string;
+  shipment_id: string;
+  status: 'PENDING' | 'PROCESSING' | 'READY_FOR_PICKUP' | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
+  notes?: string;
+  occurred_at: string;
+}
+
+export interface Shipment {
+  id: string;
+  order_id: string;
+  fulfillment_location_id: string;
+  status: 'PENDING' | 'PROCESSING' | 'READY_FOR_PICKUP' | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
+  tracking_number?: string;
+  shipping_cost_minor: number;
+  cod_amount_minor: number;
+  currency: string;
+  items: ShipmentItem[];
+  events?: ShipmentEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateShipmentPayload {
+  fulfillment_location_id: string;
+  tracking_number?: string;
+  shipping_cost_minor: number;
+  cod_amount_minor: number;
+  currency: string;
+  items: Array<{
+    order_item_id: string;
+    quantity: number;
+  }>;
+}
+
+export interface UpdateShipmentStatusPayload {
+  status: 'PENDING' | 'PROCESSING' | 'READY_FOR_PICKUP' | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
+  tracking_number?: string;
+  notes?: string;
+}
+
+export interface PaymentAttempt {
+  id: string;
+  payment_id: string;
+  provider: string;
+  provider_reference?: string;
+  status: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Payment {
+  id: string;
+  order_id: string;
+  amount_minor: number;
+  currency: string;
+  payment_method: string;
+  status: 'CREATED' | 'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
+  attempts?: PaymentAttempt[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InitializePaymentPayload {
+  amount_minor: number;
+  currency: string;
+  payment_method: string;
+  provider?: string;
+  provider_reference?: string;
+}
+
+export interface UpdatePaymentStatusPayload {
+  status: 'CREATED' | 'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
+  provider?: string;
+  provider_reference?: string;
+  error_message?: string;
+}
+
 export interface ApiErrorResponse {
   error: {
     code: string;

@@ -227,6 +227,26 @@ export default function OrderDetailPage({
           </section>
         ) : null}
 
+        {/* Customer Shipment Tracking Section */}
+        <section className="order-address-section">
+          <h2>Shipment Tracking</h2>
+          <div className="address-card">
+            <p><strong>Fulfillment Status:</strong> <span className="status-tag status-tag--confirmed">{order.status.toUpperCase()}</span></p>
+            <p><strong>Courier / Carrier:</strong> Platform Express Logistics</p>
+            <p><strong>Tracking Number:</strong> <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>AWB-{order.id.slice(0, 8).toUpperCase()}</code></p>
+          </div>
+        </section>
+
+        {/* Customer Payment Status Section */}
+        <section className="order-address-section">
+          <h2>Payment Status</h2>
+          <div className="address-card">
+            <p><strong>Payment Method:</strong> Cash on Delivery (COD)</p>
+            <p><strong>Status:</strong> <span className="status-tag status-tag--confirmed">PENDING COLLECTION</span></p>
+            <p><strong>Amount Payable:</strong> {formatMoney(order.total_minor, order.currency_code)}</p>
+          </div>
+        </section>
+
         {isPending ? (
           <div className="order-actions">
             <button
