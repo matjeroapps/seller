@@ -269,3 +269,33 @@ export interface Payout {
   created_at: string;
 }
 
+export interface IntegrationConnection {
+  id: string;
+  actor_type: string;
+  actor_id: string;
+  provider: 'salla' | 'shopify' | 'woocommerce' | 'easyorders' | 'custom_api';
+  name: string;
+  status: 'active' | 'paused' | 'error' | 'disconnected';
+  credentials_vault_ref?: string;
+  settings?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalEntityMapping {
+  id: string;
+  connection_id: string;
+  entity_type: 'product' | 'variant' | 'inventory' | 'order' | 'fulfillment' | 'customer';
+  internal_id: string;
+  external_id: string;
+  external_version?: string;
+  mapping_status: 'synced' | 'pending' | 'conflict' | 'error';
+  sync_direction: 'inbound' | 'outbound' | 'bidirectional';
+  conflict_status?: string;
+  metadata?: Record<string, unknown>;
+  last_synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+

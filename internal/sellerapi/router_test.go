@@ -367,6 +367,26 @@ func (s *stubCore) ListStorePayouts(ctx context.Context, subject, storeID string
 	return []coreclient.PayoutResponse{{ID: "po-1", StoreID: storeID, AmountMinor: 100000, Currency: "SAR", Status: "DISBURSED"}}, s.err
 }
 
+func (s *stubCore) CreateConnection(ctx context.Context, subject string, req coreclient.CreateConnectionPayload) (*coreclient.ConnectionResponse, error) {
+	s.subject = subject
+	return &coreclient.ConnectionResponse{ID: "conn_test_1", ActorType: req.ActorType, ActorID: req.ActorID, Provider: req.Provider, Name: req.Name, Status: "active"}, s.err
+}
+
+func (s *stubCore) ListConnections(ctx context.Context, subject, actorType, actorID string) ([]coreclient.ConnectionResponse, error) {
+	s.subject = subject
+	return []coreclient.ConnectionResponse{{ID: "conn_test_1", ActorType: actorType, ActorID: actorID, Provider: "salla", Name: "Salla Sync", Status: "active"}}, s.err
+}
+
+func (s *stubCore) UpsertEntityMapping(ctx context.Context, subject string, req coreclient.UpsertEntityMappingPayload) (*coreclient.EntityMappingResponse, error) {
+	s.subject = subject
+	return &coreclient.EntityMappingResponse{ID: "map_test_1", ConnectionID: req.ConnectionID, EntityType: req.EntityType, InternalID: req.InternalID, ExternalID: req.ExternalID, MappingStatus: "synced"}, s.err
+}
+
+func (s *stubCore) ListEntityMappings(ctx context.Context, subject, connectionID, entityType string) ([]coreclient.EntityMappingResponse, error) {
+	s.subject = subject
+	return []coreclient.EntityMappingResponse{{ID: "map_test_1", ConnectionID: connectionID, EntityType: entityType, InternalID: "int_1", ExternalID: "ext_1", MappingStatus: "synced"}}, s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()
@@ -950,6 +970,33 @@ func TestStoreFinancialOperations(t *testing.T) {
 		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/finance/payouts", "")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("list store payouts status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestStoreIntegrationOperations(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	t.Run("list store connections", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/connections", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store connections status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("create store connection", func(t *testing.T) {
+		body := `{"provider":"salla","name":"Salla Store Sync"}`
+		rec := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/integrations/connections", body)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create store connection status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("list store entity mappings", func(t *testing.T) {
+		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/mappings?connection_id=conn-1&entity_type=product", "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list store entity mappings status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
 		}
 	})
 }
