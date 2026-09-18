@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 
 	"github.com/matjeroapps/seller/internal/config"
 )
@@ -20,7 +20,7 @@ func Init(ctx context.Context, cfg config.Config) (Shutdown, error) {
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName(cfg.ServiceName),
-			semconv.DeploymentEnvironmentName(cfg.Environment),
+			semconv.DeploymentEnvironmentNameKey.String(cfg.Environment),
 		),
 	)
 	if err != nil {
