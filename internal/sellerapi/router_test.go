@@ -402,6 +402,46 @@ func (s *stubCore) ListSellerSyncJobs(ctx context.Context, subject, storeID stri
 	return []coreclient.SellerSyncJobResponse{{ID: "job_test_1", StoreID: storeID, ConnectionID: "conn-1", SyncType: "full", Status: "PENDING"}}, s.err
 }
 
+func (s *stubCore) CreateAPIKey(ctx context.Context, subject string, req coreclient.CreateAPIKeyPayload) (*coreclient.CreateAPIKeyResponse, error) {
+	s.subject = subject
+	return &coreclient.CreateAPIKeyResponse{
+		Record:    coreclient.APIKeyResponse{ID: "key_1", ActorType: req.ActorType, ActorID: req.ActorID, Name: req.Name, KeyPrefix: "prefix_val", Scopes: req.Scopes, Status: "active"},
+		RawAPIKey: "raw_key_val",
+	}, s.err
+}
+
+func (s *stubCore) AuthenticateAPIKey(ctx context.Context, rawKey string) (*coreclient.APIKeyResponse, error) {
+	if rawKey == "invalid" {
+		return nil, &coreclient.Error{Status: 401, Code: "invalid_api_key"}
+	}
+	return &coreclient.APIKeyResponse{ID: "key_1", ActorType: "seller", ActorID: "store-1", Name: "Test Key", KeyPrefix: "prefix_val", Scopes: []string{"products:read"}, Status: "active"}, s.err
+}
+
+func (s *stubCore) ListAPIKeys(ctx context.Context, subject, actorType, actorID string) ([]coreclient.APIKeyResponse, error) {
+	s.subject = subject
+	return []coreclient.APIKeyResponse{{ID: "key_1", ActorType: actorType, ActorID: actorID, Name: "Test Key", KeyPrefix: "prefix_val", Status: "active"}}, s.err
+}
+
+func (s *stubCore) RevokeAPIKey(ctx context.Context, subject, keyID, actorID string) error {
+	s.subject = subject
+	return s.err
+}
+
+func (s *stubCore) CreateWebhookSubscription(ctx context.Context, subject string, req coreclient.CreateWebhookSubscriptionPayload) (*coreclient.WebhookSubscriptionResponse, error) {
+	s.subject = subject
+	return &coreclient.WebhookSubscriptionResponse{ID: "sub_1", ActorType: req.ActorType, ActorID: req.ActorID, TargetURL: req.TargetURL, SubscribedEvents: req.SubscribedEvents, Status: "active"}, s.err
+}
+
+func (s *stubCore) ListWebhookSubscriptions(ctx context.Context, subject, actorType, actorID string) ([]coreclient.WebhookSubscriptionResponse, error) {
+	s.subject = subject
+	return []coreclient.WebhookSubscriptionResponse{{ID: "sub_1", ActorType: actorType, ActorID: actorID, TargetURL: "https://example.com/webhook", SubscribedEvents: []string{"order.created"}, Status: "active"}}, s.err
+}
+
+func (s *stubCore) DeleteWebhookSubscription(ctx context.Context, subject, subID, actorID string) error {
+	s.subject = subject
+	return s.err
+}
+
 // newHandler builds the seller routes behind an authenticated principal.
 func newHandler(core CoreCapabilities, themes ThemeCapabilities) http.Handler {
 	router := chi.NewRouter()
@@ -1034,6 +1074,64 @@ func TestStoreIntegrationOperations(t *testing.T) {
 		rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/sync-jobs/job-1", "")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("get store sync job status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestPublicIntegrationAPI(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	t.Run("API key management endpoints", func(t *testing.T) {
+		recCreate := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/integrations/api-keys", `{"name":"Public Integration Token","scopes":["products:read"],"live":false}`)
+		if recCreate.Code != http.StatusCreated {
+			t.Fatalf("create api key status = %d, want 201 (body %q)", recCreate.Code, recCreate.Body.String())
+		}
+
+		recList := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/api-keys", "")
+		if recList.Code != http.StatusOK {
+			t.Fatalf("list api keys status = %d, want 200 (body %q)", recList.Code, recList.Body.String())
+		}
+
+		recRevoke := doRequest(t, handler, http.MethodDelete, "/v1/seller/stores/store-1/integrations/api-keys/key_1", "")
+		if recRevoke.Code != http.StatusOK {
+			t.Fatalf("revoke api key status = %d, want 200 (body %q)", recRevoke.Code, recRevoke.Body.String())
+		}
+	})
+
+	t.Run("webhook subscription endpoints", func(t *testing.T) {
+		recCreate := doRequest(t, handler, http.MethodPost, "/v1/seller/stores/store-1/integrations/webhooks", `{"target_url":"https://example.com/wh","subscribed_events":["order.created"]}`)
+		if recCreate.Code != http.StatusCreated {
+			t.Fatalf("create webhook sub status = %d, want 201 (body %q)", recCreate.Code, recCreate.Body.String())
+		}
+
+		recList := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/integrations/webhooks", "")
+		if recList.Code != http.StatusOK {
+			t.Fatalf("list webhook subs status = %d, want 200 (body %q)", recList.Code, recList.Body.String())
+		}
+
+		recDel := doRequest(t, handler, http.MethodDelete, "/v1/seller/stores/store-1/integrations/webhooks/sub_1", "")
+		if recDel.Code != http.StatusOK {
+			t.Fatalf("delete webhook sub status = %d, want 200 (body %q)", recDel.Code, recDel.Body.String())
+		}
+	})
+
+	t.Run("public gateway authentication requirement", func(t *testing.T) {
+		recUnauth := doRequest(t, handler, http.MethodGet, "/v1/public/products", "")
+		if recUnauth.Code != http.StatusUnauthorized {
+			t.Fatalf("unauthenticated public endpoint status = %d, want 401", recUnauth.Code)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
+		req.Header.Set("X-Matjero-API-Key", "raw_key_val")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("authenticated public endpoint status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("X-RateLimit-Limit") == "" {
+			t.Errorf("missing rate limit header X-RateLimit-Limit")
 		}
 	})
 }

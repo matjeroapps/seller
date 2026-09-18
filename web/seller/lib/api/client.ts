@@ -1,4 +1,5 @@
 import type {
+  ApiKey,
   CreateShipmentPayload,
   ExternalEntityMapping,
   InitializePaymentPayload,
@@ -21,7 +22,8 @@ import type {
   StructuredPublishReadiness,
   SupplierCatalogItem,
   UpdatePaymentStatusPayload,
-  UpdateShipmentStatusPayload
+  UpdateShipmentStatusPayload,
+  WebhookSubscription
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
@@ -353,6 +355,51 @@ export const sellerApi = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  // API Keys & Webhooks
+  async listStoreAPIKeys(storeId: string): Promise<{ items: ApiKey[] }> {
+    return request<{ items: ApiKey[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/api-keys`);
+  },
+
+  async createStoreAPIKey(storeId: string, data: { name: string; scopes?: string[] }): Promise<ApiKey> {
+    return request<ApiKey>(`/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/api-keys`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async revokeStoreAPIKey(storeId: string, keyId: string): Promise<ApiKey> {
+    return request<ApiKey>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/api-keys/${encodeURIComponent(keyId)}/revoke`,
+      { method: 'POST' }
+    );
+  },
+
+  async listStoreWebhookSubscriptions(storeId: string): Promise<{ items: WebhookSubscription[] }> {
+    return request<{ items: WebhookSubscription[] }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/webhooks`
+    );
+  },
+
+  async createStoreWebhookSubscription(
+    storeId: string,
+    data: { target_url: string; subscribed_events: string[] }
+  ): Promise<WebhookSubscription> {
+    return request<WebhookSubscription>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/webhooks`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }
+    );
+  },
+
+  async deleteStoreWebhookSubscription(storeId: string, subscriptionId: string): Promise<void> {
+    return request<void>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/webhooks/${encodeURIComponent(subscriptionId)}`,
+      { method: 'DELETE' }
+    );
   }
 };
 

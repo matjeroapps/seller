@@ -147,3 +147,101 @@ func (c *Client) ListSellerSyncJobs(ctx context.Context, subject, storeID string
 	}
 	return res.Items, nil
 }
+
+type CreateAPIKeyPayload struct {
+	ActorType string   `json:"actor_type"`
+	ActorID   string   `json:"actor_id"`
+	Name      string   `json:"name"`
+	Scopes    []string `json:"scopes"`
+	Live      bool     `json:"live"`
+}
+
+type APIKeyResponse struct {
+	ID        string     `json:"id"`
+	ActorType string     `json:"actor_type"`
+	ActorID   string     `json:"actor_id"`
+	Name      string     `json:"name"`
+	KeyPrefix string     `json:"key_prefix"`
+	Scopes    []string   `json:"scopes"`
+	Status    string     `json:"status"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type CreateAPIKeyResponse struct {
+	Record    APIKeyResponse `json:"record"`
+	RawAPIKey string         `json:"raw_api_key"`
+}
+
+type CreateWebhookSubscriptionPayload struct {
+	ActorType        string   `json:"actor_type"`
+	ActorID          string   `json:"actor_id"`
+	TargetURL        string   `json:"target_url"`
+	Secret           string   `json:"secret,omitempty"`
+	SubscribedEvents []string `json:"subscribed_events"`
+}
+
+type WebhookSubscriptionResponse struct {
+	ID               string    `json:"id"`
+	ActorType        string    `json:"actor_type"`
+	ActorID          string    `json:"actor_id"`
+	TargetURL        string    `json:"target_url"`
+	SubscribedEvents []string  `json:"subscribed_events"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (c *Client) CreateAPIKey(ctx context.Context, subject string, req CreateAPIKeyPayload) (*CreateAPIKeyResponse, error) {
+	var res CreateAPIKeyResponse
+	if err := c.post(ctx, "/internal/v1/integrations/api-keys", req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, fmt.Errorf("create api key: %w", err)
+	}
+	return &res, nil
+}
+
+func (c *Client) AuthenticateAPIKey(ctx context.Context, rawKey string) (*APIKeyResponse, error) {
+	path := fmt.Sprintf("/internal/v1/integrations/api-keys/authenticate?raw_key=%s", url.QueryEscape(rawKey))
+	var res APIKeyResponse
+	if err := c.get(ctx, path, nil, requestOptions{}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *Client) ListAPIKeys(ctx context.Context, subject, actorType, actorID string) ([]APIKeyResponse, error) {
+	path := fmt.Sprintf("/internal/v1/integrations/api-keys?actor_type=%s&actor_id=%s", url.QueryEscape(actorType), url.QueryEscape(actorID))
+	var res CoreCollectionResponse[APIKeyResponse]
+	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
+		return []APIKeyResponse{}, nil
+	}
+	return res.Items, nil
+}
+
+func (c *Client) RevokeAPIKey(ctx context.Context, subject, keyID, actorID string) error {
+	path := fmt.Sprintf("/internal/v1/integrations/api-keys/%s?actor_id=%s", url.PathEscape(keyID), url.QueryEscape(actorID))
+	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
+}
+
+func (c *Client) CreateWebhookSubscription(ctx context.Context, subject string, req CreateWebhookSubscriptionPayload) (*WebhookSubscriptionResponse, error) {
+	var res WebhookSubscriptionResponse
+	if err := c.post(ctx, "/internal/v1/integrations/webhooks/subscriptions", req, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, fmt.Errorf("create webhook subscription: %w", err)
+	}
+	return &res, nil
+}
+
+func (c *Client) ListWebhookSubscriptions(ctx context.Context, subject, actorType, actorID string) ([]WebhookSubscriptionResponse, error) {
+	path := fmt.Sprintf("/internal/v1/integrations/webhooks/subscriptions?actor_type=%s&actor_id=%s", url.QueryEscape(actorType), url.QueryEscape(actorID))
+	var res CoreCollectionResponse[WebhookSubscriptionResponse]
+	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
+		return []WebhookSubscriptionResponse{}, nil
+	}
+	return res.Items, nil
+}
+
+func (c *Client) DeleteWebhookSubscription(ctx context.Context, subject, subID, actorID string) error {
+	path := fmt.Sprintf("/internal/v1/integrations/webhooks/subscriptions/%s?actor_id=%s", url.PathEscape(subID), url.QueryEscape(actorID))
+	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
+}

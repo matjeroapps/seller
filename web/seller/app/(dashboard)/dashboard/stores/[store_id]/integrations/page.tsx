@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers } from 'lucide-react';
+import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers, Key, Webhook, Copy, Trash2, ShieldCheck } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
-import type { IntegrationConnection, ExternalEntityMapping, SellerSyncJob } from '@/lib/api/types';
+import type { IntegrationConnection, ExternalEntityMapping, SellerSyncJob, ApiKey, WebhookSubscription } from '@/lib/api/types';
 
 export default function StoreIntegrationsPage({
   params
@@ -15,13 +15,41 @@ export default function StoreIntegrationsPage({
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const [mappings, setMappings] = useState<ExternalEntityMapping[]>([]);
   const [syncJobs, setSyncJobs] = useState<SellerSyncJob[]>([]);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookSubscription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'CONNECTIONS' | 'MAPPINGS' | 'SYNC_JOBS'>('CONNECTIONS');
+  const [activeTab, setActiveTab] = useState<'CONNECTIONS' | 'API_KEYS' | 'WEBHOOKS' | 'MAPPINGS' | 'SYNC_JOBS'>('CONNECTIONS');
+  
+  // Connection state
   const [selectedConnection, setSelectedConnection] = useState<string>('');
   const [selectedEntityType, setSelectedEntityType] = useState<string>('product');
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [provider, setProvider] = useState<string>('salla');
   const [connectionName, setConnectionName] = useState<string>('');
+
+  // API Key state
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyName, setApiKeyName] = useState('');
+  const [selectedScopes, setSelectedScopes] = useState<string[]>(['products:read', 'orders:read']);
+  const [createdRawKey, setCreatedRawKey] = useState<string | null>(null);
+
+  // Webhook state
+  const [showWebhookModal, setShowWebhookModal] = useState(false);
+  const [targetUrl, setTargetUrl] = useState('');
+  const [subscribedEvents, setSubscribedEvents] = useState<string[]>(['product.updated', 'order.created']);
+
+  const AVAILABLE_SCOPES = [
+    'products:read', 'products:write',
+    'inventory:read', 'inventory:write',
+    'orders:read', 'orders:write',
+    'webhooks:manage'
+  ];
+
+  const AVAILABLE_EVENTS = [
+    'product.created', 'product.updated',
+    'inventory.adjusted',
+    'order.created', 'order.status_changed'
+  ];
 
   const fetchConnections = () => {
     setLoading(true);
@@ -63,9 +91,33 @@ export default function StoreIntegrationsPage({
       });
   };
 
+  const fetchApiKeys = () => {
+    sellerApi
+      .listStoreAPIKeys(store_id)
+      .then((res) => {
+        setApiKeys(res.items || []);
+      })
+      .catch(() => {
+        setApiKeys([]);
+      });
+  };
+
+  const fetchWebhooks = () => {
+    sellerApi
+      .listStoreWebhookSubscriptions(store_id)
+      .then((res) => {
+        setWebhooks(res.items || []);
+      })
+      .catch(() => {
+        setWebhooks([]);
+      });
+  };
+
   useEffect(() => {
     fetchConnections();
     fetchSyncJobs();
+    fetchApiKeys();
+    fetchWebhooks();
   }, [store_id]);
 
   useEffect(() => {
@@ -73,6 +125,10 @@ export default function StoreIntegrationsPage({
       fetchMappings();
     } else if (activeTab === 'SYNC_JOBS') {
       fetchSyncJobs();
+    } else if (activeTab === 'API_KEYS') {
+      fetchApiKeys();
+    } else if (activeTab === 'WEBHOOKS') {
+      fetchWebhooks();
     }
   }, [activeTab, selectedConnection, selectedEntityType]);
 
@@ -100,29 +156,114 @@ export default function StoreIntegrationsPage({
       });
   };
 
+  const handleCreateApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKeyName) return;
+    sellerApi
+      .createStoreAPIKey(store_id, {
+        name: apiKeyName,
+        scopes: selectedScopes
+      })
+      .then((key) => {
+        if (key.raw_key) {
+          setCreatedRawKey(key.raw_key);
+        }
+        setApiKeyName('');
+        fetchApiKeys();
+      });
+  };
+
+  const handleRevokeApiKey = (keyId: string) => {
+    if (!confirm('Are you sure you want to revoke this API key? External systems using it will be denied access.')) return;
+    sellerApi.revokeStoreAPIKey(store_id, keyId).then(() => {
+      fetchApiKeys();
+    });
+  };
+
+  const handleCreateWebhook = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetUrl) return;
+    sellerApi
+      .createStoreWebhookSubscription(store_id, {
+        target_url: targetUrl,
+        subscribed_events: subscribedEvents
+      })
+      .then(() => {
+        setShowWebhookModal(false);
+        setTargetUrl('');
+        fetchWebhooks();
+      });
+  };
+
+  const handleDeleteWebhook = (subId: string) => {
+    if (!confirm('Are you sure you want to delete this webhook subscription?')) return;
+    sellerApi.deleteStoreWebhookSubscription(store_id, subId).then(() => {
+      fetchWebhooks();
+    });
+  };
+
+  const toggleScope = (scope: string) => {
+    setSelectedScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
+    );
+  };
+
+  const toggleEvent = (event: string) => {
+    setSubscribedEvents((prev) =>
+      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
+    );
+  };
+
   return (
     <div className="max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">External Integration Foundation</h1>
+          <h1 className="text-xl font-bold text-slate-900">External Integration Foundation & Developer Console</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage provider sync connections (Salla, Shopify, WooCommerce, EasyOrders, Custom API), trigger channel sync jobs, and inspect entity mapping status.
+            Manage provider sync connections, scoped Developer API keys, real-time Webhooks, and inspect channel sync job logs.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowConnectModal(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Integration Connection
-        </button>
+        <div className="flex items-center gap-2">
+          {activeTab === 'API_KEYS' && (
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedRawKey(null);
+                setShowApiKeyModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
+            >
+              <Key className="w-4 h-4" />
+              Generate New API Key
+            </button>
+          )}
+          {activeTab === 'WEBHOOKS' && (
+            <button
+              type="button"
+              onClick={() => setShowWebhookModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
+            >
+              <Webhook className="w-4 h-4" />
+              Subscribe Webhook
+            </button>
+          )}
+          {activeTab === 'CONNECTIONS' && (
+            <button
+              type="button"
+              onClick={() => setShowConnectModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Integration Connection
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        {(['CONNECTIONS', 'MAPPINGS', 'SYNC_JOBS'] as const).map((tab) => (
+        {(['CONNECTIONS', 'API_KEYS', 'WEBHOOKS', 'MAPPINGS', 'SYNC_JOBS'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -141,7 +282,7 @@ export default function StoreIntegrationsPage({
       {/* Main Content */}
       {loading ? (
         <div className="p-8 bg-white border border-slate-200 rounded-lg text-xs text-slate-500 animate-pulse">
-          Loading integration channels...
+          Loading developer console...
         </div>
       ) : activeTab === 'CONNECTIONS' ? (
         connections.length === 0 ? (
@@ -192,6 +333,166 @@ export default function StoreIntegrationsPage({
             ))}
           </div>
         )
+      ) : activeTab === 'API_KEYS' ? (
+        /* API KEYS TAB */
+        <div className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-slate-600" />
+                Store Developer API Keys
+              </h2>
+              <button
+                type="button"
+                onClick={fetchApiKeys}
+                className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh Keys
+              </button>
+            </div>
+
+            {apiKeys.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 space-y-2">
+                <Key className="w-8 h-8 text-slate-300 mx-auto" />
+                <p>No API keys generated for this store yet.</p>
+                <p className="text-[11px] text-slate-400">
+                  Generate live or test API keys to interact with `/v1/public/...` gateway endpoints for custom ERPs, mobile apps, or inventory tools.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-medium">
+                    <tr>
+                      <th className="p-2.5">Name</th>
+                      <th className="p-2.5">Prefix</th>
+                      <th className="p-2.5">Scopes</th>
+                      <th className="p-2.5">Status</th>
+                      <th className="p-2.5">Created At</th>
+                      <th className="p-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {apiKeys.map((key) => (
+                      <tr key={key.id} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-semibold text-slate-900">{key.name}</td>
+                        <td className="p-2.5 font-mono text-[11px] text-slate-600">{key.key_prefix}...</td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {key.scopes?.map((s) => (
+                              <span key={s} className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-mono">
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                              key.status === 'active'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {key.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-slate-400">{new Date(key.created_at).toLocaleString()}</td>
+                        <td className="p-2.5 text-right">
+                          {key.status === 'active' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeApiKey(key.id)}
+                              className="px-2 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded text-[11px] font-medium transition-colors"
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'WEBHOOKS' ? (
+        /* WEBHOOKS TAB */
+        <div className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <Webhook className="w-4 h-4 text-slate-600" />
+                Real-Time Webhook Subscriptions
+              </h2>
+              <button
+                type="button"
+                onClick={fetchWebhooks}
+                className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh Subscriptions
+              </button>
+            </div>
+
+            {webhooks.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 space-y-2">
+                <Webhook className="w-8 h-8 text-slate-300 mx-auto" />
+                <p>No webhook subscriptions registered.</p>
+                <p className="text-[11px] text-slate-400">
+                  Receive real-time HTTPS push notifications whenever products are updated, inventory changes, or new orders arrive.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 font-medium">
+                    <tr>
+                      <th className="p-2.5">Target Endpoint URL</th>
+                      <th className="p-2.5">Subscribed Events</th>
+                      <th className="p-2.5">Status</th>
+                      <th className="p-2.5">Created At</th>
+                      <th className="p-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {webhooks.map((sub) => (
+                      <tr key={sub.id} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-mono text-[11px] text-slate-900 max-w-xs truncate">{sub.target_url}</td>
+                        <td className="p-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {sub.subscribed_events?.map((e) => (
+                              <span key={e} className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-mono">
+                                {e}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {sub.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-slate-400">{new Date(sub.created_at).toLocaleString()}</td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWebhook(sub.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       ) : activeTab === 'MAPPINGS' ? (
         /* MAPPINGS TAB */
         <div className="space-y-4">
@@ -395,6 +696,159 @@ export default function StoreIntegrationsPage({
                   className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
                 >
                   Create Connection
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Generate API Key Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Key className="w-5 h-5 text-slate-700" />
+              Generate API Key
+            </h3>
+
+            {createdRawKey ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    Save your API key securely!
+                  </p>
+                  <p className="text-[11px]">
+                    This secret key will <strong>never be displayed again</strong>. Copy and store it safely in your server environment.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-md font-mono text-[11px] text-emerald-400 break-all select-all flex items-center justify-between gap-2">
+                  <span>{createdRawKey}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(createdRawKey)}
+                    className="p-1 hover:bg-slate-800 rounded text-slate-300 transition-colors shrink-0"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="px-4 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateApiKey} className="space-y-4 text-xs">
+                <div className="space-y-1">
+                  <label className="block text-slate-600 font-medium">Key Name / Description</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. ERP Inventory Sync Service"
+                    value={apiKeyName}
+                    onChange={(e) => setApiKeyName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-slate-600 font-medium">Granted API Scopes</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-md bg-slate-50">
+                    {AVAILABLE_SCOPES.map((scope) => (
+                      <label key={scope} className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedScopes.includes(scope)}
+                          onChange={() => toggleScope(scope)}
+                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                        />
+                        <span className="font-mono">{scope}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
+                  >
+                    Generate Key
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Subscribe Webhook Modal */}
+      {showWebhookModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Webhook className="w-5 h-5 text-slate-700" />
+              Subscribe Real-Time Webhook
+            </h3>
+            <form onSubmit={handleCreateWebhook} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="block text-slate-600 font-medium">Target Endpoint HTTPS URL</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://api.yourdomain.com/webhooks/matjerhub"
+                  value={targetUrl}
+                  onChange={(e) => setTargetUrl(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 font-mono text-[11px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-slate-600 font-medium">Subscribed Events</label>
+                <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-md bg-slate-50">
+                  {AVAILABLE_EVENTS.map((event) => (
+                    <label key={event} className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={subscribedEvents.includes(event)}
+                        onChange={() => toggleEvent(event)}
+                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                      />
+                      <span className="font-mono">{event}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowWebhookModal(false)}
+                  className="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
+                >
+                  Save Subscription
                 </button>
               </div>
             </form>
