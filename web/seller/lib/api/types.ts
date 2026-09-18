@@ -314,5 +314,32 @@ export interface SellerSyncJob {
   updated_at: string;
 }
 
+export interface ApiKey {
+  id: string;
+  actor_type: string;
+  actor_id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  status: 'active' | 'revoked' | 'expired';
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+  raw_key?: string;
+}
+
+export interface WebhookSubscription {
+  id: string;
+  actor_type: string;
+  actor_id: string;
+  target_url: string;
+  subscribed_events: string[];
+  status: 'active' | 'disabled';
+  created_at: string;
+  updated_at: string;
+  raw_secret?: string;
+}
+
+
 
 

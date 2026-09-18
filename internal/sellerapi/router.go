@@ -103,6 +103,15 @@ type CoreCapabilities interface {
 	CreateSellerSyncJob(ctx context.Context, subject, connectionID, storeID, syncType string) (*coreclient.SellerSyncJobResponse, error)
 	GetSellerSyncJob(ctx context.Context, subject, jobID string) (*coreclient.SellerSyncJobResponse, error)
 	ListSellerSyncJobs(ctx context.Context, subject, storeID string) ([]coreclient.SellerSyncJobResponse, error)
+
+	CreateAPIKey(ctx context.Context, subject string, req coreclient.CreateAPIKeyPayload) (*coreclient.CreateAPIKeyResponse, error)
+	AuthenticateAPIKey(ctx context.Context, rawKey string) (*coreclient.APIKeyResponse, error)
+	ListAPIKeys(ctx context.Context, subject, actorType, actorID string) ([]coreclient.APIKeyResponse, error)
+	RevokeAPIKey(ctx context.Context, subject, keyID, actorID string) error
+
+	CreateWebhookSubscription(ctx context.Context, subject string, req coreclient.CreateWebhookSubscriptionPayload) (*coreclient.WebhookSubscriptionResponse, error)
+	ListWebhookSubscriptions(ctx context.Context, subject, actorType, actorID string) ([]coreclient.WebhookSubscriptionResponse, error)
+	DeleteWebhookSubscription(ctx context.Context, subject, subID, actorID string) error
 }
 
 // Dependencies wires the seller routes.
@@ -210,6 +219,20 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleListStoreSyncJobs)
 		r.Post("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleCreateStoreSyncJob)
 		r.Get("/seller/stores/{store_id}/integrations/sync-jobs/{id}", deps.handleGetStoreSyncJob)
+
+		r.Get("/seller/stores/{store_id}/integrations/api-keys", deps.handleListStoreAPIKeys)
+		r.Post("/seller/stores/{store_id}/integrations/api-keys", deps.handleCreateStoreAPIKey)
+		r.Delete("/seller/stores/{store_id}/integrations/api-keys/{id}", deps.handleRevokeStoreAPIKey)
+
+		r.Get("/seller/stores/{store_id}/integrations/webhooks", deps.handleListStoreWebhookSubscriptions)
+		r.Post("/seller/stores/{store_id}/integrations/webhooks", deps.handleCreateStoreWebhookSubscription)
+		r.Delete("/seller/stores/{store_id}/integrations/webhooks/{id}", deps.handleDeleteStoreWebhookSubscription)
+
+		// Public Integration API Gateway Endpoints
+		r.Get("/public/products", deps.handlePublicListProducts)
+		r.Get("/public/inventory", deps.handlePublicGetInventory)
+		r.Post("/public/inventory/adjustments", deps.handlePublicAdjustInventory)
+		r.Get("/public/orders", deps.handlePublicListOrders)
 
 		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
 	}
