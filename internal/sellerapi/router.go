@@ -13,9 +13,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"seller/internal/actorhttp"
+	"seller/internal/audit"
 	"seller/internal/coreclient"
 	"seller/internal/httpx"
+	"seller/internal/idempotency"
 	"seller/internal/money"
+	"seller/internal/ratelimit"
 )
 
 // CoreCapabilities are the Core calls the seller routes depend on. The interface
@@ -116,125 +119,159 @@ type CoreCapabilities interface {
 
 // Dependencies wires the seller routes.
 type Dependencies struct {
-	Core CoreCapabilities
+	Core             CoreCapabilities
+	Limiter          *ratelimit.Limiter
+	IdempotencyStore *idempotency.Store
+	AuditLogger      *audit.Logger
 }
 
 func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
+	if deps.Limiter == nil {
+		deps.Limiter = ratelimit.NewLimiter(nil, 1000, 0)
+	}
+	if deps.IdempotencyStore == nil {
+		deps.IdempotencyStore = idempotency.NewStore(nil, 0)
+	}
+	if deps.AuditLogger == nil {
+		deps.AuditLogger = audit.NewLogger(nil)
+	}
+
+	idempotencyOpt := idempotency.Middleware(deps.IdempotencyStore, false)
+
 	return func(r chi.Router) {
-		r.Get("/seller/profile", deps.handleSellerProfile)
-		r.Put("/seller/profile", deps.handleSellerProfileUpdate)
-		r.Get("/seller/stores", deps.handleSellerStores)
-		r.Post("/seller/stores", deps.handleSellerStoreCreate)
-		r.Post("/seller/stores/{store_id}/status", deps.handleUpdateStoreStatus)
-		r.Get("/seller/stores/{store_id}/storefront-host", deps.handleGetStorefrontHost)
-		r.Get("/seller/catalog/offers", deps.handleSellerCatalogOffers)
-		r.Get("/seller/listings", deps.handleSellerListings)
-		r.Post("/seller/listings/import", deps.handleSellerListingImport)
-		r.Post("/seller/listings/{id}/price", deps.handleSellerListingPrice)
-		r.Post("/seller/listings/{id}/status", deps.handleSellerListingStatus)
+		r.Group(func(r chi.Router) {
+			r.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set(httpx.HeaderAPIVersion, httpx.CurrentAPIVersion)
+					next.ServeHTTP(w, r)
+				})
+			})
+			r.Use(idempotencyOpt)
 
-		// Store-Scoped Supplier Offers & Imports
-		r.Get("/seller/stores/{store_id}/supplier-offers", deps.handleListStoreSupplierOffers)
-		r.Post("/seller/stores/{store_id}/supplier-offers/{offer_id}/imports", deps.handleImportSupplierOffer)
+			r.Get("/seller/profile", deps.handleSellerProfile)
+			r.Put("/seller/profile", deps.handleSellerProfileUpdate)
+			r.Get("/seller/stores", deps.handleSellerStores)
+			r.Post("/seller/stores", deps.handleSellerStoreCreate)
+			r.Post("/seller/stores/{store_id}/status", deps.handleUpdateStoreStatus)
+			r.Get("/seller/stores/{store_id}/storefront-host", deps.handleGetStorefrontHost)
+			r.Get("/seller/catalog/offers", deps.handleSellerCatalogOffers)
+			r.Get("/seller/listings", deps.handleSellerListings)
+			r.Post("/seller/listings/import", deps.handleSellerListingImport)
+			r.Post("/seller/listings/{id}/price", deps.handleSellerListingPrice)
+			r.Post("/seller/listings/{id}/status", deps.handleSellerListingStatus)
 
-		// Store-Scoped Product & Listing Routes
-		r.Get("/seller/stores/{store_id}/products", deps.handleListStoreProducts)
-		r.Post("/seller/stores/{store_id}/products", deps.handleCreateStoreProduct)
-		r.Get("/seller/stores/{store_id}/products/{product_id}", deps.handleGetStoreProductDetail)
-		r.Put("/seller/stores/{store_id}/products/{product_id}", deps.handleUpdateStoreProduct)
-		r.Post("/seller/stores/{store_id}/products/{product_id}/status", deps.handleTransitionProductStatus)
-		r.Post("/seller/stores/{store_id}/products/{product_id}/archive", deps.handleArchiveProduct)
+			// Store-Scoped Supplier Offers & Imports
+			r.Get("/seller/stores/{store_id}/supplier-offers", deps.handleListStoreSupplierOffers)
+			r.Post("/seller/stores/{store_id}/supplier-offers/{offer_id}/imports", deps.handleImportSupplierOffer)
 
-		r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
-		r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)
+			// Store-Scoped Product & Listing Routes
+			r.Get("/seller/stores/{store_id}/products", deps.handleListStoreProducts)
+			r.Post("/seller/stores/{store_id}/products", deps.handleCreateStoreProduct)
+			r.Get("/seller/stores/{store_id}/products/{product_id}", deps.handleGetStoreProductDetail)
+			r.Put("/seller/stores/{store_id}/products/{product_id}", deps.handleUpdateStoreProduct)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/status", deps.handleTransitionProductStatus)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/archive", deps.handleArchiveProduct)
 
-		r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus", deps.handleCreateSKU)
-		r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}", deps.handleUpdateSKU)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
+			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)
 
-		// Legacy Product Media Routes
-		r.Post("/seller/stores/{store_id}/products/{product_id}/media/uploads", deps.handleCreateMediaUpload)
-		r.Post("/seller/stores/{store_id}/products/{product_id}/media", deps.handleCompleteMediaUpload)
-		r.Put("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleUpdateMedia)
-		r.Delete("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleDeleteMedia)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus", deps.handleCreateSKU)
+			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}", deps.handleUpdateSKU)
 
-		// Store Media Asset Library
-		r.Get("/seller/stores/{store_id}/media", deps.handleListStoreMedia)
-		r.Post("/seller/stores/{store_id}/media/uploads", deps.handlePresignStoreMediaUpload)
-		r.Post("/seller/stores/{store_id}/media/uploads/{intent_id}/complete", deps.handleCompleteStoreMediaUploadIntent)
-		r.Delete("/seller/stores/{store_id}/media/{asset_id}", deps.handleDeleteStoreMediaAsset)
+			// Legacy Product Media Routes
+			r.Post("/seller/stores/{store_id}/products/{product_id}/media/uploads", deps.handleCreateMediaUpload)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/media", deps.handleCompleteMediaUpload)
+			r.Put("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleUpdateMedia)
+			r.Delete("/seller/stores/{store_id}/products/{product_id}/media/{media_id}", deps.handleDeleteMedia)
 
-		// Product Media References
-		r.Get("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleListProductMediaReferences)
-		r.Post("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleAttachProductMediaReference)
-		r.Put("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleUpdateProductMediaReference)
-		r.Delete("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleDetachProductMediaReference)
+			// Store Media Asset Library
+			r.Get("/seller/stores/{store_id}/media", deps.handleListStoreMedia)
+			r.Post("/seller/stores/{store_id}/media/uploads", deps.handlePresignStoreMediaUpload)
+			r.Post("/seller/stores/{store_id}/media/uploads/{intent_id}/complete", deps.handleCompleteStoreMediaUploadIntent)
+			r.Delete("/seller/stores/{store_id}/media/{asset_id}", deps.handleDeleteStoreMediaAsset)
 
-		// Store-Scoped Listings
-		r.Get("/seller/stores/{store_id}/listings", deps.handleListStoreListings)
-		r.Get("/seller/stores/{store_id}/listings/{listing_id}", deps.handleGetStoreListing)
-		r.Put("/seller/stores/{store_id}/listings/{listing_id}/price", deps.handleSetStoreListingPrice)
-		r.Get("/seller/stores/{store_id}/listings/{listing_id}/readiness", deps.handleGetStoreListingReadiness)
-		r.Post("/seller/stores/{store_id}/listings/{listing_id}/publish", deps.handlePublishStoreListing)
-		r.Post("/seller/stores/{store_id}/listings/{listing_id}/unpublish", deps.handleUnpublishStoreListing)
-		r.Post("/seller/stores/{store_id}/listings/{listing_id}/archive", deps.handleArchiveStoreListing)
+			// Product Media References
+			r.Get("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleListProductMediaReferences)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleAttachProductMediaReference)
+			r.Put("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleUpdateProductMediaReference)
+			r.Delete("/seller/stores/{store_id}/products/{product_id}/media-references/{reference_id}", deps.handleDetachProductMediaReference)
 
-		r.Get("/seller/stores/{store_id}/locations", deps.handleListStoreLocations)
-		r.Post("/seller/stores/{store_id}/locations", deps.handleCreateStoreLocation)
-		r.Get("/seller/stores/{store_id}/inventory", deps.handleListStoreInventory)
-		r.Post("/seller/stores/{store_id}/inventory/snapshots", deps.handleCreateInventorySnapshot)
-		r.Post("/seller/stores/{store_id}/inventory/{snapshot_id}/adjustments", deps.handleAdjustInventory)
+			// Store-Scoped Listings
+			r.Get("/seller/stores/{store_id}/listings", deps.handleListStoreListings)
+			r.Get("/seller/stores/{store_id}/listings/{listing_id}", deps.handleGetStoreListing)
+			r.Put("/seller/stores/{store_id}/listings/{listing_id}/price", deps.handleSetStoreListingPrice)
+			r.Get("/seller/stores/{store_id}/listings/{listing_id}/readiness", deps.handleGetStoreListingReadiness)
+			r.Post("/seller/stores/{store_id}/listings/{listing_id}/publish", deps.handlePublishStoreListing)
+			r.Post("/seller/stores/{store_id}/listings/{listing_id}/unpublish", deps.handleUnpublishStoreListing)
+			r.Post("/seller/stores/{store_id}/listings/{listing_id}/archive", deps.handleArchiveStoreListing)
 
-		r.Get("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleGetListingPresentation)
-		r.Put("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleUpdateListingPresentation)
+			r.Get("/seller/stores/{store_id}/locations", deps.handleListStoreLocations)
+			r.Post("/seller/stores/{store_id}/locations", deps.handleCreateStoreLocation)
+			r.Get("/seller/stores/{store_id}/inventory", deps.handleListStoreInventory)
+			r.Post("/seller/stores/{store_id}/inventory/snapshots", deps.handleCreateInventorySnapshot)
+			r.Post("/seller/stores/{store_id}/inventory/{snapshot_id}/adjustments", deps.handleAdjustInventory)
 
-		r.Post("/seller/stores/{store_id}/products/{product_id}/publish", deps.handlePublishProduct)
-		r.Post("/seller/stores/{store_id}/products/{product_id}/unpublish", deps.handleUnpublishProduct)
+			r.Get("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleGetListingPresentation)
+			r.Put("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleUpdateListingPresentation)
 
-		r.Get("/seller/stores/{store_id}/orders", deps.handleListStoreOrders)
-		r.Get("/seller/stores/{store_id}/orders/{order_id}", deps.handleGetStoreOrderDetail)
-		r.Post("/seller/stores/{store_id}/orders/{order_id}/transition", deps.handleTransitionStoreOrder)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/publish", deps.handlePublishProduct)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/unpublish", deps.handleUnpublishProduct)
 
-		// Store-Scoped Shipping Operations
-		r.Post("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleCreateShipment)
-		r.Get("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleListOrderShipments)
-		r.Get("/seller/stores/{store_id}/shipments/{shipment_id}", deps.handleGetShipment)
-		r.Patch("/seller/stores/{store_id}/shipments/{shipment_id}/status", deps.handleUpdateShipmentStatus)
+			r.Get("/seller/stores/{store_id}/orders", deps.handleListStoreOrders)
+			r.Get("/seller/stores/{store_id}/orders/{order_id}", deps.handleGetStoreOrderDetail)
+			r.Post("/seller/stores/{store_id}/orders/{order_id}/transition", deps.handleTransitionStoreOrder)
 
-		// Store-Scoped Payment Operations
-		r.Post("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleInitializePayment)
-		r.Get("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleGetOrderPayment)
-		r.Get("/seller/stores/{store_id}/payments/{payment_id}", deps.handleGetPayment)
-		r.Post("/seller/stores/{store_id}/payments/{payment_id}/status", deps.handleUpdatePaymentStatus)
+			// Store-Scoped Shipping Operations
+			r.Post("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleCreateShipment)
+			r.Get("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleListOrderShipments)
+			r.Get("/seller/stores/{store_id}/shipments/{shipment_id}", deps.handleGetShipment)
+			r.Patch("/seller/stores/{store_id}/shipments/{shipment_id}/status", deps.handleUpdateShipmentStatus)
 
-		// Store-Scoped Financial Operations
-		r.Get("/seller/stores/{store_id}/finance/balance", deps.handleGetStoreBalance)
-		r.Get("/seller/stores/{store_id}/finance/ledger", deps.handleListStoreLedgerEntries)
-		r.Get("/seller/stores/{store_id}/finance/settlements", deps.handleListStoreSettlements)
-		r.Get("/seller/stores/{store_id}/finance/payouts", deps.handleListStorePayouts)
+			// Store-Scoped Payment Operations
+			r.Post("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleInitializePayment)
+			r.Get("/seller/stores/{store_id}/orders/{order_id}/payments", deps.handleGetOrderPayment)
+			r.Get("/seller/stores/{store_id}/payments/{payment_id}", deps.handleGetPayment)
+			r.Post("/seller/stores/{store_id}/payments/{payment_id}/status", deps.handleUpdatePaymentStatus)
 
-		// Store-Scoped Integration Operations
-		r.Get("/seller/stores/{store_id}/integrations/connections", deps.handleListStoreConnections)
-		r.Post("/seller/stores/{store_id}/integrations/connections", deps.handleCreateStoreConnection)
-		r.Get("/seller/stores/{store_id}/integrations/mappings", deps.handleListStoreEntityMappings)
-		r.Get("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleListStoreSyncJobs)
-		r.Post("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleCreateStoreSyncJob)
-		r.Get("/seller/stores/{store_id}/integrations/sync-jobs/{id}", deps.handleGetStoreSyncJob)
+			// Store-Scoped Financial Operations
+			r.Get("/seller/stores/{store_id}/finance/balance", deps.handleGetStoreBalance)
+			r.Get("/seller/stores/{store_id}/finance/ledger", deps.handleListStoreLedgerEntries)
+			r.Get("/seller/stores/{store_id}/finance/settlements", deps.handleListStoreSettlements)
+			r.Get("/seller/stores/{store_id}/finance/payouts", deps.handleListStorePayouts)
 
-		r.Get("/seller/stores/{store_id}/integrations/api-keys", deps.handleListStoreAPIKeys)
-		r.Post("/seller/stores/{store_id}/integrations/api-keys", deps.handleCreateStoreAPIKey)
-		r.Delete("/seller/stores/{store_id}/integrations/api-keys/{id}", deps.handleRevokeStoreAPIKey)
+			// Store-Scoped Integration Operations
+			r.Get("/seller/stores/{store_id}/integrations/connections", deps.handleListStoreConnections)
+			r.Post("/seller/stores/{store_id}/integrations/connections", deps.handleCreateStoreConnection)
+			r.Get("/seller/stores/{store_id}/integrations/mappings", deps.handleListStoreEntityMappings)
+			r.Get("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleListStoreSyncJobs)
+			r.Post("/seller/stores/{store_id}/integrations/sync-jobs", deps.handleCreateStoreSyncJob)
+			r.Get("/seller/stores/{store_id}/integrations/sync-jobs/{id}", deps.handleGetStoreSyncJob)
 
-		r.Get("/seller/stores/{store_id}/integrations/webhooks", deps.handleListStoreWebhookSubscriptions)
-		r.Post("/seller/stores/{store_id}/integrations/webhooks", deps.handleCreateStoreWebhookSubscription)
-		r.Delete("/seller/stores/{store_id}/integrations/webhooks/{id}", deps.handleDeleteStoreWebhookSubscription)
+			r.Get("/seller/stores/{store_id}/integrations/api-keys", deps.handleListStoreAPIKeys)
+			r.Post("/seller/stores/{store_id}/integrations/api-keys", deps.handleCreateStoreAPIKey)
+			r.Delete("/seller/stores/{store_id}/integrations/api-keys/{id}", deps.handleRevokeStoreAPIKey)
 
-		// Public Integration API Gateway Endpoints
-		r.Get("/public/products", deps.handlePublicListProducts)
-		r.Get("/public/inventory", deps.handlePublicGetInventory)
-		r.Post("/public/inventory/adjustments", deps.handlePublicAdjustInventory)
-		r.Get("/public/orders", deps.handlePublicListOrders)
+			r.Get("/seller/stores/{store_id}/integrations/webhooks", deps.handleListStoreWebhookSubscriptions)
+			r.Post("/seller/stores/{store_id}/integrations/webhooks", deps.handleCreateStoreWebhookSubscription)
+			r.Delete("/seller/stores/{store_id}/integrations/webhooks/{id}", deps.handleDeleteStoreWebhookSubscription)
 
-		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
+			// Public Integration API Gateway Endpoints
+			r.Get("/public/products", deps.handlePublicListProducts)
+			r.Get("/public/inventory", deps.handlePublicGetInventory)
+			r.Post("/public/inventory/adjustments", deps.handlePublicAdjustInventory)
+			r.Get("/public/orders", deps.handlePublicListOrders)
+			r.Get("/public/orders/{order_id}", deps.handlePublicGetOrderDetail)
+			r.Get("/public/orders/{order_id}/fulfillments", deps.handlePublicListOrderFulfillments)
+			r.Post("/public/orders/{order_id}/fulfillments", deps.handlePublicCreateOrderFulfillment)
+			r.Get("/public/shipments/{shipment_id}", deps.handlePublicGetShipment)
+			r.Patch("/public/shipments/{shipment_id}/status", deps.handlePublicUpdateShipmentStatus)
+
+			r.Get("/public/webhooks/subscriptions", deps.handlePublicListWebhookSubscriptions)
+			r.Post("/public/webhooks/subscriptions", deps.handlePublicCreateWebhookSubscription)
+			r.Delete("/public/webhooks/subscriptions/{id}", deps.handlePublicDeleteWebhookSubscription)
+
+			r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
+		})
 	}
 }
 
