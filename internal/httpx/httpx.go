@@ -27,6 +27,8 @@ const (
 
 	HeaderRequestID     = "X-Request-Id"
 	HeaderCorrelationID = "X-Correlation-Id"
+	HeaderAPIVersion    = "X-API-Version"
+	CurrentAPIVersion   = "2026-09-01"
 )
 
 type App struct {
@@ -59,12 +61,20 @@ func NewRouter(app App) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(correlationMiddleware)
+	r.Use(versionMiddleware)
 	r.Use(recoverMiddleware(app.Logger))
 
 	r.Get("/healthz", healthHandler(app.Config))
 	r.Get("/readyz", readyHandler(app.Config, app.Ready))
 
 	return r
+}
+
+func versionMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(HeaderAPIVersion, CurrentAPIVersion)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func Run(ctx context.Context, cfg Config, logger *slog.Logger, handler http.Handler) error {

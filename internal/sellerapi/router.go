@@ -13,9 +13,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"seller/internal/actorhttp"
+	"seller/internal/audit"
 	"seller/internal/coreclient"
 	"seller/internal/httpx"
+	"seller/internal/idempotency"
 	"seller/internal/money"
+	"seller/internal/ratelimit"
 )
 
 // CoreCapabilities are the Core calls the seller routes depend on. The interface
@@ -116,11 +119,34 @@ type CoreCapabilities interface {
 
 // Dependencies wires the seller routes.
 type Dependencies struct {
-	Core CoreCapabilities
+	Core             CoreCapabilities
+	Limiter          *ratelimit.Limiter
+	IdempotencyStore *idempotency.Store
+	AuditLogger      *audit.Logger
 }
 
 func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
+	if deps.Limiter == nil {
+		deps.Limiter = ratelimit.NewLimiter(nil, 1000, 0)
+	}
+	if deps.IdempotencyStore == nil {
+		deps.IdempotencyStore = idempotency.NewStore(nil, 0)
+	}
+	if deps.AuditLogger == nil {
+		deps.AuditLogger = audit.NewLogger(nil)
+	}
+
+	idempotencyOpt := idempotency.Middleware(deps.IdempotencyStore, false)
+
 	return func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set(httpx.HeaderAPIVersion, httpx.CurrentAPIVersion)
+				next.ServeHTTP(w, r)
+			})
+		})
+		r.Use(idempotencyOpt)
+
 		r.Get("/seller/profile", deps.handleSellerProfile)
 		r.Put("/seller/profile", deps.handleSellerProfileUpdate)
 		r.Get("/seller/stores", deps.handleSellerStores)
@@ -233,6 +259,15 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 		r.Get("/public/inventory", deps.handlePublicGetInventory)
 		r.Post("/public/inventory/adjustments", deps.handlePublicAdjustInventory)
 		r.Get("/public/orders", deps.handlePublicListOrders)
+		r.Get("/public/orders/{order_id}", deps.handlePublicGetOrderDetail)
+		r.Get("/public/orders/{order_id}/fulfillments", deps.handlePublicListOrderFulfillments)
+		r.Post("/public/orders/{order_id}/fulfillments", deps.handlePublicCreateOrderFulfillment)
+		r.Get("/public/shipments/{shipment_id}", deps.handlePublicGetShipment)
+		r.Patch("/public/shipments/{shipment_id}/status", deps.handlePublicUpdateShipmentStatus)
+
+		r.Get("/public/webhooks/subscriptions", deps.handlePublicListWebhookSubscriptions)
+		r.Post("/public/webhooks/subscriptions", deps.handlePublicCreateWebhookSubscription)
+		r.Delete("/public/webhooks/subscriptions/{id}", deps.handlePublicDeleteWebhookSubscription)
 
 		r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
 	}

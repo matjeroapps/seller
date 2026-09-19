@@ -9,17 +9,22 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"seller/internal/actorapi"
+	"seller/internal/audit"
 	"seller/internal/auth"
 	"seller/internal/config"
 	"seller/internal/coreclient"
 	"seller/internal/httpx"
+	"seller/internal/idempotency"
 	"seller/internal/logging"
 	"seller/internal/observability"
 	"seller/internal/openapi"
+	"seller/internal/ratelimit"
+	"seller/internal/redisx"
 	"seller/internal/sellerapi"
 )
 
@@ -61,6 +66,21 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	var redisClient *redisx.Client
+	if cfg.RedisAddr != "" {
+		if rc, err := redisx.New(redisx.Config{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		}); err == nil {
+			redisClient = rc
+		}
+	}
+
+	limiter := ratelimit.NewLimiter(redisClient, 1000, 1*time.Hour)
+	idempotencyStore := idempotency.NewStore(redisClient, 24*time.Hour)
+	auditLogger := audit.NewLogger(logger)
+
 	appCfg := httpx.ConfigFrom(cfg)
 	router := httpx.NewRouter(httpx.App{
 		Config: appCfg,
@@ -93,7 +113,12 @@ func run(ctx context.Context) error {
 		RequireAuth:  true,
 		AllowedRoles: []string{auth.RoleSellerOwner, auth.RoleSellerManager, auth.RoleSellerStaff},
 		Register: func(r chi.Router) {
-			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{Core: core})(r)
+			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{
+				Core:             core,
+				Limiter:          limiter,
+				IdempotencyStore: idempotencyStore,
+				AuditLogger:      auditLogger,
+			})(r)
 			sellerapi.RegisterSellerThemeRoutes(sellerapi.ThemeDependencies{Themes: core})(r)
 			sellerapi.RegisterSellerDomainRoutes(sellerapi.DomainDependencies{Domains: core})(r)
 		},
