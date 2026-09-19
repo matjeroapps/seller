@@ -30,8 +30,8 @@ type Limiter struct {
 	limit  int
 	window time.Duration
 
-	mu     sync.Mutex
-	local  map[string]*windowCounter
+	mu    sync.Mutex
+	local map[string]*windowCounter
 }
 
 type windowCounter struct {

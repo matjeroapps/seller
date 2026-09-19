@@ -18,13 +18,13 @@ import (
 
 // EventPayload defines the standard webhook JSON envelope contract.
 type EventPayload struct {
-	ID          string          `json:"id"`
-	EventType   string          `json:"event_type"`
-	APIVersion  string          `json:"api_version"`
-	CreatedAt   time.Time       `json:"created_at"`
-	ActorType   string          `json:"actor_type"`
-	ActorID     string          `json:"actor_id"`
-	Data        json.RawMessage `json:"data"`
+	ID         string          `json:"id"`
+	EventType  string          `json:"event_type"`
+	APIVersion string          `json:"api_version"`
+	CreatedAt  time.Time       `json:"created_at"`
+	ActorType  string          `json:"actor_type"`
+	ActorID    string          `json:"actor_id"`
+	Data       json.RawMessage `json:"data"`
 }
 
 // Client delivers webhook payloads over HTTP/HTTPS with HMAC signatures and retry logic.
