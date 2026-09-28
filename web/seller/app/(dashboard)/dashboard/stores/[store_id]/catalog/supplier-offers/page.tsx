@@ -114,6 +114,14 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
                     {offer.is_available ? `${offer.available_qty ?? 'In Stock'}` : 'Unavailable'}
                   </div>
                 </div>
+                <div>
+                  <span className="text-slate-400">MOQ:</span>
+                  <div className="font-semibold text-slate-800">{offer.minimum_order_quantity ?? 1}</div>
+                </div>
+                <div>
+                  <span className="text-slate-400">SKU:</span>
+                  <div className="font-semibold text-slate-800">{offer.sku_code || 'N/A'}</div>
+                </div>
               </div>
 
               <button

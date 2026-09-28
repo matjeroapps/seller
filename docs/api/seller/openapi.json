@@ -881,6 +881,10 @@
                           "market_code": {
                             "type": "string"
                           },
+                          "minimum_order_quantity": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
                           "offer_id": {
                             "type": "string"
                           },
@@ -904,6 +908,12 @@
                             ],
                             "type": "object"
                           },
+                          "primary_media_id": {
+                            "type": "string"
+                          },
+                          "primary_media_uri": {
+                            "type": "string"
+                          },
                           "product_id": {
                             "type": "string"
                           },
@@ -914,6 +924,12 @@
                             "type": "string"
                           },
                           "product_status": {
+                            "type": "string"
+                          },
+                          "sku_code": {
+                            "type": "string"
+                          },
+                          "sku_id": {
                             "type": "string"
                           },
                           "supplier_code": {

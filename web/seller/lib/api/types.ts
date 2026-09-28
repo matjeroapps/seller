@@ -60,6 +60,11 @@ export interface SupplierCatalogItem {
   category_id?: string;
   category_name?: string;
   price?: Money;
+  minimum_order_quantity?: number;
+  sku_id?: string;
+  sku_code?: string;
+  primary_media_id?: string;
+  primary_media_uri?: string;
   is_available?: boolean;
   available_qty?: number;
   fulfillment_count: number;
@@ -339,7 +344,6 @@ export interface WebhookSubscription {
   updated_at: string;
   raw_secret?: string;
 }
-
 
 
 
