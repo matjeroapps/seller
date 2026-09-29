@@ -868,6 +868,16 @@ func TestStoreScopedCatalogAndRoleAuthorization(t *testing.T) {
 		if recImport.Code != http.StatusCreated {
 			t.Errorf("import status = %d, want 201", recImport.Code)
 		}
+
+		handlerStaff := newHandlerWithRole(core, core, auth.RoleSellerStaff)
+		recStaffBrowse := doRequest(t, handlerStaff, http.MethodGet, "/v1/seller/stores/store-1/supplier-offers", "")
+		if recStaffBrowse.Code != http.StatusOK {
+			t.Errorf("staff browse status = %d, want 200", recStaffBrowse.Code)
+		}
+		recStaffImport := doRequest(t, handlerStaff, http.MethodPost, "/v1/seller/stores/store-1/supplier-offers/offer-1/imports", "")
+		if recStaffImport.Code != http.StatusForbidden {
+			t.Errorf("staff import status = %d, want 403", recStaffImport.Code)
+		}
 	})
 
 	t.Run("store listing publish unpublish and readiness", func(t *testing.T) {
