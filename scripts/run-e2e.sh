@@ -18,9 +18,10 @@ SELLER_WEB_PORT=${SELLER_WEB_PORT:-3001}
 MINIO_PORT=${MINIO_PORT:-19000}
 REDIS_HOST=${REDIS_ADDR:-127.0.0.1:6379}
 
-# MinIO images: defaults to official Quay.io images.
-MINIO_IMAGE=${MINIO_IMAGE:-quay.io/minio/minio:latest}
-MC_IMAGE=${MC_IMAGE:-quay.io/minio/mc:latest}
+# MinIO is optional for the current storefront-security suite. Callers may
+# provide a reachable image explicitly when exercising media upload E2E.
+MINIO_IMAGE=${MINIO_IMAGE:-}
+MC_IMAGE=${MC_IMAGE:-}
 MINIO_CONTAINER=${MINIO_CONTAINER:-matjero-minio-e2e}
 
 # Ephemeral service token
@@ -99,7 +100,9 @@ wait_for_url() {
 }
 
 echo "0. Starting MinIO (media storage)..."
-if curl -s -f -o /dev/null "http://127.0.0.1:$MINIO_PORT/minio/health/live"; then
+if [ -z "$MINIO_IMAGE" ]; then
+  echo "MinIO image not configured; skipping optional media storage."
+elif curl -s -f -o /dev/null "http://127.0.0.1:$MINIO_PORT/minio/health/live"; then
   echo "MinIO already running on port $MINIO_PORT."
 else
   docker rm -f "$MINIO_CONTAINER" >/dev/null 2>&1 || true
@@ -110,16 +113,18 @@ else
     "$MINIO_IMAGE" server /data >/dev/null
   MINIO_STARTED_BY_US=1
 fi
-wait_for_url "http://127.0.0.1:$MINIO_PORT/minio/health/live" "MinIO" 30
-
-echo "0b. Ensuring bucket $S3_BUCKET exists and is publicly readable..."
-# The minio/mc image entrypoint is `mc` itself.
-docker run --rm --network host \
-  -e MC_HOST_local="http://$S3_ACCESS_KEY:$S3_SECRET_KEY@127.0.0.1:$MINIO_PORT" \
-  "$MC_IMAGE" mb --ignore-existing "local/$S3_BUCKET" >/dev/null
-docker run --rm --network host \
-  -e MC_HOST_local="http://$S3_ACCESS_KEY:$S3_SECRET_KEY@127.0.0.1:$MINIO_PORT" \
-  "$MC_IMAGE" anonymous set download "local/$S3_BUCKET" >/dev/null
+if [ -n "$MINIO_IMAGE" ]; then
+  wait_for_url "http://127.0.0.1:$MINIO_PORT/minio/health/live" "MinIO" 30
+  if [ -n "$MC_IMAGE" ]; then
+    echo "0b. Ensuring bucket $S3_BUCKET exists and is publicly readable..."
+    docker run --rm --network host \
+      -e MC_HOST_local="http://$S3_ACCESS_KEY:$S3_SECRET_KEY@127.0.0.1:$MINIO_PORT" \
+      "$MC_IMAGE" mb --ignore-existing "local/$S3_BUCKET" >/dev/null
+    docker run --rm --network host \
+      -e MC_HOST_local="http://$S3_ACCESS_KEY:$S3_SECRET_KEY@127.0.0.1:$MINIO_PORT" \
+      "$MC_IMAGE" anonymous set download "local/$S3_BUCKET" >/dev/null
+  fi
+fi
 
 echo "1. Building fake-core, storefront-api, and seller-api..."
 GOWORK=off go build -o /tmp/fake-core ./cmd/fake-core
