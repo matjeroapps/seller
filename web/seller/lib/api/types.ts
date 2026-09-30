@@ -366,18 +366,32 @@ export interface WebhookSubscription {
 }
 
 export interface Theme {
+  id?: string;
   key: string;
   name: string;
-  version: string;
+  version?: string;
   description?: string;
+  type?: 'free' | 'premium' | string;
+  status?: 'draft' | 'active' | 'deprecated' | 'disabled' | string;
+}
+
+export interface ThemeVersion {
+  id: string;
+  theme_id: string;
+  version: string;
+  status: 'draft' | 'published' | 'deprecated' | string;
+  configuration_schema: Record<string, unknown>;
+  default_configuration: Record<string, unknown>;
+  component_registry_version?: string;
 }
 
 export interface ThemeInstallation {
   id: string;
   store_id: string;
+  theme_id?: string;
   theme_key: string;
   version: string;
-  status: string;
+  status: 'active' | 'inactive' | string;
 }
 
 export interface ThemeInstallationResponse {
@@ -386,4 +400,17 @@ export interface ThemeInstallationResponse {
   published_config?: Record<string, unknown>;
   draft_revision: number;
   published_revision: number;
+}
+
+export interface ThemeDraftResponse {
+  config: Record<string, unknown>;
+  revision: number;
+}
+
+export interface ThemePublishResponse {
+  published_revision: number;
+}
+
+export interface ThemePreviewResponse {
+  token: string;
 }
