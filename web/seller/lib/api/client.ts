@@ -11,7 +11,11 @@ import type {
   Payout,
   Product,
   ProductMediaReference,
+  OrderTransitionPayload,
   SellerListing,
+  SellerOrder,
+  SellerOrderDetail,
+  SellerOrderListResponse,
   SellerStoreListResponse,
   SellerSyncJob,
   Settlement,
@@ -327,6 +331,31 @@ export const sellerApi = {
   },
 
   // Shipping
+  // Orders
+  async listStoreOrders(
+    storeId: string,
+    params: { status?: string; limit?: number; offset?: number; query?: string } = {}
+  ): Promise<SellerOrderListResponse> {
+    const query = new URLSearchParams();
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.limit) query.set('limit', params.limit.toString());
+    if (params.offset) query.set('offset', params.offset.toString());
+    if (params.query) query.set('query', params.query);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request<SellerOrderListResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders${qs}`);
+  },
+
+  async getStoreOrderDetail(storeId: string, orderId: string): Promise<SellerOrderDetail> {
+    return request<SellerOrderDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}`);
+  },
+
+  async transitionStoreOrder(storeId: string, orderId: string, data: OrderTransitionPayload): Promise<SellerOrderDetail> {
+    return request<SellerOrderDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/transition`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
   async createShipment(storeId: string, orderId: string, data: CreateShipmentPayload): Promise<Shipment> {
     return request<Shipment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/shipments`, {
       method: 'POST',
