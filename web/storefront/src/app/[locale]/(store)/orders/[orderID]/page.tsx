@@ -44,9 +44,9 @@ type Order = {
 export default function OrderDetailPage({
   params
 }: {
-  params: Promise<{ locale: string; orderID: string }>;
+  params: Promise<{ locale: string; orderID: string }> | { locale: string; orderID: string };
 }) {
-  const resolvedParams = use(params);
+  const resolvedParams = 'then' in params ? use(params) : params;
   const locale: Locale = isLocale(resolvedParams.locale) ? resolvedParams.locale : 'en';
   const orderID = resolvedParams.orderID;
   const copy = dictionaryFor(locale);
@@ -239,11 +239,11 @@ export default function OrderDetailPage({
 
         {/* Customer Payment Status Section */}
         <section className="order-address-section">
-          <h2>Payment Status</h2>
+          <h2>{copy.order.paymentStatus}</h2>
           <div className="address-card">
-            <p><strong>Payment Method:</strong> Cash on Delivery (COD)</p>
-            <p><strong>Status:</strong> <span className="status-tag status-tag--confirmed">PENDING COLLECTION</span></p>
-            <p><strong>Amount Payable:</strong> {formatMoney(order.total_minor, order.currency_code)}</p>
+            <p><strong>{copy.order.paymentMethodLabel}:</strong> {copy.checkout.cod}</p>
+            <p><strong>{copy.order.status}:</strong> <span className="status-tag status-tag--confirmed">{copy.order.paymentPendingCollection}</span></p>
+            <p><strong>{copy.order.amountPayable}:</strong> {formatMoney(order.total_minor, order.currency_code)}</p>
           </div>
         </section>
 

@@ -869,3 +869,102 @@ func TestFailedFinalizeDoesNotClearCartCookie(t *testing.T) {
 		}
 	}
 }
+
+func TestBuyNowCartIsolation(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeOrder: coreclient.PublicOrder{ID: "ord-buynow-1", OrderNumber: "#BN100", Status: "pending"},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	// Finalizing a Buy Now session with matjero_buy_now_session marker MUST expire Buy Now session but PRESERVE matjero_cart
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-bn-99/finalize", strings.NewReader(`{"contact_email":"buynow@test.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-bn-99", Value: "guest-tok-bn"})
+	req.AddCookie(&http.Cookie{Name: "matjero_buy_now_session_sess-bn-99", Value: "1"})
+	req.AddCookie(&http.Cookie{Name: "matjero_cart", Value: "original-cart-cookie-intact"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+
+	setCookies := rec.Result().Cookies()
+	var foundOrderCookie, expiredBuyNowCookie bool
+	for _, c := range setCookies {
+		if c.Name == "matjero_guest_order_ord-buynow-1" && c.Value == "guest-tok-bn" {
+			foundOrderCookie = true
+		}
+		if c.Name == "matjero_buy_now_session_sess-bn-99" && (c.MaxAge < 0 || c.Expires.Year() < 2000) {
+			expiredBuyNowCookie = true
+		}
+		if c.Name == "matjero_cart" {
+			t.Errorf("Buy Now finalization MUST NOT delete or modify matjero_cart cookie, got %v", c)
+		}
+	}
+
+	if !foundOrderCookie {
+		t.Errorf("expected matjero_guest_order_ord-buynow-1 cookie to be set")
+	}
+	if !expiredBuyNowCookie {
+		t.Errorf("expected matjero_buy_now_session_sess-bn-99 to be expired")
+	}
+}
+
+func TestGuestOrderCapabilityAuth(t *testing.T) {
+	comm := &stubCommerce{}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	// 1. Missing cookie returns 401 Unauthorized
+	req1 := httptest.NewRequest(http.MethodGet, "/v1/storefront/orders/ord-test-1", nil)
+	req1.Host = domainA
+	rec1 := httptest.NewRecorder()
+	router.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusUnauthorized {
+		t.Errorf("Get guest order without token status = %d, want 401", rec1.Code)
+	}
+
+	// 2. With capability token cookie returns 200
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/storefront/orders/ord-test-1", nil)
+	req2.Host = domainA
+	req2.AddCookie(&http.Cookie{Name: "matjero_guest_order_ord-test-1", Value: "valid-capability-tok"})
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Errorf("Get guest order with valid token status = %d, want 200", rec2.Code)
+	}
+
+	// 3. Cancel without token returns 401 Unauthorized
+	req3 := httptest.NewRequest(http.MethodPost, "/v1/storefront/orders/ord-test-1/cancel", nil)
+	req3.Host = domainA
+	rec3 := httptest.NewRecorder()
+	router.ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusUnauthorized {
+		t.Errorf("Cancel guest order without token status = %d, want 401", rec3.Code)
+	}
+
+	// 4. Cancel with valid token returns 200
+	req4 := httptest.NewRequest(http.MethodPost, "/v1/storefront/orders/ord-test-1/cancel", nil)
+	req4.Host = domainA
+	req4.AddCookie(&http.Cookie{Name: "matjero_guest_order_ord-test-1", Value: "valid-capability-tok"})
+	rec4 := httptest.NewRecorder()
+	router.ServeHTTP(rec4, req4)
+	if rec4.Code != http.StatusOK {
+		t.Errorf("Cancel guest order with valid token status = %d, want 200", rec4.Code)
+	}
+}

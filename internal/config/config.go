@@ -135,7 +135,7 @@ func Load(serviceName string) (Config, error) {
 		StorefrontCacheTTL:             time.Duration(cacheTTLSeconds) * time.Second,
 		StorefrontCacheMaxPayloadBytes: cacheMaxPayloadBytes,
 
-		StorefrontCheckoutEnabled: boolEnv("STOREFRONT_CHECKOUT_ENABLED", false),
+		StorefrontCheckoutEnabled: boolEnv("STOREFRONT_CHECKOUT_ENABLED", true),
 		StorefrontCookieSecure:    boolEnv("STOREFRONT_COOKIE_SECURE", stringEnv("APP_ENV", "development") == "production"),
 	}
 
