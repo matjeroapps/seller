@@ -149,6 +149,7 @@ export type Dictionary = {
   };
   checkout: {
     title: string;
+    shippingInfo: string;
     recipientName: string;
     addressLine1: string;
     addressLine2: string;
@@ -157,6 +158,12 @@ export type Dictionary = {
     postalCode: string;
     countryCode: string;
     contactEmail: string;
+    paymentMethod: string;
+    cod: string;
+    codDescription: string;
+    priceChangedError: string;
+    inventoryError: string;
+    expiredError: string;
     submit: string;
     submitting: string;
   };
@@ -174,6 +181,10 @@ export type Dictionary = {
     confirmationDeadline: string;
     created: string;
     shippingAddress: string;
+    paymentStatus: string;
+    paymentMethodLabel: string;
+    paymentPendingCollection: string;
+    amountPayable: string;
   };
 };
 
@@ -293,6 +304,7 @@ const en: Dictionary = {
   },
   checkout: {
     title: 'Checkout',
+    shippingInfo: 'Shipping Information',
     recipientName: 'Recipient Name',
     addressLine1: 'Address Line 1',
     addressLine2: 'Address Line 2 (Optional)',
@@ -301,6 +313,12 @@ const en: Dictionary = {
     postalCode: 'Postal Code',
     countryCode: 'Country Code',
     contactEmail: 'Email Address',
+    paymentMethod: 'Payment Method',
+    cod: 'Cash on Delivery (COD)',
+    codDescription: 'Pay when your order is delivered. Order will be confirmed and processed immediately.',
+    priceChangedError: 'Prices changed since checkout began. Please review your cart.',
+    inventoryError: 'An item in your cart is no longer available in the requested quantity.',
+    expiredError: 'This checkout session has expired. Please return to your cart and start again.',
     submit: 'Place Order',
     submitting: 'Processing...'
   },
@@ -317,7 +335,11 @@ const en: Dictionary = {
     totals: 'Totals',
     confirmationDeadline: 'Confirmation Deadline',
     created: 'Order Date',
-    shippingAddress: 'Shipping Address'
+    shippingAddress: 'Shipping Address',
+    paymentStatus: 'Payment Status',
+    paymentMethodLabel: 'Payment Method',
+    paymentPendingCollection: 'Payment Pending (COD)',
+    amountPayable: 'Amount Payable'
   }
 };
 
@@ -437,6 +459,7 @@ const ar: Dictionary = {
   },
   checkout: {
     title: 'إتمام الطلب',
+    shippingInfo: 'معلومات الشحن والتوصيل',
     recipientName: 'اسم المستلم',
     addressLine1: 'عنوان الشارع',
     addressLine2: 'عنوان إضافي (اختياري)',
@@ -445,6 +468,12 @@ const ar: Dictionary = {
     postalCode: 'الرمز البريدي',
     countryCode: 'رمز الدولة',
     contactEmail: 'البريد الإلكتروني',
+    paymentMethod: 'طريقة الدفع',
+    cod: 'الدفع عند الاستلام',
+    codDescription: 'الدفع نقداً أو بالبطاقة عند استلام الشحنة. سيتم تأكيد الطلب وتجهيزه فوراً.',
+    priceChangedError: 'تغيرت أسعار بعض المنتجات منذ بدء الطلب. يرجى مراجعة السلة.',
+    inventoryError: 'أحد المنتجات في السلة غير متوفر بالكمية المطلوبة حالياً.',
+    expiredError: 'انتهت صلاحية جلسة إتمام الطلب. يرجى العودة إلى السلة والمحاولة مرة أخرى.',
     submit: 'تأكيد الطلب',
     submitting: 'جاري معالجة الطلب...'
   },
@@ -461,7 +490,11 @@ const ar: Dictionary = {
     totals: 'الإجمالي',
     confirmationDeadline: 'الموعد النهائي للتأكيد',
     created: 'تاريخ الطلب',
-    shippingAddress: 'عنوان الشحن'
+    shippingAddress: 'عنوان الشحن',
+    paymentStatus: 'حالة الدفع',
+    paymentMethodLabel: 'طريقة الدفع',
+    paymentPendingCollection: 'في انتظار التحصيل عند الاستلام',
+    amountPayable: 'المبلغ المستحق'
   }
 };
 
