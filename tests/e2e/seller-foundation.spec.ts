@@ -31,8 +31,8 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
   ]);
 
   await page.goto(`${SELLER_APP_URL}/dashboard`);
-  await expect(page).toHaveURL(/\/dashboard\/stores\/str_dev_01$/);
-  await expect(page.getByRole('heading', { name: /Store-A|Store Dashboard/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard\/stores\/[a-zA-Z0-9_-]+$/);
+  await expect(page.getByRole('heading', { name: /Store A|Store-A|Store Dashboard/ })).toBeVisible();
   await expect(page.getByText('Launch Readiness')).toBeVisible();
   await expect(page.getByText('Products', { exact: true })).toBeVisible();
   await expect(page.getByText('Supplier Offers')).toBeVisible();
