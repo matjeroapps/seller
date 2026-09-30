@@ -70,13 +70,13 @@ describe('Manual Shipment Fulfillment & Tracking (T018 / US3)', () => {
     updated_at: '2026-09-30T10:30:00Z'
   };
 
-  it('renders "Fulfill & Mark Shipped" button for orders in ready_for_shipping status', async () => {
+  it('renders "Create Shipment" button for orders in ready_for_shipping status', async () => {
     vi.mocked(sellerApi.getStoreOrderDetail).mockResolvedValue(mockReadyOrder);
 
     render(<StoreOrderDetailPage params={{ store_id: 'str_1', order_id: 'ord_ready_1' }} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fulfill & Mark Shipped')).toBeInTheDocument();
+      expect(screen.getByText('Create Shipment')).toBeInTheDocument();
     });
   });
 
@@ -99,10 +99,10 @@ describe('Manual Shipment Fulfillment & Tracking (T018 / US3)', () => {
     render(<StoreOrderDetailPage params={{ store_id: 'str_1', order_id: 'ord_ready_1' }} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fulfill & Mark Shipped')).toBeInTheDocument();
+      expect(screen.getByText('Create Shipment')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Fulfill & Mark Shipped'));
+    fireEvent.click(screen.getByText('Create Shipment'));
 
     expect(screen.getByText(/Manual Package Dispatch & Fulfillment/)).toBeInTheDocument();
 

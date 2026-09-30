@@ -177,13 +177,13 @@ export default function StoreOrderDetailPage({
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Order {order.order_number || `#${order.id.slice(0, 8)}`}
+              Order Fulfillment & Tracking — #{order.order_number || order.id.slice(0, 8)}
             </h1>
             {getStatusBadge(order.status)}
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            <h2 className="text-xs text-slate-500 inline font-normal">Order Fulfillment & Tracking</h2> • Placed on {formattedCreated} • ID: <span className="font-mono">{order.id}</span>
-          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Placed on {formattedCreated} • ID: <span className="font-mono">{order.id}</span>
+          </p>
         </div>
 
         {/* Action Buttons */}
@@ -213,12 +213,11 @@ export default function StoreOrderDetailPage({
           {canShip && (
             <button
               type="button"
-              aria-label="Create Shipment"
               disabled={actionLoading}
               onClick={() => setIsFulfillmentModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-md shadow-sm disabled:opacity-50"
             >
-              <Truck className="w-3.5 h-3.5" /> Fulfill & Mark Shipped
+              <Truck className="w-3.5 h-3.5" /> Create Shipment
             </button>
           )}
 

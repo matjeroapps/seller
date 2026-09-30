@@ -130,7 +130,7 @@ describe('Seller Orders Management (M6-01)', () => {
       render(<StoreOrderDetailPage params={{ store_id: 'str_1', order_id: 'ord_123' }} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Order ORD-2026-0001')).toBeInTheDocument();
+        expect(screen.getByText(/ORD-2026-0001/)).toBeInTheDocument();
         expect(screen.getByText('Arabian Musk 100ml')).toBeInTheDocument();
         expect(screen.getByText('fahad@example.com')).toBeInTheDocument();
         expect(screen.getByText('King Fahd Road')).toBeInTheDocument();
