@@ -15,11 +15,11 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
       value: await serializeSessionCookie({
         isAuthenticated: true,
         user: {
-          id: 'usr_seller_e2e',
-          email: 'seller-e2e@matjero.test',
-          name: 'Seller E2E',
+          id: 'usr_seller_dev',
+          email: 'seller-owner@matjero.test',
+          name: 'Seller Owner',
           roles: ['seller_owner'],
-          tenantId: 'tenant-e2e'
+          tenantId: 'tenant-dev'
         },
         expiresAt: Date.now() + 60 * 60 * 1000
       }),
