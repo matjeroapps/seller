@@ -194,9 +194,9 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
     <div className="max-w-4xl space-y-7 pb-12">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Storefront Theme & Presentation Studio</h1>
+        <h1 className="text-xl font-bold text-slate-900">Canonical Storefront Settings</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Manage visual presentation, switch themes, customize brand styling in draft mode, and preview changes with live merchant catalog data for {currentStore?.name || 'this store'}.
+          Manage visual presentation, themes, customize brand styling in draft mode, and preview changes with live merchant catalog data for {currentStore?.name || 'this store'}.
         </p>
       </div>
 
@@ -223,9 +223,9 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Canonical Customer Storefront</h2>
+              <h2 className="text-sm font-bold text-slate-900">Canonical Storefront Host</h2>
               <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                <span>Resolved Endpoint:</span>
+                <span>Resolved via Core domain host resolver:</span>
                 <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-slate-800">
                   {canonicalStorefrontUrl}
                 </code>
@@ -239,7 +239,7 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-xs"
           >
-            Visit Live Storefront <ExternalLink className="w-3.5 h-3.5" />
+            Open Canonical Customer Storefront <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
 
