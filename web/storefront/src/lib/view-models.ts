@@ -66,6 +66,28 @@ function plainText(value: unknown, maxLength: number): string {
 }
 
 /**
+ * normalizeMediaUrl ensures media URLs from storage (MinIO/S3) or external CDNs
+ * resolve to safe, client-accessible paths (such as the Storefront /media/* proxy).
+ */
+export function normalizeMediaUrl(uri: unknown, maxLength = 2048): string {
+  if (typeof uri !== 'string') {
+    return '';
+  }
+  const trimmed = uri.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.startsWith('/media/')) {
+    return safeUrl(trimmed, maxLength);
+  }
+  const bucketMatch = trimmed.match(/(?:matjero-staging-media|matjerhub-media)\/(.+)$/);
+  if (bucketMatch && bucketMatch[1]) {
+    return safeUrl(`/media/${bucketMatch[1]}`, maxLength);
+  }
+  return safeUrl(trimmed, maxLength);
+}
+
+/**
  * formatPrice renders a minor-unit amount for display.
  *
  * The currency's minor unit comes from the store's market, so the fraction digits
@@ -114,7 +136,7 @@ export function toProductCard(
   copy: Dictionary,
   previewToken?: string | null
 ): ProductCardModel {
-  const imageUri = safeUrl(item.image?.uri, 2048);
+  const imageUri = normalizeMediaUrl(item.image?.uri, 2048);
   const name = plainText(item.name, 256);
 
   return {
@@ -251,7 +273,7 @@ export function toProductDetailModel(
     availabilityLabel: availabilityLabel(product.availability, copy),
     images: (product.images ?? [])
       .slice(0, MAX_GALLERY_IMAGES)
-      .map((image) => ({ uri: safeUrl(image.uri, 2048), alt: plainText(image.alt_text, 256) || name }))
+      .map((image) => ({ uri: normalizeMediaUrl(image.uri, 2048), alt: plainText(image.alt_text, 256) || name }))
       .filter((image) => image.uri !== ''),
     categories: (product.categories ?? []).map((category) => ({
       href: categoryHref(locale, category.slug, previewToken),

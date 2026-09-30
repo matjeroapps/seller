@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { locales } from '../src/i18n/locales';
-import { formatPrice, toProductCard, toThemeContext, topLevelCategories } from '../src/lib/view-models';
+import { formatPrice, normalizeMediaUrl, toProductCard, toThemeContext, topLevelCategories } from '../src/lib/view-models';
 import { categoriesA, productItemA, productItemAOut, storeA, storeB } from './fixtures/storefront';
 import { copyFor } from './support/render';
 
@@ -174,3 +174,31 @@ describe('theme context', () => {
     expect(context.settings.announcement?.text).toBe('Free delivery over 500');
   });
 });
+
+describe('media normalization', () => {
+  it('rewrites internal MinIO/S3 bucket URLs to /media/* relative paths', () => {
+    expect(normalizeMediaUrl('http://minio:9000/matjero-staging-media/products/aurora.jpg')).toBe(
+      '/media/products/aurora.jpg'
+    );
+    expect(normalizeMediaUrl('http://localhost:9000/matjero-staging-media/products/thumb.png')).toBe(
+      '/media/products/thumb.png'
+    );
+    expect(normalizeMediaUrl('http://127.0.0.1:9000/matjerhub-media/banners/hero.webp')).toBe(
+      '/media/banners/hero.webp'
+    );
+  });
+
+  it('preserves existing /media/ relative paths and valid external CDN URLs', () => {
+    expect(normalizeMediaUrl('/media/products/lamp.jpg')).toBe('/media/products/lamp.jpg');
+    expect(normalizeMediaUrl('https://cdn.example.com/products/lamp.jpg')).toBe(
+      'https://cdn.example.com/products/lamp.jpg'
+    );
+  });
+
+  it('rejects unsafe schemes and returns empty string', () => {
+    expect(normalizeMediaUrl('javascript:alert(1)')).toBe('');
+    expect(normalizeMediaUrl('data:image/png;base64,123')).toBe('');
+    expect(normalizeMediaUrl(undefined)).toBe('');
+  });
+});
+

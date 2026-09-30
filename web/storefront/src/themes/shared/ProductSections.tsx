@@ -1,5 +1,5 @@
 import type { ProductDetailViewModel, ThemeContext } from '../contract';
-import { safeUrl } from '../settings';
+import { normalizeMediaUrl } from '../../lib/view-models';
 import { PURCHASE_CONTROL_ANCHOR } from './constants';
 
 /**
@@ -73,7 +73,7 @@ export function ImageTextSection({ content }: { content: Record<string, unknown>
   const body = str(content.body);
   const layout = content.layout === 'right' ? 'right' : 'left';
   const image = isContentObject(content.image) ? content.image : null;
-  const uri = safeUrl(image ? image.uri : undefined, 2048);
+  const uri = normalizeMediaUrl(image ? image.uri : undefined, 2048);
   const alt = image ? str(image.alt_text) : '';
   if (!heading && !body && !uri) {
     return null;

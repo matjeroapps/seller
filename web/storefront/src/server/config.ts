@@ -27,6 +27,8 @@ export type StorefrontRuntimeConfig = {
   fallbackHost: string;
   /** Public protocol used when the request does not carry a trusted proxy value. */
   publicProtocol?: 'http' | 'https';
+  /** Public URL or proxy base URL for media storage. */
+  storagePublicUrl?: string;
 };
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -47,6 +49,7 @@ export function runtimeConfig(env: NodeJS.ProcessEnv = process.env): StorefrontR
     trustForwardedHost: env.TRUSTED_FORWARDED_HOST === 'true',
     requestTimeoutMs: readTimeout(env.STOREFRONT_API_TIMEOUT_MS),
     fallbackHost: (env.STOREFRONT_FALLBACK_HOST ?? '').trim(),
-    publicProtocol
+    publicProtocol,
+    storagePublicUrl: (env.STORAGE_PUBLIC_URL ?? env.MEDIA_PUBLIC_BASE_URL ?? '/media').trim()
   };
 }

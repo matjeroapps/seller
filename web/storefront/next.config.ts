@@ -12,10 +12,15 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async rewrites() {
     const apiBaseUrl = (process.env.STOREFRONT_API_BASE_URL || 'http://127.0.0.1:8080').trim();
+    const storagePublicUrl = (process.env.STORAGE_PUBLIC_URL || process.env.MEDIA_PUBLIC_BASE_URL || 'http://127.0.0.1:9000/matjero-staging-media').trim();
     return [
       {
         source: '/v1/storefront/:path*',
         destination: `${apiBaseUrl}/v1/storefront/:path*`
+      },
+      {
+        source: '/media/:path*',
+        destination: `${storagePublicUrl}/:path*`
       }
     ];
   }
