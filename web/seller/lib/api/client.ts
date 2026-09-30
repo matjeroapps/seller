@@ -105,6 +105,10 @@ export const sellerApi = {
     return request<{ items: Theme[] }>('/v1/seller/themes');
   },
 
+  async getThemeVersions(themeKey: string): Promise<{ items: import('./types').ThemeVersion[] }> {
+    return request<{ items: import('./types').ThemeVersion[] }>(`/v1/seller/themes/${encodeURIComponent(themeKey)}/versions`);
+  },
+
   async getThemeInstallation(storeId: string): Promise<ThemeInstallationResponse> {
     return request<ThemeInstallationResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme`);
   },
@@ -113,6 +117,35 @@ export const sellerApi = {
     return request<ThemeInstallationResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/install`, {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  },
+
+  async getThemeDraft(storeId: string): Promise<import('./types').ThemeDraftResponse> {
+    return request<import('./types').ThemeDraftResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/draft`);
+  },
+
+  async updateThemeDraft(storeId: string, config: Record<string, unknown>): Promise<import('./types').ThemeDraftResponse> {
+    return request<import('./types').ThemeDraftResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/draft`, {
+      method: 'PUT',
+      body: JSON.stringify({ config })
+    });
+  },
+
+  async publishTheme(storeId: string): Promise<import('./types').ThemePublishResponse> {
+    return request<import('./types').ThemePublishResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/publish`, {
+      method: 'POST'
+    });
+  },
+
+  async discardThemeDraft(storeId: string): Promise<import('./types').ThemeDraftResponse> {
+    return request<import('./types').ThemeDraftResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/discard`, {
+      method: 'POST'
+    });
+  },
+
+  async createThemePreview(storeId: string): Promise<import('./types').ThemePreviewResponse> {
+    return request<import('./types').ThemePreviewResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/preview`, {
+      method: 'POST'
     });
   },
 
