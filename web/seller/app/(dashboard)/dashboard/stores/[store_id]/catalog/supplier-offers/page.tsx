@@ -13,6 +13,8 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [importingOfferId, setImportingOfferId] = useState<string | null>(null);
+  const [importedOffers, setImportedOffers] = useState<Record<string, string>>({});
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string; listingId?: string } | null>(null);
 
   const loadOffers = (searchQuery?: string) => {
     setLoading(true);
@@ -22,7 +24,10 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
         setOffers(res.items || []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        setNotification({ type: 'error', message: err.message || 'Failed to load supplier offers' });
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -36,11 +41,20 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
 
   const handleImport = async (offerId: string) => {
     setImportingOfferId(offerId);
+    setNotification(null);
     try {
       const listing = await sellerApi.importSupplierOffer(store_id, offerId);
-      alert('Supplier offer imported successfully as a store listing!');
+      setImportedOffers((prev) => ({ ...prev, [offerId]: listing.id }));
+      setNotification({
+        type: 'success',
+        message: 'Supplier offer imported successfully into your store catalog!',
+        listingId: listing.id,
+      });
     } catch (err: any) {
-      alert(err.message || 'Failed to import supplier offer');
+      setNotification({
+        type: 'error',
+        message: err.message || 'Failed to import supplier offer',
+      });
     } finally {
       setImportingOfferId(null);
     }
@@ -61,6 +75,41 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
           View Store Listings
         </Link>
       </div>
+
+      {/* Notification Banner */}
+      {notification && (
+        <div
+          className={`flex items-start justify-between p-3 text-xs rounded-lg border ${
+            notification.type === 'success'
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : 'bg-rose-50 text-rose-900 border-rose-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {notification.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{notification.message}</span>
+            {notification.listingId && (
+              <Link
+                href={`/dashboard/stores/${store_id}/catalog/listings`}
+                className="underline font-medium ml-1 hover:text-emerald-700"
+              >
+                Go to Listings
+              </Link>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setNotification(null)}
+            className="text-xs opacity-60 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Search Bar */}
       <form onSubmit={handleSearch} className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -89,52 +138,70 @@ export default function StoreSupplierOffersPage({ params }: { params: Promise<{ 
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {offers.map((offer) => (
-            <div key={offer.offer_id} className="p-4 bg-white border border-slate-200 rounded-lg shadow-sm space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{offer.product_name}</h3>
-                  <div className="text-[11px] text-slate-500">Supplier: {offer.supplier_name}</div>
-                </div>
-                <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">
-                  {offer.market_code}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100">
-                <div>
-                  <span className="text-slate-400">Offer Price:</span>
-                  <div className="font-semibold text-slate-800">
-                    {offer.price ? `${offer.price.currency} ${offer.price.amount}` : 'N/A'}
+          {offers.map((offer) => {
+            const importedListingId = importedOffers[offer.offer_id];
+            return (
+              <div key={offer.offer_id} className="p-4 bg-white border border-slate-200 rounded-lg shadow-sm space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">{offer.product_name}</h3>
+                    <div className="text-[11px] text-slate-500">Supplier: {offer.supplier_name}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {importedListingId && (
+                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                        Imported
+                      </span>
+                    )}
+                    <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">
+                      {offer.market_code}
+                    </span>
                   </div>
                 </div>
-                <div>
-                  <span className="text-slate-400">Availability:</span>
-                  <div className="font-semibold text-slate-800">
-                    {offer.is_available ? `${offer.available_qty ?? 'In Stock'}` : 'Unavailable'}
+
+                <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100">
+                  <div>
+                    <span className="text-slate-400">Offer Price:</span>
+                    <div className="font-semibold text-slate-800">
+                      {offer.price ? `${offer.price.currency} ${offer.price.amount}` : 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Availability:</span>
+                    <div className="font-semibold text-slate-800">
+                      {offer.is_available ? `${offer.available_qty ?? 'In Stock'}` : 'Unavailable'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">MOQ:</span>
+                    <div className="font-semibold text-slate-800">{offer.minimum_order_quantity ?? 1}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">SKU:</span>
+                    <div className="font-semibold text-slate-800">{offer.sku_code || 'N/A'}</div>
                   </div>
                 </div>
-                <div>
-                  <span className="text-slate-400">MOQ:</span>
-                  <div className="font-semibold text-slate-800">{offer.minimum_order_quantity ?? 1}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">SKU:</span>
-                  <div className="font-semibold text-slate-800">{offer.sku_code || 'N/A'}</div>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                disabled={importingOfferId === offer.offer_id || !offer.is_available}
-                onClick={() => handleImport(offer.offer_id)}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {importingOfferId === offer.offer_id ? 'Importing...' : 'Import to Store Catalog'}
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  disabled={importingOfferId === offer.offer_id || !offer.is_available}
+                  onClick={() => handleImport(offer.offer_id)}
+                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    importedListingId
+                      ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200'
+                      : 'text-white bg-amber-600 hover:bg-amber-700'
+                  } disabled:opacity-50`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {importingOfferId === offer.offer_id
+                    ? 'Importing...'
+                    : importedListingId
+                    ? 'Re-import (Idempotent)'
+                    : 'Import to Store Catalog'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
