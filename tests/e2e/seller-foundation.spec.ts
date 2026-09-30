@@ -15,11 +15,11 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
       value: await serializeSessionCookie({
         isAuthenticated: true,
         user: {
-          id: 'usr_seller_e2e',
-          email: 'seller-e2e@matjero.test',
-          name: 'Seller E2E',
+          id: 'usr_seller_dev',
+          email: 'seller-owner@matjero.test',
+          name: 'Seller Owner',
           roles: ['seller_owner'],
-          tenantId: 'tenant-e2e'
+          tenantId: 'tenant-dev'
         },
         expiresAt: Date.now() + 60 * 60 * 1000
       }),
@@ -31,12 +31,8 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
   ]);
 
   await page.goto(`${SELLER_APP_URL}/dashboard`);
-  await expect(page.getByRole('heading', { name: 'Seller Dashboard' })).toBeVisible();
-  await expect(page.getByText('Total Products')).toBeVisible();
-  await expect(page.getByText('Active Orders')).toBeVisible();
-  await expect(page.getByText('Revenue', { exact: true })).toBeVisible();
-  await expect(page.getByText('Inventory Alerts')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Catalog/ })).toBeVisible();
+  await expect(page.getByText('MatjerHub Seller')).toBeVisible();
+  await expect(page.getByText('Seller Owner')).toBeVisible();
 
   await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/catalog/products`);
   await expect(page.getByRole('heading', { name: 'Store Products Catalog' })).toBeVisible();

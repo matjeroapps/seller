@@ -21,6 +21,8 @@ import type {
   StoreMediaAsset,
   StructuredPublishReadiness,
   SupplierCatalogItem,
+  Theme,
+  ThemeInstallationResponse,
   UpdatePaymentStatusPayload,
   UpdateShipmentStatusPayload,
   WebhookSubscription
@@ -91,6 +93,26 @@ export const sellerApi = {
     return request<Store>(`/v1/seller/stores/${encodeURIComponent(storeId)}/status`, {
       method: 'POST',
       body: JSON.stringify({ status })
+    });
+  },
+
+  async getStorefrontHost(storeId: string): Promise<{ host: string }> {
+    return request<{ host: string }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/storefront-host`);
+  },
+
+  // Themes
+  async listThemes(): Promise<{ items: Theme[] }> {
+    return request<{ items: Theme[] }>('/v1/seller/themes');
+  },
+
+  async getThemeInstallation(storeId: string): Promise<ThemeInstallationResponse> {
+    return request<ThemeInstallationResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme`);
+  },
+
+  async installTheme(storeId: string, data: { theme_key: string; version?: string }): Promise<ThemeInstallationResponse> {
+    return request<ThemeInstallationResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme/install`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
   },
 
