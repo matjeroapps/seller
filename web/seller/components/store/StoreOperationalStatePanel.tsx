@@ -64,11 +64,11 @@ export function StoreOperationalStatePanel({
         <button
           type="button"
           onClick={onToggle}
-          disabled={isSaving}
+          disabled={isSaving || !state}
           className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold text-white shadow-xs disabled:cursor-not-allowed disabled:opacity-60 ${accepting ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
         >
           {accepting ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
-          {isSaving ? 'Saving...' : accepting ? 'Pause checkout' : 'Resume checkout'}
+          {isSaving ? 'Saving...' : !state ? 'Loading...' : accepting ? 'Pause checkout' : 'Resume checkout'}
         </button>
       </div>
     </section>
