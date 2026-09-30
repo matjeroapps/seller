@@ -915,6 +915,9 @@ func (deps Dependencies) handleUnpublishProduct(w http.ResponseWriter, r *http.R
 }
 
 func (deps Dependencies) handleListStoreOrders(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
 	subject, _, ok := deps.sellerID(w, r)
 	if !ok {
 		return
@@ -933,6 +936,9 @@ func (deps Dependencies) handleListStoreOrders(w http.ResponseWriter, r *http.Re
 }
 
 func (deps Dependencies) handleGetStoreOrderDetail(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
 	subject, _, ok := deps.sellerID(w, r)
 	if !ok {
 		return
@@ -949,6 +955,9 @@ func (deps Dependencies) handleGetStoreOrderDetail(w http.ResponseWriter, r *htt
 }
 
 func (deps Dependencies) handleTransitionStoreOrder(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
 	subject, _, ok := deps.sellerID(w, r)
 	if !ok {
 		return

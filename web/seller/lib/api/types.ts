@@ -414,3 +414,73 @@ export interface ThemePublishResponse {
 export interface ThemePreviewResponse {
   token: string;
 }
+
+export interface SellerOrder {
+  id: string;
+  order_number: string;
+  status: string;
+  currency: string;
+  total: number;
+  item_count: number;
+  recipient_name: string;
+  confirmation_deadline_at?: string;
+  created_at: string;
+}
+
+export interface SellerOrderItem {
+  id: string;
+  product_name: string;
+  sku_code: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  source: 'seller_owned' | 'supplier_backed' | string;
+}
+
+export interface SellerOrderTimelineEvent {
+  id: string;
+  type: string;
+  detail: string;
+  created_at: string;
+}
+
+export interface SellerOrderAddress {
+  recipient_name?: string;
+  phone?: string;
+  address_line_1?: string;
+  address_line_2?: string;
+  city?: string;
+  region?: string;
+  postal_code?: string;
+  country_code?: string;
+}
+
+export interface SellerOrderDetail {
+  id: string;
+  order_number: string;
+  status: string;
+  currency: string;
+  subtotal: number;
+  total: number;
+  item_count: number;
+  confirmation_deadline_at?: string;
+  shipping_address?: SellerOrderAddress;
+  contact_email?: string;
+  items: SellerOrderItem[];
+  timeline: SellerOrderTimelineEvent[];
+  allowed_next_actions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SellerOrderListResponse {
+  orders: SellerOrder[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface OrderTransitionPayload {
+  target_status: string;
+  reason?: string;
+}
