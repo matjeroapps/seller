@@ -93,6 +93,7 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
                   <th className="px-4 py-3">Source Type</th>
                   <th className="px-4 py-3">Market</th>
                   <th className="px-4 py-3">Publish Status</th>
+                  <th className="px-4 py-3">Availability</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -130,6 +131,17 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
                         {l.status === 'archived' && <Archive className="w-3 h-3" />}
                         {l.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {l.status === 'published' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Active Supply
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          {l.status === 'draft' ? 'Draft (Unpublished)' : 'Inactive'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link

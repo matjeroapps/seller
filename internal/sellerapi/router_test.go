@@ -41,6 +41,7 @@ type stubCore struct {
 	catalog   []coreclient.SupplierCatalogItem
 	listings  []coreclient.SellerListing
 	listing   coreclient.SellerListing
+	lifecycle coreclient.SellerListingLifecycle
 	themes    []coreclient.Theme
 	versions  []coreclient.ThemeVersion
 	install   coreclient.ThemeInstallationResponse
@@ -113,6 +114,11 @@ func (s *stubCore) ListStoreListings(ctx context.Context, storeID, subject strin
 func (s *stubCore) GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error) {
 	s.storeID, s.subject = storeID, subject
 	return &s.listing, s.err
+}
+
+func (s *stubCore) GetStoreListingLifecycle(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListingLifecycle, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.lifecycle, s.err
 }
 
 func (s *stubCore) ImportListing(ctx context.Context, storeID, subject string, importReq coreclient.ListingImport) (coreclient.SellerListing, error) {

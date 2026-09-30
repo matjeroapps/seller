@@ -146,6 +146,12 @@ export const sellerApi = {
     );
   },
 
+  async getStoreListingLifecycle(storeId: string, listingId: string): Promise<import('./types').SellerListingLifecycle> {
+    return request<import('./types').SellerListingLifecycle>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(listingId)}/lifecycle`
+    );
+  },
+
   async updateListingPrice(storeId: string, listingId: string, price: { currency: string; amount: number }): Promise<SellerListing> {
     return request<SellerListing>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(listingId)}/price`,
