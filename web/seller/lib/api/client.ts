@@ -23,6 +23,7 @@ import type {
   Store,
   StoreBalance,
   StoreMediaAsset,
+  StoreOperationalState,
   StructuredPublishReadiness,
   SupplierCatalogItem,
   Theme,
@@ -102,6 +103,20 @@ export const sellerApi = {
 
   async getStorefrontHost(storeId: string): Promise<{ host: string }> {
     return request<{ host: string }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/storefront-host`);
+  },
+
+  async getStoreOperationalState(storeId: string): Promise<StoreOperationalState> {
+    return request<StoreOperationalState>(`/v1/seller/stores/${encodeURIComponent(storeId)}/operational-state`);
+  },
+
+  async updateStoreOperationalState(
+    storeId: string,
+    data: { checkout_status: 'accepting' | 'paused'; maintenance_message?: string }
+  ): Promise<StoreOperationalState> {
+    return request<StoreOperationalState>(`/v1/seller/stores/${encodeURIComponent(storeId)}/operational-state`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   },
 
   // Themes
@@ -492,6 +507,5 @@ export const sellerApi = {
     );
   }
 };
-
 
 

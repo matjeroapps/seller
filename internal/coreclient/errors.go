@@ -26,6 +26,7 @@ const (
 	CodePreviewUnavailable       = "preview_unavailable"
 	CodeStorefrontUnavailable    = "storefront_unavailable"
 	CodeCheckoutExpired          = "checkout_expired"
+	CodeCheckoutPaused           = "checkout_paused"
 	CodeIdempotencyConflict      = "idempotency_conflict"
 	CodeInvalidOrderTransition   = "invalid_order_transition"
 	CodePriceChanged             = "price_changed"
@@ -98,7 +99,7 @@ func statusForCode(code string) int {
 		return http.StatusConflict
 	case CodeChecksumMismatch, CodePublishNotReady:
 		return http.StatusUnprocessableEntity
-	case CodeUnavailable, CodePreviewUnavailable:
+	case CodeUnavailable, CodePreviewUnavailable, CodeCheckoutPaused:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError

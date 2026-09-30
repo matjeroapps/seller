@@ -20,6 +20,15 @@ export interface SellerStoreListResponse {
   active_store_count: number;
 }
 
+export interface StoreOperationalState {
+  store_id: string;
+  checkout_status: 'accepting' | 'paused' | string;
+  maintenance_message: string;
+  updated_by?: string;
+  updated_at?: string;
+  checkout_accepting: boolean;
+}
+
 export interface Product {
   id: string;
   store_id?: string;

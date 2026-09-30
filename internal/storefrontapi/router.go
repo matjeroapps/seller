@@ -202,6 +202,12 @@ func writeStorefrontError(w http.ResponseWriter, err error) {
 			httpx.WriteError(w, http.StatusConflict, "listing_unavailable", "listing unavailable")
 		case coreclient.CodeCheckoutExpired:
 			httpx.WriteError(w, http.StatusConflict, "checkout_expired", "checkout session expired")
+		case coreclient.CodeCheckoutPaused:
+			message := "Checkout is temporarily unavailable. Please try again later."
+			if coreErr.Message != "" {
+				message = coreErr.Message
+			}
+			httpx.WriteError(w, http.StatusServiceUnavailable, "checkout_paused", message)
 		case coreclient.CodeIdempotencyConflict:
 			httpx.WriteError(w, http.StatusConflict, "idempotency_conflict", "idempotency conflict")
 		case coreclient.CodeInvalidOrderTransition:

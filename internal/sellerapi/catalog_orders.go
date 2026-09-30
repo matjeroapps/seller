@@ -54,6 +54,42 @@ func (deps Dependencies) handleUpdateStoreStatus(w http.ResponseWriter, r *http.
 	httpx.WriteJSON(w, http.StatusOK, store)
 }
 
+func (deps Dependencies) handleGetStoreOperationalState(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	state, err := deps.Core.GetStoreOperationalState(r.Context(), chi.URLParam(r, "store_id"), subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, state)
+}
+
+func (deps Dependencies) handleUpdateStoreOperationalState(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	var body coreclient.StoreOperationalStateUpdate
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	state, err := deps.Core.UpdateStoreOperationalState(r.Context(), chi.URLParam(r, "store_id"), subject, body)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, state)
+}
+
 func (deps Dependencies) handleListStoreSupplierOffers(w http.ResponseWriter, r *http.Request) {
 	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
 		return

@@ -174,6 +174,12 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 		// and the human-readable reason are passed through unchanged: a seller
 		// needs to know which transition was refused and why.
 		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodeInvalidOrderTransition, coreErr.Message)
+	case coreclient.CodeCheckoutPaused:
+		message := "checkout is temporarily unavailable"
+		if coreErr.Message != "" {
+			message = coreErr.Message
+		}
+		httpx.WriteError(w, http.StatusServiceUnavailable, coreclient.CodeCheckoutPaused, message)
 	case coreclient.CodeUnavailable:
 		httpx.WriteError(w, http.StatusServiceUnavailable, "service_unavailable", "service temporarily unavailable")
 	default:
