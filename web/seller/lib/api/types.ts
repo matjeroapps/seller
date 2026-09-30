@@ -365,5 +365,25 @@ export interface WebhookSubscription {
   raw_secret?: string;
 }
 
+export interface Theme {
+  key: string;
+  name: string;
+  version: string;
+  description?: string;
+}
 
+export interface ThemeInstallation {
+  id: string;
+  store_id: string;
+  theme_key: string;
+  version: string;
+  status: string;
+}
 
+export interface ThemeInstallationResponse {
+  installation: ThemeInstallation;
+  draft_config?: Record<string, unknown>;
+  published_config?: Record<string, unknown>;
+  draft_revision: number;
+  published_revision: number;
+}

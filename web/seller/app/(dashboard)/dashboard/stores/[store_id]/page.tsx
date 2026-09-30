@@ -2,9 +2,10 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { Package, Truck, Boxes, Image as ImageIcon, Store as StoreIcon, Activity } from 'lucide-react';
+import { Package, Truck, Boxes, Image as ImageIcon, Store as StoreIcon, Activity, ExternalLink } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
-import type { Store, Product, SellerListing } from '@/lib/api/types';
+import type { Store, Product, SellerListing, ThemeInstallation } from '@/lib/api/types';
+import { StoreLaunchChecklist } from '@/components/onboarding/StoreLaunchChecklist';
 
 export default function StoreOverviewPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
@@ -12,6 +13,8 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [listings, setListings] = useState<SellerListing[]>([]);
+  const [themeInstallation, setThemeInstallation] = useState<ThemeInstallation | null>(null);
+  const [storefrontHost, setStorefrontHost] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -20,13 +23,17 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
     Promise.all([
       sellerApi.getStores(),
       sellerApi.listStoreProducts(store_id).catch(() => ({ items: [] })),
-      sellerApi.listStoreListings(store_id).catch(() => ({ items: [] }))
+      sellerApi.listStoreListings(store_id).catch(() => ({ items: [] })),
+      sellerApi.getThemeInstallation(store_id).then((res) => res.installation).catch(() => null),
+      sellerApi.getStorefrontHost(store_id).then((res) => res.host).catch(() => '')
     ])
-      .then(([storeRes, prodRes, listRes]) => {
+      .then(([storeRes, prodRes, listRes, themeRes, hostRes]) => {
         if (!isMounted) return;
         setStores(storeRes.items || []);
         setProducts(prodRes.items || []);
         setListings(listRes.items || []);
+        setThemeInstallation(themeRes);
+        setStorefrontHost(hostRes);
         setLoading(false);
       })
       .catch(() => {
@@ -53,6 +60,10 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
     }
   };
 
+  const handlePublishStore = async () => {
+    await handleStatusChange('active');
+  };
+
   if (loading) {
     return <div className="p-6 text-sm text-slate-500 animate-pulse">Loading store dashboard...</div>;
   }
@@ -63,7 +74,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 bg-white border border-slate-200 rounded-lg shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 bg-white border border-slate-200 rounded-xl shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900">{currentStore?.name || 'Store Dashboard'}</h1>
@@ -94,9 +105,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
               type="button"
               disabled={updatingStatus}
               onClick={() => handleStatusChange('active')}
-              className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs"
             >
-              Activate Store
+              {updatingStatus ? 'Activating...' : 'Activate Store'}
             </button>
           )}
           {currentStore?.status === 'active' && (
@@ -104,9 +115,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
               type="button"
               disabled={updatingStatus}
               onClick={() => handleStatusChange('inactive')}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-600 text-white rounded hover:bg-slate-700 disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors shadow-xs"
             >
-              Deactivate Store
+              {updatingStatus ? 'Deactivating...' : 'Deactivate Store'}
             </button>
           )}
           {currentStore?.status === 'inactive' && (
@@ -114,19 +125,31 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
               type="button"
               disabled={updatingStatus}
               onClick={() => handleStatusChange('active')}
-              className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs"
             >
-              Re-activate Store
+              {updatingStatus ? 'Re-activating...' : 'Re-activate Store'}
             </button>
           )}
         </div>
       </div>
 
+      {/* Onboarding Launch Readiness Checklist */}
+      {currentStore && (
+        <StoreLaunchChecklist
+          store={currentStore}
+          listings={listings}
+          themeInstallation={themeInstallation}
+          storefrontHost={storefrontHost}
+          onPublishStore={handlePublishStore}
+          isPublishing={updatingStatus}
+        />
+      )}
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
           href={`/dashboard/stores/${store_id}/catalog/products`}
-          className="p-4 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-colors shadow-sm"
+          className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-xs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-medium uppercase tracking-wider">Products</span>
@@ -138,7 +161,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
         <Link
           href={`/dashboard/stores/${store_id}/catalog/listings`}
-          className="p-4 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-colors shadow-sm"
+          className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-xs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-medium uppercase tracking-wider">Published</span>
@@ -150,7 +173,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
         <Link
           href={`/dashboard/stores/${store_id}/catalog/supplier-offers`}
-          className="p-4 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-colors shadow-sm"
+          className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-xs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-medium uppercase tracking-wider">Supplier Offers</span>
@@ -162,7 +185,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
         <Link
           href={`/dashboard/stores/${store_id}/media`}
-          className="p-4 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-colors shadow-sm"
+          className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-xs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-medium uppercase tracking-wider">Media Library</span>
@@ -174,14 +197,14 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       </div>
 
       {/* Quick Navigation Cards */}
-      <div className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Catalog Operations</h2>
+      <div className="p-6 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Catalog & Store Operations</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Link
             href={`/dashboard/stores/${store_id}/catalog/products/new`}
-            className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
           >
-            <Package className="w-5 h-5 text-indigo-600" />
+            <Package className="w-5 h-5 text-indigo-600 shrink-0" />
             <div>
               <div className="text-xs font-semibold text-slate-900">New Product</div>
               <div className="text-[11px] text-slate-500">Create seller-owned draft product</div>
@@ -190,9 +213,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
           <Link
             href={`/dashboard/stores/${store_id}/catalog/supplier-offers`}
-            className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
           >
-            <Truck className="w-5 h-5 text-amber-600" />
+            <Truck className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
               <div className="text-xs font-semibold text-slate-900">Import Offers</div>
               <div className="text-[11px] text-slate-500">Idempotent supplier offer import</div>
@@ -201,9 +224,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
           <Link
             href={`/dashboard/stores/${store_id}/inventory`}
-            className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
           >
-            <Boxes className="w-5 h-5 text-emerald-600" />
+            <Boxes className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
               <div className="text-xs font-semibold text-slate-900">Inventory</div>
               <div className="text-[11px] text-slate-500">Adjust on-hand snapshot stock</div>
