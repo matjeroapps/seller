@@ -354,6 +354,7 @@ func TestStorefrontMapsCoreErrorsToPublicResponses(t *testing.T) {
 		{"missing record", coreclient.CodeNotFound, http.StatusNotFound, "not_found"},
 		{"invalid query", coreclient.CodeValidationError, http.StatusBadRequest, "validation_error"},
 		{"invalid argument", coreclient.CodeInvalidArgument, http.StatusBadRequest, "validation_error"},
+		{"checkout paused", coreclient.CodeCheckoutPaused, http.StatusServiceUnavailable, "checkout_paused"},
 		{"core internal", coreclient.CodeInternalError, http.StatusInternalServerError, "internal_error"},
 	}
 
@@ -371,6 +372,50 @@ func TestStorefrontMapsCoreErrorsToPublicResponses(t *testing.T) {
 				t.Errorf("error code = %q, want %q", got, tc.wantCode)
 			}
 		})
+	}
+}
+
+func TestStorefrontPassesCheckoutPauseMessageThrough(t *testing.T) {
+	comm := &stubCommerce{
+		finalizeErr: &coreclient.Error{
+			Status:  http.StatusServiceUnavailable,
+			Code:    coreclient.CodeCheckoutPaused,
+			Message: "Back after inventory review",
+		},
+	}
+	router := chi.NewRouter()
+	router.Use(i18n.Middleware(i18n.Default()))
+	router.Route("/v1", func(r chi.Router) {
+		RegisterStorefrontRoutes(Dependencies{
+			Commerce: comm,
+			Platform: config.Config{StorefrontCheckoutEnabled: true},
+		})(r)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/storefront/checkout/sessions/sess-123/finalize", strings.NewReader(`{"contact_email":"a@b.com"}`))
+	req.Host = domainA
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "matjero_guest_session_sess-123", Value: "guest-tok-123"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Back after inventory review") {
+		t.Fatalf("pause message must be passed through, got: %s", body)
+	}
+	var payload struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		t.Fatalf("decode error envelope: %v", err)
+	}
+	if payload.Error.Code != "checkout_paused" {
+		t.Fatalf("error code = %q, want checkout_paused", payload.Error.Code)
 	}
 }
 

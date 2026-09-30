@@ -3,10 +3,11 @@
 import { useEffect, useState, use, useCallback } from 'react';
 import { ExternalLink, Globe, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
-import type { Store, Theme, ThemeInstallationResponse } from '@/lib/api/types';
+import type { Store, StoreOperationalState, Theme, ThemeInstallationResponse } from '@/lib/api/types';
 import { ThemeCatalogGrid } from '@/components/theme/ThemeCatalogGrid';
 import { ThemeSwitchConfirmModal } from '@/components/theme/ThemeSwitchConfirmModal';
 import { ThemeDraftEditor } from '@/components/theme/ThemeDraftEditor';
+import { StoreOperationalStatePanel } from '@/components/store/StoreOperationalStatePanel';
 
 export default function StorefrontSettingsPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
@@ -14,6 +15,8 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
   const [stores, setStores] = useState<Store[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [themeInstallation, setThemeInstallation] = useState<ThemeInstallationResponse | null>(null);
+  const [operationalState, setOperationalState] = useState<StoreOperationalState | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('Checkout is temporarily unavailable. Please try again later.');
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -23,20 +26,26 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
   const [targetSwitchThemeKey, setTargetSwitchThemeKey] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSavingOperationalState, setIsSavingOperationalState] = useState(false);
   const [loadingPreviewTheme, setLoadingPreviewTheme] = useState<string | null>(null);
 
   const fetchThemeData = useCallback(async () => {
     try {
       setErrorMessage(null);
-      const [storesRes, themesRes, installRes] = await Promise.all([
+      const [storesRes, themesRes, installRes, operationalRes] = await Promise.all([
         sellerApi.getStores().catch(() => ({ items: [] })),
         sellerApi.listThemes().catch(() => ({ items: [] })),
-        sellerApi.getThemeInstallation(store_id).catch(() => null)
+        sellerApi.getThemeInstallation(store_id).catch(() => null),
+        sellerApi.getStoreOperationalState(store_id)
       ]);
 
       setStores(storesRes.items || []);
       setThemes(themesRes.items || []);
       setThemeInstallation(installRes);
+      setOperationalState(operationalRes);
+      if (operationalRes?.maintenance_message) {
+        setMaintenanceMessage(operationalRes.maintenance_message);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load theme settings';
       setErrorMessage(msg);
@@ -190,6 +199,27 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
     }
   };
 
+  const handleToggleOperationalState = async () => {
+    const nextStatus = operationalState?.checkout_accepting ? 'paused' : 'accepting';
+    try {
+      setIsSavingOperationalState(true);
+      setErrorMessage(null);
+      const next = await sellerApi.updateStoreOperationalState(store_id, {
+        checkout_status: nextStatus,
+        maintenance_message: maintenanceMessage
+      });
+      setOperationalState(next);
+      setMaintenanceMessage(next.maintenance_message);
+      setSuccessMessage(next.checkout_accepting ? 'Checkout resumed for this store.' : 'Checkout paused for this store.');
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update checkout operations';
+      setErrorMessage(msg);
+    } finally {
+      setIsSavingOperationalState(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-7 pb-12">
       {/* Header */}
@@ -257,6 +287,14 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
           <span className="text-[11px] text-slate-500">Atomic host resolution active</span>
         </div>
       </div>
+
+      <StoreOperationalStatePanel
+        state={operationalState}
+        maintenanceMessage={maintenanceMessage}
+        isSaving={isSavingOperationalState}
+        onMaintenanceMessageChange={setMaintenanceMessage}
+        onToggle={handleToggleOperationalState}
+      />
 
       {/* Theme Catalog Grid */}
       <ThemeCatalogGrid

@@ -35,6 +35,20 @@ type Store struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+type StoreOperationalState struct {
+	StoreID            string     `json:"store_id"`
+	CheckoutStatus     string     `json:"checkout_status"`
+	MaintenanceMessage string     `json:"maintenance_message"`
+	UpdatedBy          string     `json:"updated_by,omitempty"`
+	UpdatedAt          *time.Time `json:"updated_at,omitempty"`
+	CheckoutAccepting  bool       `json:"checkout_accepting"`
+}
+
+type StoreOperationalStateUpdate struct {
+	CheckoutStatus     string `json:"checkout_status"`
+	MaintenanceMessage string `json:"maintenance_message,omitempty"`
+}
+
 // SellerListing is a seller's listing of a supplier offer.
 type SellerListing struct {
 	ID              string    `json:"id"`
@@ -204,6 +218,26 @@ func (c *Client) UpdateStoreStatus(ctx context.Context, storeID, subject, status
 	var payload Store
 	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/status"
 	err := c.post(ctx, path, map[string]string{"status": status}, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func (c *Client) GetStoreOperationalState(ctx context.Context, storeID, subject string) (*StoreOperationalState, error) {
+	var payload StoreOperationalState
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/operational-state"
+	err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func (c *Client) UpdateStoreOperationalState(ctx context.Context, storeID, subject string, update StoreOperationalStateUpdate) (*StoreOperationalState, error) {
+	var payload StoreOperationalState
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/operational-state"
+	err := c.put(ctx, path, update, requestOptions{Subject: subject}, &payload)
 	if err != nil {
 		return nil, err
 	}

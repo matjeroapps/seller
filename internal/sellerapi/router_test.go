@@ -38,6 +38,7 @@ type stubCore struct {
 	status    string
 	stores    []coreclient.Store
 	store     coreclient.Store
+	state     coreclient.StoreOperationalState
 	catalog   []coreclient.SupplierCatalogItem
 	listings  []coreclient.SellerListing
 	listing   coreclient.SellerListing
@@ -89,6 +90,18 @@ func (s *stubCore) GetStore(ctx context.Context, storeID, subject string) (corec
 func (s *stubCore) UpdateStoreStatus(ctx context.Context, storeID, subject, status string) (*coreclient.Store, error) {
 	s.storeID, s.subject = storeID, subject
 	return &s.store, s.err
+}
+
+func (s *stubCore) GetStoreOperationalState(ctx context.Context, storeID, subject string) (*coreclient.StoreOperationalState, error) {
+	s.storeID, s.subject = storeID, subject
+	return &s.state, s.err
+}
+
+func (s *stubCore) UpdateStoreOperationalState(ctx context.Context, storeID, subject string, update coreclient.StoreOperationalStateUpdate) (*coreclient.StoreOperationalState, error) {
+	s.storeID, s.subject = storeID, subject
+	s.state.CheckoutStatus = update.CheckoutStatus
+	s.state.MaintenanceMessage = update.MaintenanceMessage
+	return &s.state, s.err
 }
 
 func (s *stubCore) ListSupplierCatalog(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error) {
@@ -631,6 +644,36 @@ func TestSellerStoreCreateReturns201(t *testing.T) {
 	}
 }
 
+func TestSellerStoreOperationalStateRoutes(t *testing.T) {
+	core := &stubCore{state: coreclient.StoreOperationalState{
+		StoreID:            "store-1",
+		CheckoutStatus:     "accepting",
+		MaintenanceMessage: "Checkout is temporarily unavailable. Please try again later.",
+		CheckoutAccepting:  true,
+	}}
+	handler := newHandler(core, core)
+
+	getRec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-1/operational-state", "")
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200 (body %q)", getRec.Code, getRec.Body.String())
+	}
+	if core.storeID != "store-1" || core.subject != testSubject {
+		t.Fatalf("Core get called with store=%q subject=%q", core.storeID, core.subject)
+	}
+
+	putRec := doRequest(t, handler, http.MethodPut, "/v1/seller/stores/store-1/operational-state", `{"checkout_status":"paused","maintenance_message":"Back soon"}`)
+	if putRec.Code != http.StatusOK {
+		t.Fatalf("put status = %d, want 200 (body %q)", putRec.Code, putRec.Body.String())
+	}
+	var payload coreclient.StoreOperationalState
+	if err := json.NewDecoder(putRec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.CheckoutStatus != "paused" || payload.MaintenanceMessage != "Back soon" {
+		t.Fatalf("payload = %+v", payload)
+	}
+}
+
 // --- public error mapping ---
 
 func TestSellerMapsCoreErrorsToPublicResponses(t *testing.T) {
@@ -646,6 +689,7 @@ func TestSellerMapsCoreErrorsToPublicResponses(t *testing.T) {
 		{"insufficient inventory", coreclient.CodeInsufficientInventory, http.StatusConflict, "insufficient_inventory"},
 		{"conflict", coreclient.CodeConflict, http.StatusConflict, "conflict"},
 		{"forbidden", coreclient.CodeForbidden, http.StatusForbidden, "forbidden"},
+		{"checkout paused", coreclient.CodeCheckoutPaused, http.StatusServiceUnavailable, "checkout_paused"},
 		{"internal", coreclient.CodeInternalError, http.StatusInternalServerError, "internal_error"},
 	}
 
@@ -663,6 +707,23 @@ func TestSellerMapsCoreErrorsToPublicResponses(t *testing.T) {
 				t.Errorf("error code = %q, want %q", got, tc.wantCode)
 			}
 		})
+	}
+}
+
+func TestSellerPassesCheckoutPauseMessageThrough(t *testing.T) {
+	core := &stubCore{err: &coreclient.Error{
+		Status:  http.StatusServiceUnavailable,
+		Code:    coreclient.CodeCheckoutPaused,
+		Message: "Back after inventory review",
+	}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodGet, "/v1/seller/profile", "")
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Back after inventory review") {
+		t.Fatalf("pause message must be passed through, got: %s", rec.Body.String())
 	}
 }
 
