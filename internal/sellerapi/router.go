@@ -37,6 +37,7 @@ type CoreCapabilities interface {
 	ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*coreclient.SellerListing, error)
 	ListStoreListings(ctx context.Context, storeID, subject string, page coreclient.Page) ([]coreclient.SellerListing, error)
 	GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
+	GetStoreListingLifecycle(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListingLifecycle, error)
 	ImportListing(ctx context.Context, storeID, subject string, importReq coreclient.ListingImport) (coreclient.SellerListing, error)
 	SetListingPrice(ctx context.Context, listingID, subject string, price coreclient.PriceUpdate) error
 	SetStoreListingPrice(ctx context.Context, storeID, listingID, subject string, price coreclient.PriceUpdate) error
@@ -199,6 +200,7 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			// Store-Scoped Listings
 			r.Get("/seller/stores/{store_id}/listings", deps.handleListStoreListings)
 			r.Get("/seller/stores/{store_id}/listings/{listing_id}", deps.handleGetStoreListing)
+			r.Get("/seller/stores/{store_id}/listings/{listing_id}/lifecycle", deps.handleGetStoreListingLifecycle)
 			r.Put("/seller/stores/{store_id}/listings/{listing_id}/price", deps.handleSetStoreListingPrice)
 			r.Get("/seller/stores/{store_id}/listings/{listing_id}/readiness", deps.handleGetStoreListingReadiness)
 			r.Post("/seller/stores/{store_id}/listings/{listing_id}/publish", deps.handlePublishStoreListing)

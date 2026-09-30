@@ -133,6 +133,25 @@ func (deps Dependencies) handleGetStoreListing(w http.ResponseWriter, r *http.Re
 	httpx.WriteJSON(w, http.StatusOK, listing)
 }
 
+func (deps Dependencies) handleGetStoreListingLifecycle(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+	listingID := chi.URLParam(r, "listing_id")
+
+	lifecycle, err := deps.Core.GetStoreListingLifecycle(r.Context(), storeID, listingID, subject)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, lifecycle)
+}
+
 func (deps Dependencies) handleSetStoreListingPrice(w http.ResponseWriter, r *http.Request) {
 	if !requireRoles(w, r, roleOwner, roleManager) {
 		return

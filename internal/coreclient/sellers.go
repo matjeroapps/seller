@@ -285,6 +285,32 @@ func (c *Client) GetStoreListing(ctx context.Context, storeID, listingID, subjec
 	return &payload, nil
 }
 
+// SellerListingLifecycle represents the lifecycle status and upstream availability of an imported listing.
+type SellerListingLifecycle struct {
+	ListingID              string       `json:"listing_id"`
+	StoreID                string       `json:"store_id"`
+	Status                 string       `json:"status"`
+	EffectiveAvailability  string       `json:"effective_availability"`
+	IsUpstreamAvailable    bool         `json:"is_upstream_available"`
+	SupplierOfferID        *string      `json:"supplier_offer_id,omitempty"`
+	SupplierOfferStatus    *string      `json:"supplier_offer_status,omitempty"`
+	HasMarginWarning       bool         `json:"has_margin_warning"`
+	CurrentRetailPrice     *money.Money `json:"current_retail_price,omitempty"`
+	UpstreamWholesalePrice *money.Money `json:"upstream_wholesale_price,omitempty"`
+	LastSyncedAt           time.Time    `json:"last_synced_at"`
+}
+
+// GetStoreListingLifecycle fetches the lifecycle synchronization status for a specific store listing.
+func (c *Client) GetStoreListingLifecycle(ctx context.Context, storeID, listingID, subject string) (*SellerListingLifecycle, error) {
+	var payload SellerListingLifecycle
+	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/listings/" + url.PathEscape(listingID) + "/lifecycle"
+	err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	if err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
 // ListingImport is the listing import payload. The target store is the
 // authorized path parameter, never the body.
 type ListingImport struct {

@@ -46,6 +46,26 @@ export interface SellerListing {
   updated_at: string;
 }
 
+export interface SellerListingLifecycle {
+  listing_id: string;
+  store_id: string;
+  status: 'draft' | 'published' | 'unpublished' | 'archived';
+  effective_availability: 'available' | 'out_of_stock' | 'upstream_unavailable' | string;
+  is_upstream_available: boolean;
+  supplier_offer_id?: string;
+  supplier_offer_status?: string;
+  has_margin_warning: boolean;
+  current_retail_price?: {
+    currency: string;
+    amount: number;
+  };
+  upstream_wholesale_price?: {
+    currency: string;
+    amount: number;
+  };
+  last_synced_at: string;
+}
+
 export interface SupplierCatalogItem {
   offer_id: string;
   offer_status: string;
