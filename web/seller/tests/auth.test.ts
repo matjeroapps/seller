@@ -47,12 +47,41 @@ describe('seller auth foundation', () => {
 
   it('uses the configured local issuer without converting it to https', () => {
     const previousIssuer = process.env.ZITADEL_ISSUER;
+    const previousProjectId = process.env.ZITADEL_PROJECT_ID;
     process.env.ZITADEL_ISSUER = 'http://localhost:8081/';
+    process.env.ZITADEL_PROJECT_ID = 'seller-project-123';
 
     const config = getZitadelConfig();
     expect(getZitadelEndpoints(config).authorization).toBe('http://localhost:8081/oauth/v2/authorize');
 
     if (previousIssuer === undefined) delete process.env.ZITADEL_ISSUER;
     else process.env.ZITADEL_ISSUER = previousIssuer;
+    if (previousProjectId === undefined) delete process.env.ZITADEL_PROJECT_ID;
+    else process.env.ZITADEL_PROJECT_ID = previousProjectId;
+  });
+
+  it('fails closed when ZITADEL_PROJECT_ID is missing', () => {
+    const previousProjectId = process.env.ZITADEL_PROJECT_ID;
+    const previousNextPublicProjectId = process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID;
+    delete process.env.ZITADEL_PROJECT_ID;
+    delete process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID;
+
+    expect(() => getZitadelConfig()).toThrow(/ZITADEL_PROJECT_ID is required/i);
+
+    if (previousProjectId !== undefined) process.env.ZITADEL_PROJECT_ID = previousProjectId;
+    if (previousNextPublicProjectId !== undefined) process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID = previousNextPublicProjectId;
+  });
+
+  it('configures project audience scope and removes management scope', () => {
+    const previousProjectId = process.env.ZITADEL_PROJECT_ID;
+    process.env.ZITADEL_PROJECT_ID = 'seller-project-999';
+
+    const config = getZitadelConfig();
+    expect(config.projectId).toBe('seller-project-999');
+    expect(config.scopes).toContain('urn:zitadel:iam:org:project:id:seller-project-999:aud');
+    expect(config.scopes).not.toContain('urn:zitadel:iam:org:project:id:zitadel:aud');
+
+    if (previousProjectId !== undefined) process.env.ZITADEL_PROJECT_ID = previousProjectId;
+    else delete process.env.ZITADEL_PROJECT_ID;
   });
 });

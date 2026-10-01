@@ -3,9 +3,10 @@ package auth
 import "strings"
 
 type Config struct {
-	IssuerURL  string
-	Audience   string
-	RolesClaim string
+	IssuerURL    string
+	DiscoveryURL string
+	Audience     string
+	RolesClaim   string
 }
 
 func NormalizeIssuer(issuer string) string {

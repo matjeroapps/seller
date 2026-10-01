@@ -58,9 +58,10 @@ func run(ctx context.Context) error {
 	}
 
 	verifier, err := auth.NewOIDCVerifier(ctx, auth.Config{
-		IssuerURL:  cfg.ZitadelIssuer,
-		Audience:   cfg.ZitadelAudience,
-		RolesClaim: auth.DefaultRolesClaim(),
+		IssuerURL:    cfg.ZitadelIssuer,
+		DiscoveryURL: cfg.ZitadelDiscoveryURL,
+		Audience:     cfg.ZitadelAudience,
+		RolesClaim:   auth.DefaultRolesClaim(),
 	})
 	if err != nil {
 		return err

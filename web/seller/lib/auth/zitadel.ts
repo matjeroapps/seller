@@ -4,6 +4,7 @@ export interface ZitadelConfig {
   issuer: string;
   clientId: string;
   clientSecret: string;
+  projectId: string;
   redirectUri: string;
   postLogoutRedirectUri: string;
   scopes: string[];
@@ -20,15 +21,21 @@ export function getZitadelConfig(): ZitadelConfig {
   const issuer = (process.env.ZITADEL_ISSUER || process.env.NEXT_PUBLIC_ZITADEL_ISSUER || 'http://localhost:8081').replace(/\/$/, '');
   const clientId = process.env.ZITADEL_CLIENT_ID || process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || '';
   const clientSecret = process.env.ZITADEL_CLIENT_SECRET || '';
+  const projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID || '';
   const baseUrl = process.env.NEXT_PUBLIC_SELLER_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+
+  if (!projectId) {
+    throw new Error('ZITADEL_PROJECT_ID is required');
+  }
 
   return {
     issuer,
     clientId,
     clientSecret,
+    projectId,
     redirectUri: `${baseUrl}/auth/callback`,
     postLogoutRedirectUri: `${baseUrl}/login`,
-    scopes: ['openid', 'profile', 'email', 'urn:zitadel:iam:org:project:id:zitadel:aud']
+    scopes: ['openid', 'profile', 'email', `urn:zitadel:iam:org:project:id:${projectId}:aud`]
   };
 }
 
