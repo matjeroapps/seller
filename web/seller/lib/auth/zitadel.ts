@@ -2,6 +2,7 @@ import type { SellerUser } from './session-cookie';
 
 export interface ZitadelConfig {
   issuer: string;
+  internalIssuer: string;
   clientId: string;
   clientSecret: string;
   projectId: string;
@@ -15,10 +16,13 @@ export interface ZitadelEndpoints {
   token: string;
   userinfo: string;
   endSession: string;
+  forwardedHost?: string;
+  forwardedProto?: string;
 }
 
 export function getZitadelConfig(): ZitadelConfig {
   const issuer = (process.env.ZITADEL_ISSUER || process.env.NEXT_PUBLIC_ZITADEL_ISSUER || 'http://localhost:8081').replace(/\/$/, '');
+  const internalIssuer = (process.env.ZITADEL_INTERNAL_ISSUER || issuer).replace(/\/$/, '');
   const clientId = process.env.ZITADEL_CLIENT_ID || process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || '';
   const clientSecret = process.env.ZITADEL_CLIENT_SECRET || '';
   const projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID || '';
@@ -30,6 +34,7 @@ export function getZitadelConfig(): ZitadelConfig {
 
   return {
     issuer,
+    internalIssuer,
     clientId,
     clientSecret,
     projectId,
@@ -46,6 +51,33 @@ export function getZitadelEndpoints(config: ZitadelConfig): ZitadelEndpoints {
     token: `${base}/oauth/v2/token`,
     userinfo: `${base}/oidc/v1/userinfo`,
     endSession: `${base}/oauth/v2/logout`
+  };
+}
+
+export function getZitadelServerEndpoints(config: ZitadelConfig): ZitadelEndpoints {
+  const base = config.internalIssuer || config.issuer;
+  const publicIssuerUrl = new URL(config.issuer);
+  const internalIssuerUrl = new URL(base);
+  const usesInternalTransport = publicIssuerUrl.host !== internalIssuerUrl.host || publicIssuerUrl.protocol !== internalIssuerUrl.protocol;
+
+  return {
+    authorization: `${config.issuer}/oauth/v2/authorize`,
+    token: `${base}/oauth/v2/token`,
+    userinfo: `${base}/oidc/v1/userinfo`,
+    endSession: `${config.issuer}/oauth/v2/logout`,
+    forwardedHost: usesInternalTransport ? publicIssuerUrl.host : undefined,
+    forwardedProto: usesInternalTransport ? publicIssuerUrl.protocol.replace(':', '') : undefined
+  };
+}
+
+function forwardedIssuerHeaders(endpoints: ZitadelEndpoints): Record<string, string> {
+  if (!endpoints.forwardedHost || !endpoints.forwardedProto) {
+    return {};
+  }
+
+  return {
+    'x-forwarded-host': endpoints.forwardedHost,
+    'x-forwarded-proto': endpoints.forwardedProto
   };
 }
 
@@ -88,7 +120,8 @@ export async function exchangeCodeForTokens(config: ZitadelConfig, endpoints: Zi
     method: 'POST',
     headers: {
       accept: 'application/json',
-      'content-type': 'application/x-www-form-urlencoded'
+      'content-type': 'application/x-www-form-urlencoded',
+      ...forwardedIssuerHeaders(endpoints)
     },
     body: params.toString()
   });
@@ -104,7 +137,8 @@ export async function fetchUserInfo(endpoints: ZitadelEndpoints, accessToken: st
   const response = await fetch(endpoints.userinfo, {
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${accessToken}`
+      authorization: `Bearer ${accessToken}`,
+      ...forwardedIssuerHeaders(endpoints)
     }
   });
 
@@ -142,6 +176,7 @@ export async function verifySellerApiAccess(accessToken: string, expectedSubject
   }
 
   if (!response.ok) {
+    console.warn('seller auth bootstrap verification failed', { status: response.status });
     throw new Error('Authentication bootstrap verification failed');
   }
 
