@@ -31,7 +31,8 @@ test('UI-5 seller portal foundation protects and renders dashboard shell', async
   ]);
 
   await page.goto(`${SELLER_APP_URL}/dashboard`);
-  await expect(page.getByText('MatjerHub Seller')).toBeVisible();
+  await expect(page.getByText('MatjerHub')).toBeVisible();
+  await expect(page.getByText('Seller Portal')).toBeVisible();
   await expect(page.getByText('Seller Owner')).toBeVisible();
 
   await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/catalog/products`);

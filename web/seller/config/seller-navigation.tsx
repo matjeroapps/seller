@@ -3,8 +3,10 @@ import {
   BarChart3,
   Boxes,
   ChartNoAxesColumn,
+  CreditCard,
   LayoutDashboard,
   PackageSearch,
+  PlugZap,
   Settings,
   ShoppingBag,
   Store,
@@ -79,6 +81,13 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
       tenantScoped: true
     },
     {
+      id: 'shipments',
+      label: 'Shipments',
+      icon: <Truck aria-hidden="true" className={iconClassName} />,
+      path: `${storePrefix}/shipments`,
+      tenantScoped: true
+    },
+    {
       id: 'customers',
       label: 'Customers',
       icon: <UsersRound aria-hidden="true" className={iconClassName} />,
@@ -97,6 +106,20 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
       label: 'Analytics',
       icon: <BarChart3 aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/analytics`,
+      tenantScoped: true
+    },
+    {
+      id: 'finance',
+      label: 'Finance',
+      icon: <CreditCard aria-hidden="true" className={iconClassName} />,
+      path: `${storePrefix}/finance`,
+      tenantScoped: true
+    },
+    {
+      id: 'integrations',
+      label: 'Integrations',
+      icon: <PlugZap aria-hidden="true" className={iconClassName} />,
+      path: `${storePrefix}/integrations`,
       tenantScoped: true
     },
     {
