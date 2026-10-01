@@ -8,9 +8,12 @@ describe('seller navigation foundation', () => {
       'dashboard',
       'catalog',
       'orders',
+      'shipments',
       'customers',
       'storefront',
       'analytics',
+      'finance',
+      'integrations',
       'settings'
     ]);
     expect(sellerNavigation.find((item) => item.id === 'catalog')?.children?.map((item) => item.id)).toEqual([

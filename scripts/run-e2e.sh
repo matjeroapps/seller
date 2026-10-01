@@ -155,9 +155,13 @@ PIDS+=($!)
 wait_for_url "http://127.0.0.1:$SELLER_API_PORT/healthz" "Seller API" 15
 
 echo "5. Starting seller portal (Next.js dev server)..."
+SELLER_API_BEARER_TOKEN=$(
+  node -e "fetch(process.env.FAKE_CORE_ISSUER_URL + '/test-control/token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ subject: process.env.FAKE_CORE_SELLER_SUBJECT || 'usr_seller_dev' }) }).then((res) => res.json()).then((payload) => process.stdout.write(payload.access_token || '')).catch((err) => { console.error(err); process.exit(1); })"
+)
 # setsid gives Next.js its own process group so cleanup can kill the whole tree.
 setsid env \
   NEXT_PUBLIC_SELLER_APP_URL="$SELLER_APP_URL" \
+  SELLER_API_BEARER_TOKEN="$SELLER_API_BEARER_TOKEN" \
   SELLER_SESSION_SECRET="$SELLER_SESSION_SECRET" \
   npm run dev --workspace=@commerce/seller-web \
   >/tmp/seller-web-e2e.log 2>&1 &

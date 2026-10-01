@@ -33,7 +33,11 @@ import type {
   WebhookSubscription
 } from './types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
+const SELLER_API_BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
+
+function getBaseUrl() {
+  return typeof window === 'undefined' ? SELLER_API_BASE_URL : '/api/seller';
+}
 
 export class ApiError extends Error {
   code: string;
@@ -53,7 +57,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${getBaseUrl()}${path}`, {
     ...options,
     headers,
     credentials: 'include'
@@ -507,5 +511,4 @@ export const sellerApi = {
     );
   }
 };
-
 
