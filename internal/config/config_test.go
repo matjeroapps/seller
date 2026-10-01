@@ -53,3 +53,50 @@ func TestProductionConfigValidation(t *testing.T) {
 		t.Fatalf("Environment = %q, want production", cfg.Environment)
 	}
 }
+
+func TestLoadZitadelDiscoveryURLDefaultsToIssuer(t *testing.T) {
+	t.Setenv("ZITADEL_ISSUER", "http://localhost:8081")
+	t.Setenv("ZITADEL_DISCOVERY_URL", "")
+
+	cfg, err := Load("seller-api")
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ZitadelDiscoveryURL != "http://localhost:8081" {
+		t.Fatalf("ZitadelDiscoveryURL = %q, want http://localhost:8081", cfg.ZitadelDiscoveryURL)
+	}
+}
+
+func TestLoadZitadelDiscoveryURLExplicit(t *testing.T) {
+	t.Setenv("ZITADEL_ISSUER", "https://auth.matjero.com")
+	t.Setenv("ZITADEL_DISCOVERY_URL", "http://zitadel.internal:8081")
+	t.Setenv("CORE_API_BASE_URL", "http://core-api.internal:8080")
+	t.Setenv("CORE_API_TOKEN", "secret-seller-token")
+	t.Setenv("STOREFRONT_COOKIE_SECURE", "true")
+
+	cfg, err := Load("seller-api")
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ZitadelIssuer != "https://auth.matjero.com" {
+		t.Fatalf("ZitadelIssuer = %q, want https://auth.matjero.com", cfg.ZitadelIssuer)
+	}
+	if cfg.ZitadelDiscoveryURL != "http://zitadel.internal:8081" {
+		t.Fatalf("ZitadelDiscoveryURL = %q, want http://zitadel.internal:8081", cfg.ZitadelDiscoveryURL)
+	}
+}
+
+func TestLoadExplicitZitadelAudience(t *testing.T) {
+	t.Setenv("ZITADEL_AUDIENCE", "seller-project-123")
+
+	cfg, err := Load("seller-api")
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ZitadelAudience != "seller-project-123" {
+		t.Fatalf("ZitadelAudience = %q, want seller-project-123", cfg.ZitadelAudience)
+	}
+}

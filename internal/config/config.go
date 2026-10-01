@@ -9,15 +9,16 @@ import (
 )
 
 type Config struct {
-	ServiceName        string
-	Environment        string
-	HTTPAddr           string
-	RedisAddr          string
-	RabbitMQURL        string
-	ZitadelIssuer      string
-	ZitadelAudience    string
-	OpenAPIDocsEnabled bool
-	ShutdownTimeout    time.Duration
+	ServiceName         string
+	Environment         string
+	HTTPAddr            string
+	RedisAddr           string
+	RabbitMQURL         string
+	ZitadelIssuer       string
+	ZitadelDiscoveryURL string
+	ZitadelAudience     string
+	OpenAPIDocsEnabled  bool
+	ShutdownTimeout     time.Duration
 
 	// RedisPassword authenticates against a protected Redis. It is a secret:
 	// never commit it, log it, or bake it into an image layer.
@@ -108,13 +109,17 @@ func Load(serviceName string) (Config, error) {
 		return Config{}, err
 	}
 
+	zitadelIssuer := stringEnv("ZITADEL_ISSUER", "http://localhost:8081")
+	zitadelDiscoveryURL := stringEnv("ZITADEL_DISCOVERY_URL", zitadelIssuer)
+
 	cfg := Config{
 		ServiceName:          serviceName,
 		Environment:          stringEnv("APP_ENV", "development"),
 		HTTPAddr:             stringEnv("HTTP_ADDR", ":8080"),
 		RedisAddr:            stringEnv("REDIS_ADDR", "localhost:6379"),
 		RabbitMQURL:          stringEnv("RABBITMQ_URL", "amqp://commerce:commerce@localhost:5672/"),
-		ZitadelIssuer:        stringEnv("ZITADEL_ISSUER", "http://localhost:8081"),
+		ZitadelIssuer:        zitadelIssuer,
+		ZitadelDiscoveryURL:  zitadelDiscoveryURL,
 		ZitadelAudience:      stringEnv("ZITADEL_AUDIENCE", serviceName),
 		OpenAPIDocsEnabled:   boolEnv("OPENAPI_DOCS_ENABLED", stringEnv("APP_ENV", "development") != "production"),
 		ShutdownTimeout:      time.Duration(timeoutSeconds) * time.Second,
