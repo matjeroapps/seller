@@ -68,6 +68,8 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   };
 
   const settingsPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/settings` : '/dashboard/settings';
+  const notificationsPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/notifications` : settingsPath;
+  const profilePath = currentStoreId ? `/dashboard/stores/${currentStoreId}/account` : settingsPath;
   const catalogSearchPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/catalog/products` : '/dashboard';
 
   return (
@@ -168,7 +170,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
             <button type="button" className="seller-icon-button" onClick={() => navigate(settingsPath)} aria-label="Help and settings">
               <CircleHelp aria-hidden="true" />
             </button>
-            <button type="button" className="seller-icon-button seller-notification-button" aria-label="Notifications">
+            <button type="button" className="seller-icon-button seller-notification-button" onClick={() => navigate(notificationsPath)} aria-label="Notifications">
               <Bell aria-hidden="true" />
               <span aria-hidden="true" />
             </button>
@@ -183,7 +185,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
               </button>
               {profileOpen && (
                 <div className="seller-profile__menu">
-                  <button type="button" onClick={() => navigate(settingsPath)}>
+                  <button type="button" onClick={() => navigate(profilePath)}>
                     <Settings aria-hidden="true" />
                     Account settings
                   </button>
