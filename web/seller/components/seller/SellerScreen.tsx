@@ -2,49 +2,49 @@ import Link from 'next/link';
 
 type Tone = 'emerald' | 'sky' | 'amber' | 'rose' | 'slate' | 'violet';
 
-export interface StitchAction {
+export interface SellerScreenAction {
   label: string;
   href?: string;
   variant?: 'primary' | 'secondary';
 }
 
-export interface StitchMetric {
+export interface SellerScreenMetric {
   label: string;
   value: string;
   hint: string;
   tone?: Tone;
 }
 
-export interface StitchField {
+export interface SellerScreenField {
   label: string;
   value: string;
   hint?: string;
   type?: 'input' | 'select' | 'textarea' | 'toggle' | 'check';
 }
 
-export interface StitchSectionItem {
+export interface SellerScreenSectionItem {
   title: string;
   meta: string;
   status?: string;
   tone?: Tone;
 }
 
-export interface StitchSection {
+export interface SellerScreenSection {
   title: string;
   kicker?: string;
   description?: string;
-  fields?: StitchField[];
-  items?: StitchSectionItem[];
+  fields?: SellerScreenField[];
+  items?: SellerScreenSectionItem[];
 }
 
-export interface SellerStitchScreenConfig {
+export interface SellerScreenConfig {
   eyebrow: string;
   title: string;
   description: string;
-  actions?: StitchAction[];
-  metrics?: StitchMetric[];
-  sections: StitchSection[];
-  rail?: StitchSection[];
+  actions?: SellerScreenAction[];
+  metrics?: SellerScreenMetric[];
+  sections: SellerScreenSection[];
+  rail?: SellerScreenSection[];
 }
 
 function toneClasses(tone: Tone = 'slate') {
@@ -60,7 +60,7 @@ function toneClasses(tone: Tone = 'slate') {
   return tones[tone];
 }
 
-function actionClassName(action: StitchAction) {
+function actionClassName(action: SellerScreenAction) {
   if (action.variant === 'primary') {
     return 'inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800';
   }
@@ -68,7 +68,7 @@ function actionClassName(action: StitchAction) {
   return 'inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50';
 }
 
-function StitchActionControl({ action }: { action: StitchAction }) {
+function SellerScreenActionControl({ action }: { action: SellerScreenAction }) {
   const className = actionClassName(action);
 
   if (action.href) {
@@ -86,19 +86,19 @@ function StitchActionControl({ action }: { action: StitchAction }) {
   );
 }
 
-function StitchActions({ actions, storeId }: { actions?: StitchAction[]; storeId: string }) {
+function SellerScreenActions({ actions, storeId }: { actions?: SellerScreenAction[]; storeId: string }) {
   if (!actions?.length) return null;
 
   return (
     <div className="flex flex-wrap justify-end gap-2">
       {actions.map((action) => (
-        <StitchActionControl key={action.label} action={{ ...action, href: action.href?.replace(':storeId', storeId) }} />
+        <SellerScreenActionControl key={action.label} action={{ ...action, href: action.href?.replace(':storeId', storeId) }} />
       ))}
     </div>
   );
 }
 
-function StitchHeader({ screen, storeId }: { screen: SellerStitchScreenConfig; storeId: string }) {
+function SellerHeader({ screen, storeId }: { screen: SellerScreenConfig; storeId: string }) {
   return (
     <header className="rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-emerald-950 via-emerald-800 to-slate-900 p-6 text-white shadow-xl">
       <div className="flex flex-wrap items-start justify-between gap-5">
@@ -107,13 +107,13 @@ function StitchHeader({ screen, storeId }: { screen: SellerStitchScreenConfig; s
           <h1 className="mt-3 max-w-4xl text-3xl font-black leading-tight md:text-5xl">{screen.title}</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-emerald-50">{screen.description}</p>
         </div>
-        <StitchActions actions={screen.actions} storeId={storeId} />
+        <SellerScreenActions actions={screen.actions} storeId={storeId} />
       </div>
     </header>
   );
 }
 
-function StitchMetricCard({ metric }: { metric: StitchMetric }) {
+function SellerScreenMetricCard({ metric }: { metric: SellerScreenMetric }) {
   return (
     <article className={`rounded-3xl border p-5 shadow-sm ${toneClasses(metric.tone)}`}>
       <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">{metric.label}</p>
@@ -123,19 +123,19 @@ function StitchMetricCard({ metric }: { metric: StitchMetric }) {
   );
 }
 
-function StitchMetrics({ metrics }: { metrics?: StitchMetric[] }) {
+function SellerScreenMetrics({ metrics }: { metrics?: SellerScreenMetric[] }) {
   if (!metrics?.length) return null;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => (
-        <StitchMetricCard key={metric.label} metric={metric} />
+        <SellerScreenMetricCard key={metric.label} metric={metric} />
       ))}
     </div>
   );
 }
 
-function StitchFieldCard({ field }: { field: StitchField }) {
+function SellerScreenFieldCard({ field }: { field: SellerScreenField }) {
   const isToggle = field.type === 'toggle';
   const isCheck = field.type === 'check';
 
@@ -158,7 +158,7 @@ function StitchFieldCard({ field }: { field: StitchField }) {
   );
 }
 
-function StitchSectionHeading({ section }: { section: StitchSection }) {
+function SellerScreenSectionHeading({ section }: { section: SellerScreenSection }) {
   return (
     <div className="mb-4">
       {section.kicker && <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">{section.kicker}</p>}
@@ -168,19 +168,19 @@ function StitchSectionHeading({ section }: { section: StitchSection }) {
   );
 }
 
-function StitchFields({ fields, title }: { fields?: StitchField[]; title: string }) {
+function SellerScreenFields({ fields, title }: { fields?: SellerScreenField[]; title: string }) {
   if (!fields?.length) return null;
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {fields.map((field) => (
-        <StitchFieldCard key={`${title}-${field.label}`} field={field} />
+        <SellerScreenFieldCard key={`${title}-${field.label}`} field={field} />
       ))}
     </div>
   );
 }
 
-function StitchItemRow({ item }: { item: StitchSectionItem }) {
+function SellerItemRow({ item }: { item: SellerScreenSectionItem }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div>
@@ -192,63 +192,63 @@ function StitchItemRow({ item }: { item: StitchSectionItem }) {
   );
 }
 
-function StitchItems({ items }: { items?: StitchSectionItem[] }) {
+function SellerItems({ items }: { items?: SellerScreenSectionItem[] }) {
   if (!items?.length) return null;
 
   return (
     <div className="grid gap-3">
       {items.map((item) => (
-        <StitchItemRow key={item.title} item={item} />
+        <SellerItemRow key={item.title} item={item} />
       ))}
     </div>
   );
 }
 
-function StitchSectionCard({ section }: { section: StitchSection }) {
+function SellerScreenSectionCard({ section }: { section: SellerScreenSection }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <StitchSectionHeading section={section} />
-      <StitchFields fields={section.fields} title={section.title} />
-      <StitchItems items={section.items} />
+      <SellerScreenSectionHeading section={section} />
+      <SellerScreenFields fields={section.fields} title={section.title} />
+      <SellerItems items={section.items} />
     </section>
   );
 }
 
-function StitchSections({ sections }: { sections?: StitchSection[] }) {
+function SellerScreenSections({ sections }: { sections?: SellerScreenSection[] }) {
   if (!sections?.length) return null;
 
   return (
     <>
       {sections.map((section) => (
-        <StitchSectionCard key={section.title} section={section} />
+        <SellerScreenSectionCard key={section.title} section={section} />
       ))}
     </>
   );
 }
 
-function StitchContent({ screen }: { screen: SellerStitchScreenConfig }) {
+function SellerContent({ screen }: { screen: SellerScreenConfig }) {
   const layoutClassName = screen.rail ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]' : 'grid gap-6';
 
   return (
     <div className={layoutClassName}>
       <div className="grid gap-6">
-        <StitchSections sections={screen.sections} />
+        <SellerScreenSections sections={screen.sections} />
       </div>
       {screen.rail && (
         <aside className="grid content-start gap-6">
-          <StitchSections sections={screen.rail} />
+          <SellerScreenSections sections={screen.rail} />
         </aside>
       )}
     </div>
   );
 }
 
-export function SellerStitchScreen({ screen, storeId }: { screen: SellerStitchScreenConfig; storeId: string }) {
+export function SellerScreen({ screen, storeId }: { screen: SellerScreenConfig; storeId: string }) {
   return (
     <div dir="rtl" lang="ar" className="mx-auto grid max-w-7xl gap-6 text-right">
-      <StitchHeader screen={screen} storeId={storeId} />
-      <StitchMetrics metrics={screen.metrics} />
-      <StitchContent screen={screen} />
+      <SellerHeader screen={screen} storeId={storeId} />
+      <SellerScreenMetrics metrics={screen.metrics} />
+      <SellerContent screen={screen} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { SellerStitchScreen } from '@/components/stitch/SellerStitchScreen';
-import { shippingDocumentsScreen } from '@/components/stitch/seller-stitch-screen-configs';
+import { SellerScreen } from '@/components/seller/SellerScreen';
+import { shippingDocumentsScreen } from '@/components/seller/Configs';
 
 export default async function StoreOrderDocumentsPage({
   params
@@ -8,5 +8,5 @@ export default async function StoreOrderDocumentsPage({
 }) {
   const { store_id } = await params;
 
-  return <SellerStitchScreen screen={shippingDocumentsScreen} storeId={store_id} />;
+  return <SellerScreen screen={shippingDocumentsScreen} storeId={store_id} />;
 }
