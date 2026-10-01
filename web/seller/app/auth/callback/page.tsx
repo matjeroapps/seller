@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import { clearAuthTransaction, exchangeCodeForTokens, fetchUserInfo, getAuthTransaction, getZitadelConfig, getZitadelEndpoints, setCurrentSession } from '@/lib/auth';
+import { clearAuthTransaction, exchangeCodeForTokens, fetchUserInfo, getAuthTransaction, getZitadelConfig, getZitadelEndpoints, setCurrentSession, verifySellerApiAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +29,8 @@ export default async function AuthCallbackPage({
     const endpoints = getZitadelEndpoints(config);
     const tokens = await exchangeCodeForTokens(config, endpoints, params.code, transaction.codeVerifier);
     const user = await fetchUserInfo(endpoints, tokens.access_token);
+
+    await verifySellerApiAccess(tokens.access_token, user.id);
 
     await setCurrentSession({
       isAuthenticated: true,

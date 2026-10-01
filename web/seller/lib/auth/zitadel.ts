@@ -34,7 +34,7 @@ export function getZitadelConfig(): ZitadelConfig {
     clientSecret,
     projectId,
     redirectUri: `${baseUrl}/auth/callback`,
-    postLogoutRedirectUri: `${baseUrl}/login`,
+    postLogoutRedirectUri: baseUrl,
     scopes: ['openid', 'profile', 'email', `urn:zitadel:iam:org:project:id:${projectId}:aud`]
   };
 }
@@ -122,4 +122,38 @@ export async function fetchUserInfo(endpoints: ZitadelEndpoints, accessToken: st
     roles: Object.keys((userInfo['urn:zitadel:iam:org:project:roles'] as Record<string, unknown> | undefined) || {}),
     tenantId: typeof userInfo['urn:zitadel:iam:org:id'] === 'string' ? userInfo['urn:zitadel:iam:org:id'] : undefined
   };
+}
+
+export async function verifySellerApiAccess(accessToken: string, expectedSubject: string): Promise<void> {
+  const baseUrl = (process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081').replace(/\/$/, '');
+  const url = `${baseUrl}/v1/bootstrap?locale=en`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${accessToken}`
+      }
+    });
+  } catch {
+    throw new Error('Authentication bootstrap verification failed');
+  }
+
+  if (!response.ok) {
+    throw new Error('Authentication bootstrap verification failed');
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error('Authentication bootstrap verification failed');
+  }
+
+  const subject = (payload as { principal?: { subject?: string } })?.principal?.subject;
+  if (!subject || typeof subject !== 'string' || subject !== expectedSubject) {
+    throw new Error('Authentication bootstrap verification failed');
+  }
 }
