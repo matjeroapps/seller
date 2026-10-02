@@ -97,15 +97,15 @@ func (o *oidcAuthority) mintToken(subject string) (string, error) {
 
 	now := time.Now().UTC()
 	claims := map[string]any{
-		"iss":                o.issuer,
-		"sub":                subject,
-		"aud":                o.aud,
-		"iat":                now.Unix(),
-		"exp":                now.Add(5 * time.Hour).Unix(),
-		"email":              subject + "@matjerhub.test",
-		"preferred_username": subject,
-		"locale":             "en",
-		"roles":              roles,
+		"iss":                               o.issuer,
+		"sub":                               subject,
+		"aud":                               o.aud,
+		"iat":                               now.Unix(),
+		"exp":                               now.Add(5 * time.Hour).Unix(),
+		"email":                             subject + "@matjerhub.test",
+		"preferred_username":                subject,
+		"locale":                            "en",
+		"roles":                             roles,
 		"urn:zitadel:iam:org:project:roles": projectRoles,
 	}
 	return o.signRS256(claims)

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright.test';
+import { test, expect } from '@playwright/test';
 import { SELLER_ACTORS, STORE_FIXTURES } from './support/seller-actors';
 
 test.describe('Seller Actor Session Security & Proxy Forwarding (T010)', () => {
