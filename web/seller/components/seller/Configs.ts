@@ -1,6 +1,6 @@
-import type { SellerStitchScreenConfig } from './SellerStitchScreen';
+import type { SellerScreenConfig } from './SellerScreen';
 
-export const customerManagementScreen: SellerStitchScreenConfig = {
+export const customerManagementScreen: SellerScreenConfig = {
   eyebrow: 'إدارة العملاء وقاعدة البيانات',
   title: 'عملاء المتجر، الشرائح، وسجل التعاملات',
   description: 'واجهة Stitch لإدارة قاعدة العملاء: البحث، الشرائح الذكية، حالة الحساب، العناوين، حدود الائتمان، والتواصل التسويقي من مكان واحد.',
@@ -47,7 +47,7 @@ export const customerManagementScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const addCustomerScreen: SellerStitchScreenConfig = {
+export const addCustomerScreen: SellerScreenConfig = {
   eyebrow: 'إضافة عميل جديد - متجر هب',
   title: 'إنشاء ملف عميل مع العنوان، الضريبة، والمحفظة',
   description: 'يعكس شاشة Stitch لإضافة عميل جديد عبر أقسام واضحة تشمل المعلومات الشخصية، عنوان SPL، بيانات ZATCA، حدود الائتمان، التفضيلات، والوسوم.',
@@ -100,7 +100,7 @@ export const addCustomerScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const payoutRequestScreen: SellerStitchScreenConfig = {
+export const payoutRequestScreen: SellerScreenConfig = {
   eyebrow: 'طلب تحويل وسحب الأرباح',
   title: 'طلب تحويل من المحفظة إلى الحساب البنكي',
   description: 'شاشة Stitch مخصصة لإرسال طلبات السحب مع رصيد المحفظة، طريقة التحويل، الحساب البنكي، ملخص التسوية، والتنبيه بالمراجعة الثنائية.',
@@ -145,7 +145,7 @@ export const payoutRequestScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const settingsScreen: SellerStitchScreenConfig = {
+export const settingsScreen: SellerScreenConfig = {
   eyebrow: 'إعدادات المتجر والحساب',
   title: 'هوية المتجر، الامتثال، العملة، والسياسات',
   description: 'تنفيذ شاشة Stitch لإعدادات المتجر: الهوية، العنوان اللوجستي، ZATCA، العملة واللغة، سياسات المتجر، وحفظ التغييرات.',
@@ -195,7 +195,7 @@ export const settingsScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const profileAccountScreen: SellerStitchScreenConfig = {
+export const profileAccountScreen: SellerScreenConfig = {
   eyebrow: 'الملف الشخصي والحساب',
   title: 'إدارة الملف الشخصي، التوثيق، والأمان',
   description: 'تفاصيل شاشة Stitch تشمل بيانات التاجر الشخصية والمهنية، توثيق الهوية والسجل التجاري، كلمة المرور، 2FA، Passkeys، الجلسات النشطة، ومساحات العمل المرتبطة.',
@@ -261,7 +261,7 @@ export const profileAccountScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const analyticsScreen: SellerStitchScreenConfig = {
+export const analyticsScreen: SellerScreenConfig = {
   eyebrow: 'التحليلات والتقارير المتقدمة',
   title: 'لوحة تقارير الأداء، المبيعات، والعمليات',
   description: 'يغطي تصميم Stitch لوحة التحليلات المتقدمة مع KPIs، الرسوم البيانية، تقارير القنوات، المنتجات، العملاء، والتصدير.',
@@ -287,7 +287,7 @@ export const analyticsScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const notificationsScreen: SellerStitchScreenConfig = {
+export const notificationsScreen: SellerScreenConfig = {
   eyebrow: 'مركز الإشعارات والتنبيهات',
   title: 'تنبيهات العمليات، المخزون، المالية، والتكاملات',
   description: 'يعكس تصميم Stitch مركز إشعارات موحد بفلاتر الأولوية، الحالة، القنوات، وإعدادات التنبيه للفريق.',
@@ -315,7 +315,7 @@ export const notificationsScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const cartsScreen: SellerStitchScreenConfig = {
+export const cartsScreen: SellerScreenConfig = {
   eyebrow: 'إدارة السلات الشرائية',
   title: 'السلات النشطة والمتروكة واسترداد المبيعات',
   description: 'تنفيذ شاشة Stitch لمراقبة السلات، مراحل التخلي، قيمة السلة، آخر نشاط، وإجراءات التواصل والاسترداد.',
@@ -340,7 +340,7 @@ export const cartsScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const newOrderScreen: SellerStitchScreenConfig = {
+export const newOrderScreen: SellerScreenConfig = {
   eyebrow: 'إنشاء طلب جديد',
   title: 'طلب يدوي مع اختيار العميل، المنتجات، الشحن، والدفع',
   description: 'شاشة Stitch لإنشاء طلب من لوحة التاجر مع ملخص جانبي، تحقق مخزون، عنوان شحن، خيارات دفع، وفاتورة ZATCA.',
@@ -379,7 +379,7 @@ export const newOrderScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const usersScreen: SellerStitchScreenConfig = {
+export const usersScreen: SellerScreenConfig = {
   eyebrow: 'إدارة المستخدمين وفريق العمل',
   title: 'الأدوار، الصلاحيات، ودعوات الفريق',
   description: 'تنفيذ شاشة Stitch لإدارة فريق المتجر مع الدعوات، الأدوار، حالة الوصول، وسجل النشاط.',
@@ -406,7 +406,7 @@ export const usersScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const billingScreen: SellerStitchScreenConfig = {
+export const billingScreen: SellerScreenConfig = {
   eyebrow: 'الخطة والاشتراك وإدارة الباقات',
   title: 'الخطة الحالية، الفواتير، وحدود الاستخدام',
   description: 'يعكس تصميم Stitch شاشة الاشتراك والباقات مع الخطة الحالية، المزايا، الفواتير، الترقية، وطريقة الدفع.',
@@ -431,7 +431,7 @@ export const billingScreen: SellerStitchScreenConfig = {
   ]
 };
 
-export const shippingDocumentsScreen: SellerStitchScreenConfig = {
+export const shippingDocumentsScreen: SellerScreenConfig = {
   eyebrow: 'معاينة وطباعة بوليصة الشحن والفاتورة ZATCA',
   title: 'مستندات الطلب: ملصق الشحن، العنوان، والفاتورة',
   description: 'يغطي تصميم Stitch شاشة مراجعة وطباعة مستندات الطلب قبل التسليم: بوليصة الشحن، ملصق العنوان، فاتورة ZATCA، وإجراءات التنزيل والطباعة.',
