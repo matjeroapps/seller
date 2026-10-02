@@ -1,6 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { clearAuthTransaction, exchangeCodeForTokens, fetchUserInfo, getAuthTransaction, getZitadelConfig, getZitadelServerEndpoints, setCurrentSession, verifySellerApiAccess } from '@/lib/auth';
+import {
+  clearAuthTransaction,
+  exchangeCodeForTokens,
+  fetchUserInfo,
+  getAuthTransaction,
+  getZitadelConfig,
+  getZitadelServerEndpoints,
+  setCurrentSession,
+  verifySellerApiAccess,
+} from '@/lib/auth';
+import { createActorSession } from '@/lib/auth/session-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,10 +45,24 @@ export async function GET(request: NextRequest) {
 
     await verifySellerApiAccess(tokens.access_token, user.id);
 
+    const expiresAt = Date.now() + (tokens.expires_in || 12 * 60 * 60) * 1000;
+    const actorSession = await createActorSession({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      roles: user.roles,
+      accessToken: tokens.access_token,
+      refreshToken: (tokens as any).refresh_token,
+      expiresAt,
+    });
+
     await setCurrentSession({
       isAuthenticated: true,
       user,
-      expiresAt: Date.now() + (tokens.expires_in || 12 * 60 * 60) * 1000
+      expiresAt,
+      sessionId: actorSession.sessionId,
+      accessToken: actorSession.accessToken,
     });
     await clearAuthTransaction();
   } catch {

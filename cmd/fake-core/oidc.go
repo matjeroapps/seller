@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -74,6 +75,26 @@ func (o *oidcAuthority) mintToken(subject string) (string, error) {
 	if subject == "" {
 		subject = "usr_seller_dev"
 	}
+
+	var roles []string
+	projectRoles := map[string]any{}
+
+	if strings.HasSuffix(subject, "_manager") {
+		roles = []string{"seller_manager"}
+		projectRoles["seller_manager"] = "seller-manager"
+	} else if strings.HasSuffix(subject, "_staff") {
+		roles = []string{"seller_staff"}
+		projectRoles["seller_staff"] = "seller-staff"
+	} else if strings.HasSuffix(subject, "no_role") || strings.HasSuffix(subject, "norole") {
+		roles = []string{}
+	} else {
+		// Default to owner for dev/owner subjects
+		roles = []string{"seller_owner"}
+		projectRoles["seller_owner"] = "seller-owner"
+		projectRoles["seller_manager"] = "seller-manager"
+		projectRoles["seller_staff"] = "seller-staff"
+	}
+
 	now := time.Now().UTC()
 	claims := map[string]any{
 		"iss":                o.issuer,
@@ -81,15 +102,11 @@ func (o *oidcAuthority) mintToken(subject string) (string, error) {
 		"aud":                o.aud,
 		"iat":                now.Unix(),
 		"exp":                now.Add(5 * time.Hour).Unix(),
-		"email":              subject + "@matjero.test",
-		"preferred_username": "seller_dev",
+		"email":              subject + "@matjerhub.test",
+		"preferred_username": subject,
 		"locale":             "en",
-		"roles":              []string{"seller_owner"},
-		"urn:zitadel:iam:org:project:roles": map[string]any{
-			"seller_owner":   "seller-owner",
-			"seller_manager": "seller-manager",
-			"seller_staff":   "seller-staff",
-		},
+		"roles":              roles,
+		"urn:zitadel:iam:org:project:roles": projectRoles,
 	}
 	return o.signRS256(claims)
 }

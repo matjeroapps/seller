@@ -493,3 +493,20 @@ export interface OrderTransitionPayload {
   target_status: string;
   reason?: string;
 }
+
+export interface SellerProfile {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  avatar_url?: string;
+  roles: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UpdateSellerProfilePayload {
+  name?: string;
+  phone?: string;
+}
+

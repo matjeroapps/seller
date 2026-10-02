@@ -16,6 +16,7 @@ import type {
   SellerOrder,
   SellerOrderDetail,
   SellerOrderListResponse,
+  SellerProfile,
   SellerStoreListResponse,
   SellerSyncJob,
   Settlement,
@@ -29,6 +30,7 @@ import type {
   Theme,
   ThemeInstallationResponse,
   UpdatePaymentStatusPayload,
+  UpdateSellerProfilePayload,
   UpdateShipmentStatusPayload,
   WebhookSubscription
 } from './types';
@@ -68,9 +70,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let errMessage = `HTTP request failed with status ${response.status}`;
     try {
       const errBody = await response.json();
-      if (errBody?.error?.code) {
+      if (typeof errBody?.error === 'object' && errBody?.error?.code) {
         errCode = errBody.error.code;
         errMessage = errBody.error.message || errCode;
+      } else if (typeof errBody?.error === 'string') {
+        errCode = errBody.error;
+        errMessage = errBody.message || errCode;
+      } else if (errBody?.message) {
+        errMessage = errBody.message;
       }
     } catch {
       // ignore parse error
@@ -509,6 +516,21 @@ export const sellerApi = {
       `/v1/seller/stores/${encodeURIComponent(storeId)}/integrations/webhooks/${encodeURIComponent(subscriptionId)}`,
       { method: 'DELETE' }
     );
+  },
+
+  // Account Profile
+  async getProfile(): Promise<SellerProfile> {
+    return request<SellerProfile>('/v1/seller/profile');
+  },
+
+  async updateProfile(data: UpdateSellerProfilePayload): Promise<SellerProfile> {
+    return request<SellerProfile>('/v1/seller/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 };
+
+export const sellerClient = sellerApi;
+
 

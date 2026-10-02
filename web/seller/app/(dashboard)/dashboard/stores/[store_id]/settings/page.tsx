@@ -1,8 +1,12 @@
-import { SellerScreen } from '@/components/seller/SellerScreen';
-import { settingsScreen } from '@/components/seller/Configs';
+import { SettingsScreen } from '@/components/seller/SettingsScreen';
 
-export default async function StoreSettingsPage({ params }: { params: Promise<{ store_id: string }> }) {
+type Props = {
+  params: Promise<{ store_id: string }>;
+};
+
+export const dynamic = 'force-dynamic';
+
+export default async function SettingsPage({ params }: Props) {
   const { store_id } = await params;
-
-  return <SellerScreen screen={settingsScreen} storeId={store_id} />;
+  return <SettingsScreen storeId={store_id} />;
 }

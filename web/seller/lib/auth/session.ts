@@ -7,8 +7,9 @@ import {
   parseSessionCookie,
   serializeSessionCookie,
   sessionCookieName,
-  type SellerSession
+  type SellerSession,
 } from './session-cookie';
+import { destroyActorSession } from './session-store';
 
 const sessionMaxAge = 60 * 60 * 12;
 
@@ -23,18 +24,32 @@ export async function getCurrentUser() {
 }
 
 export async function setCurrentSession(session: SellerSession) {
+  if (!session.sessionId) {
+    return;
+  }
   const cookieStore = await cookies();
-  cookieStore.set(sessionCookieName, await serializeSessionCookie(session), {
+  cookieStore.set(sessionCookieName, await serializeSessionCookie(session.sessionId), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: sessionMaxAge,
-    path: '/'
+    path: '/',
   });
 }
 
 export async function clearSession() {
   const cookieStore = await cookies();
+  const rawCookie = cookieStore.get(sessionCookieName)?.value;
+  if (rawCookie) {
+    try {
+      const sessionId = await decodeSignedCookieValue<string>(rawCookie);
+      if (sessionId) {
+        await destroyActorSession(sessionId);
+      }
+    } catch {
+      // ignore
+    }
+  }
   cookieStore.delete(sessionCookieName);
 }
 
@@ -58,7 +73,7 @@ export async function setAuthTransaction(transaction: AuthTransaction) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 10 * 60,
-    path: '/'
+    path: '/',
   });
 }
 

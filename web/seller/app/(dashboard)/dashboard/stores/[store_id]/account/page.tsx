@@ -1,8 +1,7 @@
-import { SellerScreen } from '@/components/seller/SellerScreen';
-import { profileAccountScreen } from '@/components/seller/Configs';
+import { AccountScreen } from '@/components/seller/AccountScreen';
 
-export default async function StoreAccountPage({ params }: { params: Promise<{ store_id: string }> }) {
-  const { store_id } = await params;
+export const dynamic = 'force-dynamic';
 
-  return <SellerScreen screen={profileAccountScreen} storeId={store_id} />;
+export default async function AccountPage() {
+  return <AccountScreen />;
 }
