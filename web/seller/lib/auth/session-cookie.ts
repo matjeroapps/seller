@@ -1,3 +1,5 @@
+import { getActorSession } from './session-store';
+
 export const sessionCookieName = 'mh_seller_session';
 
 export interface SellerUser {
@@ -13,42 +15,74 @@ export interface SellerSession {
   isAuthenticated: boolean;
   user: SellerUser | null;
   expiresAt: number | null;
+  sessionId?: string;
+  accessToken?: string;
 }
 
 export function createEmptySession(): SellerSession {
   return {
     isAuthenticated: false,
     user: null,
-    expiresAt: null
+    expiresAt: null,
   };
 }
 
-export async function parseSessionCookie(value?: string | null): Promise<SellerSession> {
-  if (!value) {
+export async function parseSessionCookie(cookieValue?: string | null): Promise<SellerSession> {
+  if (!cookieValue) {
     return createEmptySession();
   }
 
   try {
-    const parsed = await decodeSignedCookieValue<SellerSession>(value);
-    if (!parsed.isAuthenticated || !parsed.user) {
+    const raw = await decodeSignedCookieValue<any>(cookieValue);
+    if (!raw) {
       return createEmptySession();
     }
 
-    if (parsed.expiresAt && parsed.expiresAt < Date.now()) {
-      return createEmptySession();
+    if (typeof raw === 'string') {
+      const actorSession = await getActorSession(raw);
+      if (!actorSession) {
+        return createEmptySession();
+      }
+
+      return {
+        isAuthenticated: true,
+        user: {
+          id: actorSession.sub,
+          email: actorSession.email,
+          name: actorSession.name,
+          avatarUrl: actorSession.avatarUrl,
+          roles: actorSession.roles,
+        },
+        expiresAt: actorSession.expiresAt,
+        sessionId: actorSession.sessionId,
+        accessToken: actorSession.accessToken,
+      };
     }
 
-    return parsed;
+    if (raw.isAuthenticated && raw.user) {
+      if (raw.expiresAt && raw.expiresAt < Date.now()) {
+        return createEmptySession();
+      }
+      return raw as SellerSession;
+    }
+
+    return createEmptySession();
   } catch {
     return createEmptySession();
   }
 }
 
-export async function serializeSessionCookie(session: SellerSession) {
-  return encodeSignedCookieValue(session);
+export async function serializeSessionCookie(payload: SellerSession | string): Promise<string> {
+  if (typeof payload === 'string') {
+    return encodeSignedCookieValue(payload);
+  }
+  if (payload.sessionId) {
+    return encodeSignedCookieValue(payload.sessionId);
+  }
+  return encodeSignedCookieValue(payload);
 }
 
-export function encodeCookieValue(payload: unknown) {
+export function encodeCookieValue(payload: unknown): string {
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   let binary = '';
   for (const byte of bytes) {
@@ -65,7 +99,7 @@ export function decodeCookieValue<T>(value: string): T {
   return JSON.parse(new TextDecoder().decode(bytes)) as T;
 }
 
-export async function encodeSignedCookieValue(payload: unknown) {
+export async function encodeSignedCookieValue(payload: unknown): Promise<string> {
   const encodedPayload = encodeCookieValue(payload);
   const signature = await signCookiePayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
@@ -85,20 +119,20 @@ export async function decodeSignedCookieValue<T>(value: string): Promise<T> {
   return decodeCookieValue<T>(encodedPayload);
 }
 
-function getSessionSecret() {
-  const secret = process.env.SELLER_SESSION_SECRET || process.env.NEXTAUTH_SECRET;
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET || process.env.SELLER_SESSION_SECRET || process.env.NEXTAUTH_SECRET;
   if (secret) {
     return secret;
   }
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('SELLER_SESSION_SECRET is required in production');
+    throw new Error('SESSION_SECRET is required in production');
   }
 
-  return 'dev-only-seller-session-secret';
+  return 'dev-only-seller-session-secret-32-bytes-long';
 }
 
-async function signCookiePayload(encodedPayload: string) {
+async function signCookiePayload(encodedPayload: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(getSessionSecret()),
@@ -110,7 +144,7 @@ async function signCookiePayload(encodedPayload: string) {
   return encodeBytes(new Uint8Array(signature));
 }
 
-function encodeBytes(bytes: Uint8Array) {
+function encodeBytes(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
@@ -119,7 +153,7 @@ function encodeBytes(bytes: Uint8Array) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function constantTimeEquals(left: string, right: string) {
+function constantTimeEquals(left: string, right: string): boolean {
   if (left.length !== right.length) {
     return false;
   }
