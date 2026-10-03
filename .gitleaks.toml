@@ -7,4 +7,5 @@ useDefault = true
 description = "Cross-repo contract fixtures: synthetic, valueless tokens"
 paths = [
     '''internal/coreclient/testdata/p58/.*''',
+    '''internal/coreapi/merchant_console_test.go''',
 ]
