@@ -113,6 +113,7 @@ func run(ctx context.Context) error {
 		Actor:        "seller",
 		RequireAuth:  true,
 		AllowedRoles: []string{auth.RoleSellerOwner, auth.RoleSellerManager, auth.RoleSellerStaff},
+		Console:      core,
 		Register: func(r chi.Router) {
 			sellerapi.RegisterSellerRoutes(sellerapi.Dependencies{
 				Core:             core,
@@ -122,6 +123,7 @@ func run(ctx context.Context) error {
 			})(r)
 			sellerapi.RegisterSellerThemeRoutes(sellerapi.ThemeDependencies{Themes: core})(r)
 			sellerapi.RegisterSellerDomainRoutes(sellerapi.DomainDependencies{Domains: core})(r)
+			sellerapi.RegisterMerchantSupplyRoutes(sellerapi.Dependencies{Core: core})(r)
 		},
 	}, core, verifier))
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,6 +22,16 @@ type Config struct {
 	RequireAuth  bool
 	AllowedRoles []string
 	Register     func(r chi.Router)
+	// Console resolves the subject-oriented Merchant bootstrap from Core. It is
+	// optional: actors without a Merchant Console integration leave it nil and
+	// the bootstrap response simply carries no merchant_console block.
+	Console MerchantConsoleService
+}
+
+// MerchantConsoleService resolves the Merchant Console bootstrap. It is
+// satisfied by *coreclient.Client.
+type MerchantConsoleService interface {
+	GetMerchantBootstrap(ctx context.Context, subject string) (*coreclient.MerchantBootstrap, error)
 }
 
 // MarketService reads market reference data. It is satisfied by
@@ -76,14 +87,53 @@ func (s Server) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, api.NewBootstrap(
+	bootstrap := api.NewBootstrap(
 		s.config.AppName,
 		s.config.Actor,
 		principal,
 		locale,
 		i18n.SupportedLocales,
 		marketsList,
-	))
+	)
+
+	if s.config.Console != nil && principal != nil {
+		console, err := s.config.Console.GetMerchantBootstrap(r.Context(), principal.Subject)
+		if err != nil {
+			// Core is authoritative for merchant workspaces; a failure here is
+			// never masked with an empty or guessed console context.
+			var coreErr *coreclient.Error
+			if errors.As(err, &coreErr) && coreErr.Status == http.StatusForbidden {
+				httpx.WriteError(w, http.StatusForbidden, "merchant_workspace_forbidden", "merchant workspace forbidden")
+				return
+			}
+			httpx.WriteError(w, http.StatusInternalServerError, "bootstrap_unavailable", "bootstrap unavailable")
+			return
+		}
+		consoleBlock := &api.MerchantConsoleBootstrap{
+			ContractVersion: console.Meta.ContractVersion,
+			Workspaces:      console.Workspaces,
+		}
+		// The selected workspace is echoed only when the request explicitly
+		// names one and Core resolved it as an operable workspace for this
+		// principal. It is never guessed and never defaults to the first.
+		if selected := strings.TrimSpace(r.URL.Query().Get("merchant_id")); selected != "" {
+			valid := false
+			for _, ws := range console.Workspaces {
+				if ws.MerchantID == selected && ws.Operable() {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				httpx.WriteError(w, http.StatusForbidden, "merchant_workspace_forbidden", "merchant workspace forbidden")
+				return
+			}
+			consoleBlock.Selected = &selected
+		}
+		bootstrap.MerchantConsole = consoleBlock
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, bootstrap)
 }
 
 func (s Server) handleMarkets(w http.ResponseWriter, r *http.Request) {

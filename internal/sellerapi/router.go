@@ -118,6 +118,20 @@ type CoreCapabilities interface {
 	CreateWebhookSubscription(ctx context.Context, subject string, req coreclient.CreateWebhookSubscriptionPayload) (*coreclient.WebhookSubscriptionResponse, error)
 	ListWebhookSubscriptions(ctx context.Context, subject, actorType, actorID string) ([]coreclient.WebhookSubscriptionResponse, error)
 	DeleteWebhookSubscription(ctx context.Context, subject, subID, actorID string) error
+
+	// Merchant Console supply read pass-throughs (Feature 025). Core performs
+	// the authoritative merchant membership/capability/permission checks.
+	ListSupplyConnections(ctx context.Context, subject, merchantID, connectionType string) ([]coreclient.SupplyConnection, error)
+	GetSupplyConnection(ctx context.Context, subject, merchantID, connectionID string) (*coreclient.SupplyConnection, error)
+	ListSupplyImportBatches(ctx context.Context, subject, merchantID, connectionID, status string, limit, offset int) ([]coreclient.SupplyImportBatch, error)
+	GetSupplyImportBatch(ctx context.Context, subject, merchantID, batchID string) (*coreclient.SupplyImportBatchDetail, error)
+	ListSupplyReviewCases(ctx context.Context, subject, merchantID, connectionID, status string) ([]coreclient.SupplyReviewCase, error)
+	GetSupplyReviewCase(ctx context.Context, subject, merchantID, caseID string) (*coreclient.SupplyReviewCase, error)
+	ListSupplyMappings(ctx context.Context, subject, merchantID, connectionID string) ([]coreclient.SupplyMapping, error)
+	GetSupplyMapping(ctx context.Context, subject, merchantID, mappingID string) (*coreclient.SupplyMapping, error)
+	ListSupplyCursors(ctx context.Context, subject, merchantID, connectionID string) ([]coreclient.SupplyCursor, error)
+	ListSupplyFulfillmentRequests(ctx context.Context, subject, merchantID, connectionID, status string, limit, offset int) ([]coreclient.SupplyFulfillmentRequest, error)
+	GetSupplyFulfillmentRequest(ctx context.Context, subject, merchantID, requestID string) (*coreclient.SupplyFulfillmentRequestDetail, error)
 }
 
 // Dependencies wires the seller routes.
