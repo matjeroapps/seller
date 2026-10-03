@@ -19,9 +19,31 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { getNavigationForStore, type SellerNavigationItem } from '@/config/seller-navigation';
+import {
+  getNavigationForMerchantWorkspace,
+  getNavigationForStore,
+  type MerchantWorkspaceNavigationContext,
+  type SellerNavigationItem
+} from '@/config/seller-navigation';
 import type { SellerUser } from '@/lib/auth';
+import {
+  fetchMerchantConsole,
+  isOperableWorkspace,
+  type MerchantConsoleBootstrap
+} from '@/lib/api/merchant-console';
+import { MerchantAccessDenied } from './MerchantAccessDenied';
+import { MerchantWorkspaceSwitcher } from './MerchantWorkspaceSwitcher';
 import { StoreSwitcher } from './StoreSwitcher';
+
+// Console state for the merchant-aware shell. `status` reflects the bootstrap
+// resolution of the URL-selected workspace; the data always comes from the
+// Seller BFF (never Core directly).
+type ConsoleState =
+  | { status: 'legacy' }
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'denied' }
+  | { status: 'ready'; console: MerchantConsoleBootstrap; merchantId: string };
 
 function isItemActive(pathname: string, item: SellerNavigationItem) {
   if (pathname === item.path || pathname.startsWith(`${item.path}/`)) return true;
@@ -40,16 +62,69 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [direction, setDirection] = useState<'ltr' | 'rtl'>('ltr');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'legacy' });
 
-  const currentStoreId = pathname.match(/\/dashboard\/stores\/([^/]+)/)?.[1];
-  const navItems = useMemo(() => getNavigationForStore(currentStoreId, user.roles), [currentStoreId, user.roles]);
+  // Legacy store paths remain compatibility entrypoints; canonical merchant
+  // workspace paths carry the explicit selected merchant in the URL.
+  const legacyStoreId = pathname.match(/\/dashboard\/stores\/([^/]+)/)?.[1];
+  const merchantMatch = pathname.match(/\/dashboard\/merchants\/([^/]+)(?:\/stores\/([^/]+))?/);
+  const merchantId = merchantMatch?.[1];
+  const merchantStoreId = merchantMatch?.[2];
+  const inMerchantContext = Boolean(merchantId);
+
+  useEffect(() => {
+    if (!merchantId) {
+      setConsoleState({ status: 'legacy' });
+      return;
+    }
+    // Cancel stale in-flight requests and drop previous workspace data on
+    // switch: every merchant-scoped view reloads from the selected workspace.
+    const controller = new AbortController();
+    setConsoleState({ status: 'loading' });
+    fetchMerchantConsole(merchantId, controller.signal)
+      .then((bootstrap) => {
+        if (controller.signal.aborted) return;
+        const selected = bootstrap.workspaces.find((ws) => ws.merchant_id === merchantId);
+        if (!selected || !isOperableWorkspace(selected)) {
+          setConsoleState({ status: 'denied' });
+          return;
+        }
+        setConsoleState({ status: 'ready', console: bootstrap, merchantId });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setConsoleState(error instanceof Error && error.name === 'AbortError' ? { status: 'loading' } : { status: 'error' });
+      });
+    return () => controller.abort();
+  }, [merchantId]);
+
+  const selectedWorkspace =
+    consoleState.status === 'ready' ? consoleState.console.workspaces.find((ws) => ws.merchant_id === consoleState.merchantId) : undefined;
+
+  const navItems = useMemo<SellerNavigationItem[]>(() => {
+    if (consoleState.status === 'ready' && selectedWorkspace) {
+      const context: MerchantWorkspaceNavigationContext = {
+        merchantId: consoleState.merchantId,
+        storeId: merchantStoreId,
+        capabilities: {
+          retail: selectedWorkspace.capabilities?.retail?.status,
+          supply: selectedWorkspace.capabilities?.supply?.status
+        },
+        permissions: selectedWorkspace.membership.permissions
+      };
+      return getNavigationForMerchantWorkspace(context);
+    }
+    return getNavigationForStore(legacyStoreId, user.roles);
+  }, [consoleState, selectedWorkspace, consoleState.status === 'ready' ? consoleState.merchantId : '', merchantStoreId, legacyStoreId, user.roles]);
+
   const activeItem = getFlatNavigation(navItems)
     .sort((a, b) => b.path.length - a.path.length)
     .find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
 
+  const workspaceRoot = inMerchantContext && merchantId ? `/dashboard/merchants/${merchantId}` : null;
   const breadcrumbs = [
-    { label: 'Dashboard', path: currentStoreId ? `/dashboard/stores/${currentStoreId}` : '/dashboard' },
-    ...(activeItem && activeItem.id !== 'dashboard' ? [{ label: activeItem.label, path: activeItem.path }] : [])
+    { label: 'Dashboard', path: workspaceRoot || (legacyStoreId ? `/dashboard/stores/${legacyStoreId}` : '/dashboard') },
+    ...(activeItem && activeItem.id !== 'dashboard' && activeItem.id !== 'workspace-dashboard' ? [{ label: activeItem.label, path: activeItem.path }] : [])
   ];
 
   useEffect(() => {
@@ -67,10 +142,16 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
     router.push(path);
   };
 
-  const settingsPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/settings` : '/dashboard/settings';
-  const notificationsPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/notifications` : settingsPath;
-  const profilePath = currentStoreId ? `/dashboard/stores/${currentStoreId}/account` : settingsPath;
-  const catalogSearchPath = currentStoreId ? `/dashboard/stores/${currentStoreId}/catalog/products` : '/dashboard';
+  const currentStoreId = inMerchantContext ? merchantStoreId : legacyStoreId;
+  const storeBase = currentStoreId
+    ? inMerchantContext && merchantId
+      ? `/dashboard/merchants/${merchantId}/stores/${currentStoreId}`
+      : `/dashboard/stores/${currentStoreId}`
+    : null;
+  const settingsPath = storeBase ? `${storeBase}/settings` : inMerchantContext && merchantId ? `/dashboard/merchants/${merchantId}` : '/dashboard/settings';
+  const notificationsPath = storeBase ? `${storeBase}/notifications` : settingsPath;
+  const profilePath = storeBase ? `${storeBase}/account` : settingsPath;
+  const catalogSearchPath = storeBase ? `${storeBase}/catalog/products` : workspaceRoot || '/dashboard';
 
   return (
     <div className="seller-app-shell" data-theme={theme}>
@@ -88,8 +169,22 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
           </button>
         </div>
 
+        {consoleState.status === 'ready' && selectedWorkspace && (
+          <MerchantWorkspaceSwitcher
+            workspaces={consoleState.console.workspaces}
+            selectedMerchantId={consoleState.merchantId}
+            onSelect={(nextMerchantId) => {
+              // Never reuse a store selection from another workspace.
+              navigate(`/dashboard/merchants/${nextMerchantId}`);
+            }}
+          />
+        )}
         <div className="seller-sidebar__store">
-          <StoreSwitcher currentStoreId={currentStoreId} />
+          <StoreSwitcher
+            currentStoreId={inMerchantContext ? merchantStoreId : legacyStoreId}
+            workspaceStores={consoleState.status === 'ready' ? selectedWorkspace?.stores : undefined}
+            workspaceMerchantId={consoleState.status === 'ready' ? consoleState.merchantId : undefined}
+          />
         </div>
 
         <nav className="seller-sidebar__nav">
@@ -179,7 +274,11 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
                 <span className="seller-profile__avatar">{user.name.slice(0, 2).toUpperCase()}</span>
                 <span className="seller-profile__text">
                   <span>{user.name}</span>
-                  <span>{user.roles[0] || 'Seller'}</span>
+                  <span>
+                    {consoleState.status === 'ready' && selectedWorkspace
+                      ? `${selectedWorkspace.legal_name} · ${selectedWorkspace.membership.status}`
+                      : user.roles[0] || 'Seller'}
+                  </span>
                 </span>
                 <ChevronDown aria-hidden="true" />
               </button>
@@ -204,7 +303,22 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
         </header>
 
         <main id="main-content" className="seller-main">
-          {children}
+          {consoleState.status === 'denied' ? (
+            <MerchantAccessDenied
+              backPath="/dashboard"
+              title="Merchant workspace unavailable"
+              message="This merchant workspace is not accessible for your account, or your membership is not active."
+            />
+          ) : consoleState.status === 'error' ? (
+            <div className="space-y-2" role="alert" data-testid="merchant-console-error">
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Console unavailable</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                The merchant workspace context could not be loaded. Retry from the dashboard.
+              </p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
     </div>

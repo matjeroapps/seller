@@ -126,6 +126,163 @@
                       },
                       "type": "array"
                     },
+                    "merchant_console": {
+                      "nullable": true,
+                      "properties": {
+                        "contract_version": {
+                          "type": "string"
+                        },
+                        "selected_merchant_id": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "workspaces": {
+                          "items": {
+                            "properties": {
+                              "capabilities": {
+                                "nullable": true,
+                                "properties": {
+                                  "retail": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "status"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "supply": {
+                                    "nullable": true,
+                                    "properties": {
+                                      "status": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "status"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "legal_name": {
+                                "type": "string"
+                              },
+                              "membership": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "permissions": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "status": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "permissions",
+                                  "status"
+                                ],
+                                "type": "object"
+                              },
+                              "merchant_code": {
+                                "type": "string"
+                              },
+                              "merchant_id": {
+                                "type": "string"
+                              },
+                              "merchant_status": {
+                                "type": "string"
+                              },
+                              "pending_actions": {
+                                "nullable": true,
+                                "properties": {
+                                  "open_review_cases": {
+                                    "format": "int32",
+                                    "type": "integer"
+                                  },
+                                  "unhealthy_connections": {
+                                    "format": "int32",
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "open_review_cases",
+                                  "unhealthy_connections"
+                                ],
+                                "type": "object"
+                              },
+                              "plan_summary": {
+                                "nullable": true,
+                                "properties": {
+                                  "state": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "state"
+                                ],
+                                "type": "object"
+                              },
+                              "stores": {
+                                "items": {
+                                  "properties": {
+                                    "code": {
+                                      "type": "string"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "market_code": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "id",
+                                    "market_code",
+                                    "name",
+                                    "status"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "legal_name",
+                              "membership",
+                              "merchant_code",
+                              "merchant_id",
+                              "merchant_status",
+                              "stores"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "contract_version",
+                        "workspaces"
+                      ],
+                      "type": "object"
+                    },
                     "principal": {
                       "nullable": true,
                       "properties": {

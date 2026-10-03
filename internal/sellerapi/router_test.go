@@ -1212,3 +1212,50 @@ func TestPublicIntegrationAPI(t *testing.T) {
 		}
 	})
 }
+
+// Merchant Console supply read stubs (Feature 025): canned empty results; the
+// pass-through contract tests assert subject forwarding and status mapping.
+func (s *stubCore) ListSupplyConnections(ctx context.Context, subject, merchantID, connectionType string) ([]coreclient.SupplyConnection, error) {
+	s.subject = subject
+	return []coreclient.SupplyConnection{}, s.err
+}
+func (s *stubCore) GetSupplyConnection(ctx context.Context, subject, merchantID, connectionID string) (*coreclient.SupplyConnection, error) {
+	s.subject = subject
+	return &coreclient.SupplyConnection{ID: connectionID}, s.err
+}
+func (s *stubCore) ListSupplyImportBatches(ctx context.Context, subject, merchantID, connectionID, status string, limit, offset int) ([]coreclient.SupplyImportBatch, error) {
+	s.subject = subject
+	return []coreclient.SupplyImportBatch{}, s.err
+}
+func (s *stubCore) GetSupplyImportBatch(ctx context.Context, subject, merchantID, batchID string) (*coreclient.SupplyImportBatchDetail, error) {
+	s.subject = subject
+	return &coreclient.SupplyImportBatchDetail{Records: []coreclient.SupplyImportRecord{}}, s.err
+}
+func (s *stubCore) ListSupplyReviewCases(ctx context.Context, subject, merchantID, connectionID, status string) ([]coreclient.SupplyReviewCase, error) {
+	s.subject = subject
+	return []coreclient.SupplyReviewCase{}, s.err
+}
+func (s *stubCore) GetSupplyReviewCase(ctx context.Context, subject, merchantID, caseID string) (*coreclient.SupplyReviewCase, error) {
+	s.subject = subject
+	return &coreclient.SupplyReviewCase{ID: caseID}, s.err
+}
+func (s *stubCore) ListSupplyMappings(ctx context.Context, subject, merchantID, connectionID string) ([]coreclient.SupplyMapping, error) {
+	s.subject = subject
+	return []coreclient.SupplyMapping{}, s.err
+}
+func (s *stubCore) GetSupplyMapping(ctx context.Context, subject, merchantID, mappingID string) (*coreclient.SupplyMapping, error) {
+	s.subject = subject
+	return &coreclient.SupplyMapping{ID: mappingID}, s.err
+}
+func (s *stubCore) ListSupplyCursors(ctx context.Context, subject, merchantID, connectionID string) ([]coreclient.SupplyCursor, error) {
+	s.subject = subject
+	return []coreclient.SupplyCursor{}, s.err
+}
+func (s *stubCore) ListSupplyFulfillmentRequests(ctx context.Context, subject, merchantID, connectionID, status string, limit, offset int) ([]coreclient.SupplyFulfillmentRequest, error) {
+	s.subject = subject
+	return []coreclient.SupplyFulfillmentRequest{}, s.err
+}
+func (s *stubCore) GetSupplyFulfillmentRequest(ctx context.Context, subject, merchantID, requestID string) (*coreclient.SupplyFulfillmentRequestDetail, error) {
+	s.subject = subject
+	return &coreclient.SupplyFulfillmentRequestDetail{TrackingEvents: []coreclient.SupplyTrackingEvent{}}, s.err
+}
