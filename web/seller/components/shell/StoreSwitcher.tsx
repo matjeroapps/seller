@@ -5,8 +5,19 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Store as StoreIcon, ChevronDown, Plus, Check } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { Store } from '@/lib/api/types';
+import type { MerchantWorkspaceStore } from '@/lib/api/merchant-console';
 
-export function StoreSwitcher({ currentStoreId }: { currentStoreId?: string }) {
+export function StoreSwitcher({
+  currentStoreId,
+  workspaceStores,
+  workspaceMerchantId
+}: {
+  currentStoreId?: string;
+  // When a merchant workspace is selected, the switcher is scoped to that
+  // workspace's authorized stores and navigates the canonical store paths.
+  workspaceStores?: MerchantWorkspaceStore[];
+  workspaceMerchantId?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -51,10 +62,18 @@ export function StoreSwitcher({ currentStoreId }: { currentStoreId?: string }) {
     };
   }, [currentStoreId, pathname, router]);
 
-  const selectedStore = stores.find((s) => s.id === currentStoreId) || stores[0];
+  const selectedStore = workspaceStores
+    ? workspaceStores.find((s) => s.id === currentStoreId) || workspaceStores[0]
+    : stores.find((s) => s.id === currentStoreId) || stores[0];
 
   const handleSelectStore = (storeId: string) => {
     setIsOpen(false);
+    if (workspaceMerchantId) {
+      // Canonical store paths inside the selected merchant workspace; a store
+      // of another workspace is never offered here.
+      router.push(`/dashboard/merchants/${workspaceMerchantId}/stores/${storeId}`);
+      return;
+    }
     if (currentStoreId) {
       const newPath = pathname.replace(`/dashboard/stores/${currentStoreId}`, `/dashboard/stores/${storeId}`);
       router.push(newPath);
@@ -83,7 +102,7 @@ export function StoreSwitcher({ currentStoreId }: { currentStoreId?: string }) {
     }
   };
 
-  if (loading) {
+  if (loading && !workspaceStores) {
     return (
       <button
         type="button"
@@ -131,7 +150,7 @@ export function StoreSwitcher({ currentStoreId }: { currentStoreId?: string }) {
               </span>
             </div>
             <div className="mt-1 space-y-0.5 max-h-48 overflow-y-auto">
-              {stores.map((s) => (
+              {(workspaceStores || stores).map((s) => (
                 <button
                   key={s.id}
                   type="button"
