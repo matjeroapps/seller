@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
   poweredByHeader: false,
+  serverExternalPackages: ['ioredis'],
   transpilePackages: ['@matjerhub/ui-sdk'],
   async rewrites() {
     // Feature 025 canonical route carriage: store screens keep their single

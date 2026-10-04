@@ -34,6 +34,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
+COPY --from=build --chown=node:node /src/node_modules ./node_modules
 COPY --from=build --chown=node:node /src/web/seller/.next/standalone ./
 COPY --from=build --chown=node:node /src/web/seller/.next/static ./web/seller/.next/static
 

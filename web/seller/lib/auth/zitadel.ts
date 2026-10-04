@@ -176,7 +176,8 @@ export async function verifySellerApiAccess(accessToken: string, expectedSubject
   }
 
   if (!response.ok) {
-    console.warn('seller auth bootstrap verification failed', { status: response.status });
+    const errorText = await response.text().catch(() => '');
+    console.warn('seller auth bootstrap verification failed', { status: response.status, body: errorText });
     throw new Error('Authentication bootstrap verification failed');
   }
 
