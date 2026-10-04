@@ -39,6 +39,20 @@ function getRedisClient(): Redis | null {
   return redisClient;
 }
 
+export async function ensureRedisReady(redis: Pick<Redis, 'status' | 'connect'>): Promise<boolean> {
+  if (redis.status === 'ready') {
+    return true;
+  }
+
+  try {
+    await redis.connect();
+    return true;
+  } catch (err) {
+    console.error('Failed to connect to Redis:', err);
+    return false;
+  }
+}
+
 const SESSION_PREFIX = 'seller:session:';
 const DEFAULT_TTL_SECONDS = 60 * 60 * 12; // 12 hours
 
@@ -52,7 +66,7 @@ export async function createActorSession(
   };
 
   const redis = getRedisClient();
-  if (redis) {
+  if (redis && await ensureRedisReady(redis)) {
     try {
       const ttlSeconds = Math.max(1, Math.floor((data.expiresAt - Date.now()) / 1000)) || DEFAULT_TTL_SECONDS;
       await redis.setex(`${SESSION_PREFIX}${sessionId}`, ttlSeconds, JSON.stringify(session));
@@ -73,7 +87,7 @@ export async function getActorSession(sessionId: string): Promise<ActorSessionDa
   }
 
   const redis = getRedisClient();
-  if (redis) {
+  if (redis && await ensureRedisReady(redis)) {
     try {
       const data = await redis.get(`${SESSION_PREFIX}${sessionId}`);
       if (!data) {
@@ -112,7 +126,7 @@ export async function destroyActorSession(sessionId: string): Promise<void> {
   }
 
   const redis = getRedisClient();
-  if (redis) {
+  if (redis && await ensureRedisReady(redis)) {
     try {
       await redis.del(`${SESSION_PREFIX}${sessionId}`);
     } catch {

@@ -213,6 +213,54 @@ func TestOIDCVerifierExplicitSplitDiscoveryAndIssuer(t *testing.T) {
 	})
 }
 
+func TestOIDCVerifierSplitDiscoveryPreservesIssuerPortForJWKSTransport(t *testing.T) {
+	assertedIssuer := "http://localhost:8181"
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("GenerateKey returned error: %v", err)
+	}
+
+	keyID := "test-key"
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != "localhost:8181" {
+			t.Fatalf("discovery Host = %q, want localhost:8181", r.Host)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"issuer":   assertedIssuer,
+			"jwks_uri": "http://" + r.Host + "/keys",
+		})
+	})
+	mux.HandleFunc("/keys", func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != "localhost:8181" {
+			t.Fatalf("keys Host = %q, want localhost:8181", r.Host)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"keys": []map[string]any{jwkForRSA(&privateKey.PublicKey, keyID)},
+		})
+	})
+	discovery := httptest.NewServer(mux)
+	t.Cleanup(discovery.Close)
+
+	verifier, err := NewOIDCVerifier(context.Background(), Config{
+		IssuerURL:    assertedIssuer,
+		DiscoveryURL: discovery.URL,
+		Audience:     "seller-api",
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCVerifier returned error: %v", err)
+	}
+
+	token := signJWT(t, privateKey, assertedIssuer, "seller-api", nil)
+	principal, err := verifier.Verify(context.Background(), token)
+	if err != nil {
+		t.Fatalf("Verify returned error: %v", err)
+	}
+	if principal.Issuer != assertedIssuer {
+		t.Fatalf("Principal Issuer = %q, want %q", principal.Issuer, assertedIssuer)
+	}
+}
+
 func TestOIDCVerifierRejectsWrongIssuer(t *testing.T) {
 	issuer := newOIDCIssuer(t)
 
