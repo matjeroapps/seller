@@ -59,6 +59,7 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
   }
 
   const ws = state.workspace;
+  const stores = ws.stores || [];
   const retailActive = hasActiveCapability(ws, 'retail');
   const supplyActive = hasActiveCapability(ws, 'supply');
   const retailStatus = ws.capabilities?.retail?.status || 'inactive';
@@ -91,8 +92,8 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
               {retailStatus}
             </span>
           </div>
-          {retailActive && ws.stores.length > 0 && (
-            <p className="text-xs text-slate-500 mt-2">{ws.stores.length} authorized store{ws.stores.length === 1 ? '' : 's'}</p>
+          {retailActive && stores.length > 0 && (
+            <p className="text-xs text-slate-500 mt-2">{stores.length} authorized store{stores.length === 1 ? '' : 's'}</p>
           )}
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -146,13 +147,13 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
           <Store aria-hidden="true" className="h-4 w-4 text-slate-500" />
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Authorized stores</h2>
         </div>
-        {ws.stores.length === 0 ? (
+        {stores.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-900" data-testid="stores-empty">
             <p className="text-sm text-slate-500">No stores are authorized for this workspace yet.</p>
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ws.stores.map((store) => (
+            {stores.map((store) => (
               <li key={store.id}>
                 <Link
                   href={`/dashboard/merchants/${ws.merchant_id}/stores/${store.id}`}

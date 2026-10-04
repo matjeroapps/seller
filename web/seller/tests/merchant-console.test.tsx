@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 
 import { MerchantWorkspaceSwitcher } from '../components/shell/MerchantWorkspaceSwitcher';
+import MerchantWorkspacePage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/page';
 import SupplyConnectionsPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/connections/page';
 import SupplyImportBatchesPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/import-batches/page';
 import SupplyMappingsPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/mappings/page';
@@ -139,3 +140,24 @@ describe('Merchant workspace switcher (US3)', () => {
   });
 });
 
+describe('Merchant workspace overview isolation states', () => {
+  it('renders an authoritative empty store state when stores are absent from bootstrap', async () => {
+    const workspaceWithoutStores = workspace({
+      capabilities: {
+        retail: { status: 'active' },
+        supply: { status: 'active' }
+      }
+    }) as MerchantWorkspace;
+    delete (workspaceWithoutStores as Partial<MerchantWorkspace>).stores;
+    fetchConsole.mockResolvedValueOnce({
+      contract_version: 'merchant-console/v1',
+      selected_merchant_id: 'm-1',
+      workspaces: [workspaceWithoutStores]
+    } as MerchantConsoleBootstrap);
+
+    await renderPage(<MerchantWorkspacePage params={Promise.resolve({ merchant_id: 'm-1' })} />);
+
+    expect(await screen.findByTestId('merchant-workspace-overview')).toBeInTheDocument();
+    expect(screen.getByTestId('stores-empty')).toHaveTextContent('No stores are authorized');
+  });
+});
