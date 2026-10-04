@@ -30,7 +30,8 @@ function getRedisClient(): Redis | null {
         maxRetriesPerRequest: 2,
         enableOfflineQueue: false,
       });
-    } catch {
+    } catch (err) {
+      console.error('Failed to initialize Redis client:', err);
       redisClient = null;
     }
   }
@@ -56,7 +57,8 @@ export async function createActorSession(
       const ttlSeconds = Math.max(1, Math.floor((data.expiresAt - Date.now()) / 1000)) || DEFAULT_TTL_SECONDS;
       await redis.setex(`${SESSION_PREFIX}${sessionId}`, ttlSeconds, JSON.stringify(session));
       return session;
-    } catch {
+    } catch (err) {
+      console.error('Failed to set session in Redis:', err);
       // Fallback to memory store if Redis is unreachable
     }
   }
@@ -85,7 +87,8 @@ export async function getActorSession(sessionId: string): Promise<ActorSessionDa
       }
 
       return parsed;
-    } catch {
+    } catch (err) {
+      console.error('Failed to get session from Redis:', err);
       // Fallback to memory store
     }
   }

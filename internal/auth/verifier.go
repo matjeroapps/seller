@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -15,6 +17,25 @@ type OIDCVerifier struct {
 	verifier   *oidc.IDTokenVerifier
 	rolesClaim string
 	issuer     string
+}
+
+type oidcTransport struct {
+	underlying http.RoundTripper
+	issuer     *url.URL
+	discovery  *url.URL
+}
+
+func (t *oidcTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	if req.URL.Host == t.issuer.Host || req.URL.Host == t.discovery.Host {
+		req.Host = t.issuer.Hostname()
+		req.URL.Scheme = t.discovery.Scheme
+		req.URL.Host = t.discovery.Host
+	}
+	if t.underlying != nil {
+		return t.underlying.RoundTrip(req)
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 func NewOIDCVerifier(ctx context.Context, cfg Config) (*OIDCVerifier, error) {
@@ -33,7 +54,19 @@ func NewOIDCVerifier(ctx context.Context, cfg Config) (*OIDCVerifier, error) {
 
 	provCtx := ctx
 	if discoveryURL != issuer {
-		provCtx = oidc.InsecureIssuerURLContext(ctx, issuer)
+		issuerParsed, err1 := url.Parse(issuer)
+		discParsed, err2 := url.Parse(discoveryURL)
+		if err1 == nil && err2 == nil {
+			client := &http.Client{
+				Transport: &oidcTransport{
+					underlying: http.DefaultTransport,
+					issuer:     issuerParsed,
+					discovery:  discParsed,
+				},
+			}
+			provCtx = oidc.ClientContext(ctx, client)
+		}
+		provCtx = oidc.InsecureIssuerURLContext(provCtx, issuer)
 	}
 
 	provider, err := oidc.NewProvider(provCtx, discoveryURL)
