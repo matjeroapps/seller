@@ -60,7 +60,10 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [direction, setDirection] = useState<'ltr' | 'rtl'>('ltr');
+  const [direction, setDirection] = useState<'ltr' | 'rtl'>(() => {
+    if (typeof document === 'undefined') return 'ltr';
+    return document.documentElement.dir === 'rtl' || document.documentElement.lang.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr';
+  });
   const [profileOpen, setProfileOpen] = useState(false);
   const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'legacy' });
 
