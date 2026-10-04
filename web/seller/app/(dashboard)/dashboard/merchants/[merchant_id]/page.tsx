@@ -156,6 +156,8 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
               <li key={store.id}>
                 <Link
                   href={`/dashboard/merchants/${ws.merchant_id}/stores/${store.id}`}
+                  data-store-id={store.id}
+                  data-testid={`merchant-store-card-${store.code}`}
                   className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
                 >
                   <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{store.name}</div>

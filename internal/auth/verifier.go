@@ -28,7 +28,7 @@ type oidcTransport struct {
 func (t *oidcTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
 	if req.URL.Host == t.issuer.Host || req.URL.Host == t.discovery.Host {
-		req.Host = t.issuer.Hostname()
+		req.Host = t.issuer.Host
 		req.URL.Scheme = t.discovery.Scheme
 		req.URL.Host = t.discovery.Host
 	}

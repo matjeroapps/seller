@@ -53,6 +53,10 @@ export interface MerchantConsoleBootstrap {
   selected_merchant_id?: string | null;
 }
 
+interface SellerBootstrapEnvelope {
+  merchant_console?: MerchantConsoleBootstrap;
+}
+
 export function isOperableWorkspace(workspace: MerchantWorkspace): boolean {
   return workspace.merchant_status === 'active' && workspace.membership.status === 'active';
 }
@@ -229,11 +233,15 @@ export async function fetchMerchantConsole(
   signal?: AbortSignal
 ): Promise<MerchantConsoleBootstrap> {
   const query = selectedMerchantId ? `?merchant_id=${encodeURIComponent(selectedMerchantId)}` : '';
-  return consoleRequest<MerchantConsoleBootstrap>(`/api/seller/v1/bootstrap${query}`, signal);
+  const response = await consoleRequest<MerchantConsoleBootstrap | SellerBootstrapEnvelope>(`/api/seller/v1/bootstrap${query}`, signal);
+  if ('merchant_console' in response && response.merchant_console) {
+    return response.merchant_console;
+  }
+  return response as MerchantConsoleBootstrap;
 }
 
 function merchantSupplyPath(merchantId: string, ...parts: string[]) {
-  return `/api/seller/merchants/${encodeURIComponent(merchantId)}/integrations/${parts.map(encodeURIComponent).join('/')}`;
+  return `/api/seller/v1/merchants/${encodeURIComponent(merchantId)}/integrations/${parts.map(encodeURIComponent).join('/')}`;
 }
 
 export const merchantSupplyApi = {

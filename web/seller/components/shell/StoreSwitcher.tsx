@@ -42,7 +42,7 @@ export function StoreSwitcher({
         setLoading(false);
 
         // Store selection logic if no store is selected in route
-        if (!currentStoreId && data.items && data.items.length > 0) {
+        if (!currentStoreId && pathname !== '/dashboard' && !pathname.startsWith('/dashboard/merchants/') && data.items && data.items.length > 0) {
           const activeStores = data.items.filter((s) => s.status === 'active');
           const targetStore = activeStores.length > 0 ? activeStores[0] : data.items[0];
           if (targetStore) {
@@ -121,6 +121,7 @@ export function StoreSwitcher({
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-800 bg-white border border-slate-200 rounded-md shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400"
         aria-expanded={isOpen}
+        data-testid="store-switcher"
       >
         <StoreIcon className="w-4 h-4 text-slate-600" />
         <span className="truncate max-w-[140px]">{selectedStore ? selectedStore.name : 'Select Store'}</span>
@@ -155,6 +156,8 @@ export function StoreSwitcher({
                   key={s.id}
                   type="button"
                   onClick={() => handleSelectStore(s.id)}
+                  data-store-id={s.id}
+                  data-testid={`store-switcher-option-${s.code}`}
                   className={`w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-md text-left transition-colors ${
                     s.id === selectedStore?.id ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700 hover:bg-slate-50'
                   }`}

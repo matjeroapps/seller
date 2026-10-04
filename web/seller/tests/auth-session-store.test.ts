@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   createActorSession,
   getActorSession,
   destroyActorSession,
   clearMemoryStore,
+  ensureRedisReady,
   type ActorSessionData,
 } from '../lib/auth/session-store';
 import {
@@ -94,5 +95,15 @@ describe('Auth Session Store & Cookie Security (T005)', () => {
     const tamperedValue = `${parts[0]}.invalid_signature`;
 
     await expect(decodeSignedCookieValue(tamperedValue)).rejects.toThrow();
+  });
+
+  it('connects lazy Redis clients before issuing session commands', async () => {
+    const redis = {
+      status: 'wait' as const,
+      connect: vi.fn(async () => {}),
+    };
+
+    await expect(ensureRedisReady(redis)).resolves.toBe(true);
+    expect(redis.connect).toHaveBeenCalledTimes(1);
   });
 });
