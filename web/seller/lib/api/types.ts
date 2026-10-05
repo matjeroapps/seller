@@ -44,6 +44,95 @@ export interface Product {
   updated_at: string;
 }
 
+export interface ProductTranslation {
+  locale: string;
+  name: string;
+  description: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  code: string;
+  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductSku {
+  id: string;
+  variant_id: string;
+  code: string;
+  barcode?: string;
+  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventorySummary {
+  total_on_hand: number;
+  total_reserved: number;
+  total_available: number;
+  locations: Array<{
+    location_id: string;
+    location_name: string;
+    sku_id: string;
+    on_hand_qty: number;
+    reserved_qty: number;
+    available_qty: number;
+  }>;
+}
+
+export interface PublishReadiness {
+  is_ready: boolean;
+  reasons: string[];
+}
+
+export interface ProductPageSection {
+  id: string;
+  type: string;
+  enabled: boolean;
+  sort_order: number;
+  content: Record<string, unknown>;
+}
+
+export interface SellerListingPresentation {
+  seller_listing_id: string;
+  schema_version: number;
+  purchase_behavior: string;
+  sections: ProductPageSection[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SellerProductDetail {
+  product: Omit<Product, 'store_id' | 'source' | 'name'>;
+  source: Product['source'];
+  translations: ProductTranslation[];
+  category_ids: string[];
+  variants: ProductVariant[];
+  skus: ProductSku[];
+  media: Array<{
+    id: string;
+    product_id: string;
+    media_type: string;
+    uri: string;
+    storage_key?: string;
+    alt_text: string;
+    sort_order: number;
+    is_primary: boolean;
+    metadata?: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+  }>;
+  listing: SellerListing;
+  current_price?: Money | null;
+  inventory_summary: InventorySummary;
+  presentation: SellerListingPresentation;
+  purchase_behavior: string;
+  publish_readiness: PublishReadiness;
+}
+
 export interface SellerListing {
   id: string;
   store_id: string;
