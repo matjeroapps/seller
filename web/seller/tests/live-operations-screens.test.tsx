@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountScreen } from '../components/seller/AccountScreen';
 import { SettingsScreen } from '../components/seller/SettingsScreen';
+import { ShipmentsOverviewScreen } from '../components/seller/ShipmentsOverviewScreen';
 import { TeamScreen } from '../components/seller/TeamScreen';
 import { OrderDocumentsScreen } from '../components/seller/OrderDocumentsScreen';
 import { SellerShellUserProvider } from '../components/shell/SellerShellContext';
@@ -88,6 +89,22 @@ describe('Live & Operations Screens Verification (T020)', () => {
     expect(screen.getByText('Managed by MatjerHub SSO')).toBeInTheDocument();
     expect(screen.queryByText(/Unavailable/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/ZITADEL/i)).not.toBeInTheDocument();
+  });
+
+  it('renders ShipmentsOverviewScreen with status filters', async () => {
+    vi.spyOn(sellerClient, 'listStoreOrders').mockResolvedValueOnce({
+      orders: [],
+      total: 0,
+      limit: 25,
+      offset: 0,
+    });
+
+    render(<ShipmentsOverviewScreen storeId="str_a1_1001" />);
+
+    expect(await screen.findByText('Store Shipments Overview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ALL' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PENDING' })).toBeInTheDocument();
+    expect(screen.getByText('No shipment-ready orders found')).toBeInTheDocument();
   });
 
   it('renders OrderDocumentsScreen with printable markup', async () => {

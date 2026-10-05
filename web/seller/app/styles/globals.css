@@ -1013,6 +1013,30 @@ a {
   flex-wrap: wrap;
 }
 
+.seller-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.seller-filter-bar button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-background);
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 7px 10px;
+}
+
+.seller-filter-bar button.is-active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
 .seller-section-kicker {
   color: var(--color-muted-foreground);
   font-size: 11px;
