@@ -2,7 +2,16 @@
 
 import { redirect } from 'next/navigation';
 
-import { createCodeChallenge, createCodeVerifier, createState, getAuthorizationUrl, getZitadelConfig, getZitadelEndpoints, setAuthTransaction } from '@/lib/auth';
+import {
+  createCodeChallenge,
+  createCodeVerifier,
+  createState,
+  getAuthorizationUrl,
+  getZitadelConfig,
+  getZitadelEndpoints,
+  setAuthTransaction,
+  type LoginPrompt
+} from '@/lib/auth';
 
 function normalizeRedirect(value: FormDataEntryValue | null) {
   if (typeof value !== 'string' || !value.startsWith('/')) {
@@ -20,6 +29,9 @@ export async function startLogin(formData: FormData) {
   const state = createState();
   const codeVerifier = createCodeVerifier();
   const redirectTo = normalizeRedirect(formData.get('redirect'));
+  const requestedPrompt = formData.get('prompt');
+  const prompt: LoginPrompt | undefined =
+    requestedPrompt === 'login' || requestedPrompt === 'create' ? requestedPrompt : undefined;
 
   await setAuthTransaction({
     state,
@@ -29,5 +41,5 @@ export async function startLogin(formData: FormData) {
 
   const config = getZitadelConfig();
   const endpoints = getZitadelEndpoints(config);
-  redirect(getAuthorizationUrl(config, endpoints, state, createCodeChallenge(codeVerifier)));
+  redirect(getAuthorizationUrl(config, endpoints, state, createCodeChallenge(codeVerifier), prompt));
 }

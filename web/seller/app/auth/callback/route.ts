@@ -8,6 +8,7 @@ import {
   getZitadelConfig,
   getZitadelServerEndpoints,
   setCurrentSession,
+  SellerAuthorizationError,
   verifySellerApiAccess,
 } from '@/lib/auth';
 import { createActorSession } from '@/lib/auth/session-store';
@@ -65,8 +66,11 @@ export async function GET(request: NextRequest) {
       accessToken: actorSession.accessToken,
     });
     await clearAuthTransaction();
-  } catch {
+  } catch (error) {
     await clearAuthTransaction();
+    if (error instanceof SellerAuthorizationError) {
+      return redirectTo(request, '/login?error=unauthorized');
+    }
     return redirectTo(request, '/login?error=session');
   }
 
