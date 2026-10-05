@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, AlertCircle, RefreshCw, DollarSign, Upload, Eye, TrendingUp, Percent, ShieldAlert } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { SellerListing, SellerListingLifecycle, StructuredPublishReadiness } from '@/lib/api/types';
+import { majorToMinor, minorAmount, minorToMajor } from '@/lib/money';
 
 export default function StoreListingDetailPage({
   params
@@ -44,17 +45,18 @@ export default function StoreListingDetailPage({
         setLifecycle(lifecycleRes);
         setReadiness(readinessRes);
 
-        // Pre-fill retail price if available
-        if (lifecycleRes?.current_retail_price?.amount) {
-          setPriceAmount((lifecycleRes.current_retail_price.amount / 100).toFixed(2));
-          setPriceCurrency(lifecycleRes.current_retail_price.currency || 'SAR');
+        // Pre-fill retail price if available (API amounts are minor units)
+        const retailMinor = minorAmount(lifecycleRes?.current_retail_price);
+        const wholesaleMinor = minorAmount(lifecycleRes?.upstream_wholesale_price);
+        const cur = lifecycleRes?.current_retail_price?.currency || lifecycleRes?.upstream_wholesale_price?.currency || 'SAR';
+        if (retailMinor !== null && retailMinor > 0) {
+          setPriceAmount(minorToMajor(retailMinor, cur).toFixed(2));
         }
+        setPriceCurrency(cur);
 
         // Calculate initial markup % if wholesale price is available
-        const wholesale = lifecycleRes?.upstream_wholesale_price?.amount;
-        const retail = lifecycleRes?.current_retail_price?.amount;
-        if (wholesale && retail && wholesale > 0) {
-          const calcMarkup = (((retail - wholesale) / wholesale) * 100).toFixed(1);
+        if (wholesaleMinor && retailMinor && wholesaleMinor > 0) {
+          const calcMarkup = (((retailMinor - wholesaleMinor) / wholesaleMinor) * 100).toFixed(1);
           setMarkupPercent(calcMarkup);
         }
         setLoading(false);
@@ -68,9 +70,9 @@ export default function StoreListingDetailPage({
 
   const handleApplyMarkup = (pct: number) => {
     setMarkupPercent(pct.toString());
-    const wholesaleCents = lifecycle?.upstream_wholesale_price?.amount;
-    if (wholesaleCents && wholesaleCents > 0) {
-      const wholesale = wholesaleCents / 100;
+    const wholesaleMinor = minorAmount(lifecycle?.upstream_wholesale_price);
+    if (wholesaleMinor && wholesaleMinor > 0) {
+      const wholesale = minorToMajor(wholesaleMinor, priceCurrency);
       const newRetail = wholesale * (1 + pct / 100);
       setPriceAmount(newRetail.toFixed(2));
     }
@@ -80,12 +82,16 @@ export default function StoreListingDetailPage({
     e.preventDefault();
     const amount = parseFloat(priceAmount);
     if (isNaN(amount) || amount <= 0) return;
+    if (priceIsUnsafe) {
+      setActionError('Free shipping is not covered by this margin. Raise the price or switch to buyer-paid shipping.');
+      return;
+    }
     setUpdatingPrice(true);
     setActionError(null);
     try {
       await sellerApi.updateListingPrice(store_id, listing_id, {
         currency: priceCurrency,
-        amount
+        amount_minor: majorToMinor(amount, priceCurrency)
       });
       loadData();
     } catch (err: any) {
@@ -153,15 +159,16 @@ export default function StoreListingDetailPage({
     );
   }
 
-  // Calculated economics
-  const wholesaleCents = lifecycle?.upstream_wholesale_price?.amount;
-  const wholesaleVal = wholesaleCents ? wholesaleCents / 100 : null;
+  // Calculated economics (wholesale from API is minor units)
+  const wholesaleMinor = minorAmount(lifecycle?.upstream_wholesale_price);
+  const wholesaleVal = wholesaleMinor ? minorToMajor(wholesaleMinor, priceCurrency) : null;
   const currentRetailVal = parseFloat(priceAmount) || 0;
   const shippingVal = shippingSubsidy === 'seller_free' ? parseFloat(estimatedShipping) || 0 : 0;
   const grossMarginVal = wholesaleVal ? currentRetailVal - wholesaleVal : 0;
   const netMarginVal = grossMarginVal - shippingVal;
   const netMarginPercent = currentRetailVal > 0 ? (netMarginVal / currentRetailVal) * 100 : 0;
-  const hasUnsafeMargin = (wholesaleVal !== null && netMarginVal < 0) || Boolean(lifecycle?.has_margin_warning);
+  const priceIsUnsafe = wholesaleVal !== null && netMarginVal < 0;
+  const hasUnsafeMargin = priceIsUnsafe || Boolean(lifecycle?.has_margin_warning);
 
   return (
     <div className="space-y-6">

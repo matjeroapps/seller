@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Truck, Search, Download, CheckCircle2, AlertCircle, Percent, ShieldAlert, DollarSign } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { SupplierCatalogItem } from '@/lib/api/types';
+import { formatMoney, minorAmount, minorToMajor } from '@/lib/money';
 
 export default function StoreSupplierOffersPage({
   params
@@ -68,25 +69,39 @@ export default function StoreSupplierOffersPage({
     try {
       const listing = await sellerApi.importSupplierOffer(store_id, offerId);
 
-      // If markup was customized, update price on the imported listing
-      const wholesaleAmount = selectedOffer.price?.amount || 0;
-      const currency = selectedOffer.price?.currency || 'SAR';
+      // Persist the markup as the listing retail price (minor units).
+      // Shipping policy is NOT persisted: no API stores it, so it is preview-only.
+      const wholesaleMinor = minorAmount(selectedOffer.price) ?? 0;
+      const cur = selectedOffer.price?.currency || 'SAR';
       const pct = parseFloat(markupPercent) || 0;
-      if (wholesaleAmount > 0 && pct > 0) {
-        const calculatedRetail = wholesaleAmount * (1 + pct / 100);
-        await sellerApi.updateListingPrice(store_id, listing.id, {
-          currency,
-          amount: calculatedRetail
-        }).catch(() => null);
+      let priceError: string | null = null;
+      if (wholesaleMinor > 0 && pct > 0) {
+        const retailMinor = Math.round(wholesaleMinor * (1 + pct / 100));
+        try {
+          await sellerApi.updateListingPrice(store_id, listing.id, { currency: cur, amount_minor: retailMinor });
+        } catch (priceErr: any) {
+          priceError = priceErr?.message || 'unknown error';
+        }
       }
 
       setImportedOffers((prev) => ({ ...prev, [offerId]: listing.id }));
       setSelectedOffer(null);
-      setNotification({
-        type: 'success',
-        message: 'Supplier offer imported successfully with configured merchant markup!',
-        listingId: listing.id,
-      });
+      setNotification(
+        priceError
+          ? {
+              type: 'error',
+              message: `Offer imported, but the retail price was NOT saved (${priceError}). Set it on the listing page before publishing.`,
+              listingId: listing.id,
+            }
+          : {
+              type: 'success',
+              message:
+                wholesaleMinor > 0 && pct > 0
+                  ? `Offer imported and retail price saved (${pct}% markup). The shipping policy is a preview only and was not saved.`
+                  : 'Offer imported. No retail price was set; set it on the listing page before publishing.',
+              listingId: listing.id,
+            }
+      );
     } catch (err: any) {
       setNotification({
         type: 'error',
@@ -97,11 +112,12 @@ export default function StoreSupplierOffersPage({
     }
   };
 
-  // Modal economics calculations
-  const wholesaleVal = selectedOffer?.price?.amount ?? 0;
+  // Modal economics calculations (offer price is minor units; UI math in major units)
   const currency = selectedOffer?.price?.currency || 'SAR';
+  const wholesaleMinorVal = minorAmount(selectedOffer?.price) ?? 0;
+  const wholesaleVal = minorToMajor(wholesaleMinorVal, currency);
   const markupVal = parseFloat(markupPercent) || 0;
-  const targetRetailVal = wholesaleVal * (1 + markupVal / 100);
+  const targetRetailVal = minorToMajor(Math.round(wholesaleMinorVal * (1 + markupVal / 100)), currency);
   const grossProfitVal = targetRetailVal - wholesaleVal;
   const shippingDeductionVal = shippingSubsidy === 'seller_free' ? parseFloat(estimatedShipping) || 0 : 0;
   const netProfitVal = grossProfitVal - shippingDeductionVal;
@@ -211,7 +227,7 @@ export default function StoreSupplierOffersPage({
                   <div>
                     <span className="text-slate-400">Offer Price:</span>
                     <div className="font-semibold text-slate-800">
-                      {offer.price ? `${offer.price.currency} ${offer.price.amount}` : 'N/A'}
+                      {formatMoney(offer.price)}
                     </div>
                   </div>
                   <div>
@@ -309,7 +325,9 @@ export default function StoreSupplierOffersPage({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Shipping Subsidy Policy</label>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Shipping Subsidy Policy <span className="font-normal text-slate-500">(preview only — not saved)</span>
+                </label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer">
                     <input
