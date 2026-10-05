@@ -496,17 +496,21 @@ export interface OrderTransitionPayload {
 
 export interface SellerProfile {
   id: string;
-  email: string;
+  code?: string;
+  email?: string;
   name: string;
+  status?: string;
   phone?: string;
   avatar_url?: string;
   roles: string[];
+  settings?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
 
 export interface UpdateSellerProfilePayload {
   name?: string;
+  status?: string;
   phone?: string;
+  settings?: Record<string, unknown>;
 }
-

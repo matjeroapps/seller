@@ -86,17 +86,25 @@ export function StoreSwitcher({
     e.preventDefault();
     if (!newStoreName || !newStoreCode) return;
     try {
+      const workspace = workspaceMerchantId
+        ? { id: workspaceMerchantId }
+        : await sellerApi.ensureRetailWorkspace({
+            code: `merchant-${newStoreCode}`,
+            legal_name: newStoreName
+          });
+      const merchantId = workspace.id;
       const created = await sellerApi.createStore({
         name: newStoreName,
         code: newStoreCode,
-        market_code: 'SA'
+        market_code: 'SA',
+        merchant_id: merchantId
       });
       setCreating(false);
       setNewStoreName('');
       setNewStoreCode('');
       setStores((prev) => [...prev, created]);
       setIsOpen(false);
-      router.push(`/dashboard/stores/${created.id}`);
+      router.push(`/dashboard/merchants/${merchantId}/stores/${created.id}`);
     } catch (err: any) {
       alert(err.message || 'Failed to create store');
     }

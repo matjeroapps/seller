@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Bell,
   ChevronDown,
   CircleHelp,
   Globe2,
@@ -33,6 +32,7 @@ import {
 } from '@/lib/api/merchant-console';
 import { MerchantAccessDenied } from './MerchantAccessDenied';
 import { MerchantWorkspaceSwitcher } from './MerchantWorkspaceSwitcher';
+import { SellerShellUserProvider } from './SellerShellContext';
 import { StoreSwitcher } from './StoreSwitcher';
 
 // Console state for the merchant-aware shell. `status` reflects the bootstrap
@@ -152,12 +152,12 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
       : `/dashboard/stores/${currentStoreId}`
     : null;
   const settingsPath = storeBase ? `${storeBase}/settings` : inMerchantContext && merchantId ? `/dashboard/merchants/${merchantId}` : '/dashboard/settings';
-  const notificationsPath = storeBase ? `${storeBase}/notifications` : settingsPath;
   const profilePath = storeBase ? `${storeBase}/account` : settingsPath;
   const catalogSearchPath = storeBase ? `${storeBase}/catalog/products` : workspaceRoot || '/dashboard';
 
   return (
-    <div className="seller-app-shell" data-theme={theme}>
+    <SellerShellUserProvider user={user}>
+      <div className="seller-app-shell" data-theme={theme}>
       <aside className={`seller-sidebar ${mobileNavOpen ? 'is-open' : ''}`} aria-label="Seller navigation">
         <div className="seller-sidebar__brand">
           <button type="button" className="seller-brand" onClick={() => navigate(currentStoreId ? `/dashboard/stores/${currentStoreId}` : '/dashboard')}>
@@ -268,10 +268,6 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
             <button type="button" className="seller-icon-button" onClick={() => navigate(settingsPath)} aria-label="Help and settings">
               <CircleHelp aria-hidden="true" />
             </button>
-            <button type="button" className="seller-icon-button seller-notification-button" onClick={() => navigate(notificationsPath)} aria-label="Notifications">
-              <Bell aria-hidden="true" />
-              <span aria-hidden="true" />
-            </button>
             <div className="seller-profile">
               <button type="button" className="seller-profile__trigger" onClick={() => setProfileOpen((value) => !value)} aria-expanded={profileOpen}>
                 <span className="seller-profile__avatar">{user.name.slice(0, 2).toUpperCase()}</span>
@@ -324,6 +320,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
           )}
         </main>
       </div>
-    </div>
+      </div>
+    </SellerShellUserProvider>
   );
 }

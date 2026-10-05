@@ -41,6 +41,28 @@ function getBaseUrl() {
   return typeof window === 'undefined' ? SELLER_API_BASE_URL : '/api/seller';
 }
 
+type SellerProductListPayload = {
+  products?: Array<{
+    product?: {
+      id?: string;
+      slug?: string;
+      status?: string;
+      created_at?: string;
+      updated_at?: string;
+    };
+    source?: string;
+    name?: string;
+  }>;
+  items?: Product[];
+};
+
+type CollectionPayload<T> = { items?: T[] | null } | T[] | null;
+
+function normalizeItems<T>(payload: CollectionPayload<T> | undefined): T[] {
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload?.items) ? payload.items : [];
+}
+
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -95,13 +117,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const sellerApi = {
   // Store management
   async getStores(): Promise<SellerStoreListResponse> {
-    return request<SellerStoreListResponse>('/v1/seller/stores');
+    const payload = await request<SellerStoreListResponse | null>('/v1/seller/stores');
+    return {
+      items: payload?.items || [],
+      active_store_limit: payload?.active_store_limit || 0,
+      active_store_count: payload?.active_store_count || 0
+    };
   },
 
-  async createStore(data: { name: string; code: string; market_code: string; status?: string }): Promise<Store> {
-    return request<Store>('/v1/seller/stores', {
+  async ensureRetailWorkspace(data: { code: string; legal_name: string }): Promise<{ id: string; code: string; legal_name: string; status: string }> {
+    return request('/v1/merchants/self/retail-workspace', {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  },
+
+  async createStore(data: { name: string; code: string; market_code: string; status?: string; merchant_id?: string }): Promise<Store> {
+    const { merchant_id, ...payload } = data;
+    const path = merchant_id ? `/v1/merchants/${encodeURIComponent(merchant_id)}/stores` : '/v1/seller/stores';
+    return request<Store>(path, {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
   },
 
@@ -194,7 +230,26 @@ export const sellerApi = {
 
   // Products & Listings
   async listStoreProducts(storeId: string): Promise<{ items: Product[] }> {
-    return request<{ items: Product[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`);
+    const payload = await request<SellerProductListPayload | null>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products`
+    );
+
+    if (Array.isArray(payload?.items)) {
+      return { items: payload.items };
+    }
+
+    return {
+      items: (payload?.products || []).map((row) => ({
+        id: row.product?.id || row.name || 'unknown-product',
+        store_id: storeId,
+        source: row.source === 'supplier_backed' ? 'supplier_backed' : 'seller_owned',
+        slug: row.product?.slug || '',
+        name: row.name || row.product?.slug || 'Unnamed product',
+        status: (row.product?.status || 'draft') as Product['status'],
+        created_at: row.product?.created_at || '',
+        updated_at: row.product?.updated_at || ''
+      }))
+    };
   },
 
   async createStoreProduct(storeId: string, data: { name: string; slug: string; category_id?: string }): Promise<Product> {
@@ -222,7 +277,10 @@ export const sellerApi = {
   },
 
   async listStoreListings(storeId: string): Promise<{ items: SellerListing[] }> {
-    return request<{ items: SellerListing[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/listings`);
+    const payload = await request<CollectionPayload<SellerListing>>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/listings`
+    );
+    return { items: normalizeItems(payload) };
   },
 
   async getStoreListing(storeId: string, listingId: string): Promise<SellerListing> {
@@ -343,7 +401,23 @@ export const sellerApi = {
 
   // Inventory
   async listStoreInventory(storeId: string): Promise<{ items: InventorySnapshot[] }> {
-    return request<{ items: InventorySnapshot[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory`);
+    const payload = await request<
+      | { items?: InventorySnapshot[] | null; inventory?: InventorySnapshot[] | null }
+      | InventorySnapshot[]
+      | null
+    >(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory`);
+
+    if (Array.isArray(payload)) {
+      return { items: payload };
+    }
+
+    return {
+      items: Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.inventory)
+          ? payload.inventory
+          : []
+    };
   },
 
   async adjustInventory(
@@ -520,17 +594,59 @@ export const sellerApi = {
 
   // Account Profile
   async getProfile(): Promise<SellerProfile> {
-    return request<SellerProfile>('/v1/seller/profile');
+    const payload = await request<
+      | SellerProfile
+      | {
+          seller?: {
+            id?: string;
+            code?: string;
+            name?: string;
+            status?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+          settings?: Record<string, unknown> | null;
+        }
+    >('/v1/seller/profile');
+
+    if ('seller' in payload && payload.seller) {
+      const phone = typeof payload.settings?.phone === 'string' ? payload.settings.phone : undefined;
+      return {
+        id: payload.seller.id || '',
+        code: payload.seller.code,
+        name: payload.seller.name || '',
+        status: payload.seller.status,
+        phone,
+        roles: [],
+        settings: payload.settings || {},
+        created_at: payload.seller.created_at,
+        updated_at: payload.seller.updated_at
+      };
+    }
+
+    const profilePayload = payload as SellerProfile;
+    return {
+      ...profilePayload,
+      roles: profilePayload.roles || [],
+      settings: profilePayload.settings || {}
+    };
   },
 
-  async updateProfile(data: UpdateSellerProfilePayload): Promise<SellerProfile> {
-    return request<SellerProfile>('/v1/seller/profile', {
+  async updateProfile(data: UpdateSellerProfilePayload): Promise<{ status: string }> {
+    const settings = {
+      ...(data.settings || {}),
+      ...(data.phone ? { phone: data.phone } : {})
+    };
+
+    return request<{ status: string }>('/v1/seller/profile', {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        status: data.status || 'active',
+        settings
+      }),
     });
   }
 };
 
 export const sellerClient = sellerApi;
-
-

@@ -303,6 +303,31 @@ func sellerRoutes() []RouteSpec {
 			Responses:   AuthCreatedResponses("Store created", coreclient.Store{}),
 		},
 		{
+			Method:      http.MethodPost,
+			Path:        "/v1/merchants/{merchant_id}/stores",
+			OperationID: "createMerchantStore",
+			Summary:     "Create a store in a Merchant workspace",
+			Description: "Creates a retail store through the canonical Merchant Console authorization path. Core validates the selected Merchant workspace and owns the compatibility bridge to the legacy seller profile.",
+			Tags:        []string{"Stores"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("merchant_id", "Merchant workspace identifier")},
+			RequestBody: sellerapi.SellerStoreCreateRequest{},
+			Responses:   AuthCreatedResponses("Store created", coreclient.Store{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/merchants/self/retail-workspace",
+			OperationID: "ensureRetailWorkspace",
+			Summary:     "Ensure the authenticated Seller has a retail Merchant workspace",
+			Tags:        []string{"Stores"},
+			Auth:        true,
+			RequestBody: struct {
+				Code      string `json:"code"`
+				LegalName string `json:"legal_name"`
+			}{},
+			Responses: AuthReadResponses("Retail Merchant workspace", coreclient.RetailWorkspace{}),
+		},
+		{
 			Method:      http.MethodGet,
 			Path:        "/v1/seller/stores/{store_id}/storefront-host",
 			OperationID: "getSellerStorefrontHost",

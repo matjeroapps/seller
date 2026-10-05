@@ -28,6 +28,12 @@ export function DashboardOverview() {
         setStores(items);
         setWorkspaces(merchantWorkspaces);
 
+        if (merchantWorkspaces.length === 1 && merchantWorkspaces[0].stores.length === 1) {
+          const workspace = merchantWorkspaces[0];
+          router.replace(`/dashboard/merchants/${workspace.merchant_id}/stores/${workspace.stores[0].id}`);
+          return;
+        }
+
         if (merchantWorkspaces.length > 0) {
           return;
         }

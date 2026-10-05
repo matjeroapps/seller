@@ -38,10 +38,10 @@ export type SellerNavigationItem = Omit<NavItem, 'children'> & {
 
 const iconClassName = 'h-4 w-4';
 
-export function getNavigationForStore(storeId?: string, _roles: string[] = []): SellerNavigationItem[] {
+export function getNavigationForStore(storeId?: string, _roles: string[] = [], includeTenantWhenUnselected = false): SellerNavigationItem[] {
   const storePrefix = storeId ? `/dashboard/stores/${storeId}` : '/dashboard';
 
-  return [
+  const items: SellerNavigationItem[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -99,47 +99,14 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
           label: 'Orders list',
           icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/orders`
-        },
-        {
-          id: 'orders-new',
-          label: 'Create order',
-          icon: <ClipboardPlus aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/orders/new`
-        },
-        {
-          id: 'carts',
-          label: 'Carts',
-          icon: <ShoppingCart aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/carts`
         }
       ]
-    },
-    {
-      id: 'shipments',
-      label: 'Shipments',
-      icon: <Truck aria-hidden="true" className={iconClassName} />,
-      path: `${storePrefix}/shipments`,
-      tenantScoped: true
-    },
-    {
-      id: 'customers',
-      label: 'Customers',
-      icon: <UsersRound aria-hidden="true" className={iconClassName} />,
-      path: `${storePrefix}/customers`,
-      tenantScoped: true
     },
     {
       id: 'storefront',
       label: 'Storefront',
       icon: <Store aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/storefront`,
-      tenantScoped: true
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      icon: <BarChart3 aria-hidden="true" className={iconClassName} />,
-      path: `${storePrefix}/analytics`,
       tenantScoped: true
     },
     {
@@ -154,18 +121,6 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
           label: 'Wallet',
           icon: <CreditCard aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/finance`
-        },
-        {
-          id: 'payout-request',
-          label: 'Payout request',
-          icon: <ReceiptText aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/finance/payouts/new`
-        },
-        {
-          id: 'billing',
-          label: 'Plan & billing',
-          icon: <ReceiptText aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/billing`
         }
       ]
     },
@@ -190,12 +145,6 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
           path: `${storePrefix}/settings`
         },
         {
-          id: 'notifications',
-          label: 'Notifications',
-          icon: <Bell aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/notifications`
-        },
-        {
           id: 'account',
           label: 'Profile & account',
           icon: <UserCog aria-hidden="true" className={iconClassName} />,
@@ -204,15 +153,23 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = []): 
         {
           id: 'team',
           label: 'Team',
-          icon: <UserCog aria-hidden="true" className={iconClassName} />,
+          icon: <UsersRound aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/users`
         }
       ]
     }
   ];
+
+  // Never emit tenant-scoped destinations without a concrete store. The
+  // dashboard is still useful during onboarding, but links such as
+  // /dashboard/catalog/products cannot resolve until a store exists.
+  return storeId || includeTenantWhenUnselected ? items : items.filter((item) => !item.tenantScoped);
 }
 
-export const sellerNavigation: SellerNavigationItem[] = getNavigationForStore();
+// Keep the historical exported catalog for compatibility with code that only
+// needs the information architecture. Runtime shells must call
+// getNavigationForStore() so they never emit unresolvable tenant links.
+export const sellerNavigation: SellerNavigationItem[] = getNavigationForStore(undefined, [], true);
 
 export function getNavigationForUserRoles(_roles: string[] = []) {
   return sellerNavigation;
@@ -326,52 +283,14 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
             icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/orders`,
             capability: 'retail'
-          },
-          {
-            id: 'orders-new',
-            label: 'Create order',
-            icon: <ClipboardPlus aria-hidden="true" className={iconClassName} />,
-            path: `${storePrefix}/orders/new`,
-            capability: 'retail'
-          },
-          {
-            id: 'carts',
-            label: 'Carts',
-            icon: <ShoppingCart aria-hidden="true" className={iconClassName} />,
-            path: `${storePrefix}/carts`,
-            capability: 'retail'
           }
         ]
-      },
-      {
-        id: 'shipments',
-        label: 'Shipments',
-        icon: <Truck aria-hidden="true" className={iconClassName} />,
-        path: `${storePrefix}/shipments`,
-        tenantScoped: true,
-        capability: 'retail'
-      },
-      {
-        id: 'customers',
-        label: 'Customers',
-        icon: <UsersRound aria-hidden="true" className={iconClassName} />,
-        path: `${storePrefix}/customers`,
-        tenantScoped: true,
-        capability: 'retail'
       },
       {
         id: 'storefront',
         label: 'Storefront',
         icon: <Store aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/storefront`,
-        tenantScoped: true,
-        capability: 'retail'
-      },
-      {
-        id: 'analytics',
-        label: 'Analytics',
-        icon: <BarChart3 aria-hidden="true" className={iconClassName} />,
-        path: `${storePrefix}/analytics`,
         tenantScoped: true,
         capability: 'retail'
       },
@@ -388,20 +307,6 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
             label: 'Wallet',
             icon: <CreditCard aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/finance`,
-            capability: 'retail'
-          },
-          {
-            id: 'payout-request',
-            label: 'Payout request',
-            icon: <ReceiptText aria-hidden="true" className={iconClassName} />,
-            path: `${storePrefix}/finance/payouts/new`,
-            capability: 'retail'
-          },
-          {
-            id: 'billing',
-            label: 'Plan & billing',
-            icon: <ReceiptText aria-hidden="true" className={iconClassName} />,
-            path: `${storePrefix}/billing`,
             capability: 'retail'
           }
         ]
@@ -486,22 +391,10 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
         path: storePrefix ? `${storePrefix}/settings` : workspacePrefix
       },
       {
-        id: 'notifications',
-        label: 'Notifications',
-        icon: <Bell aria-hidden="true" className={iconClassName} />,
-        path: storePrefix ? `${storePrefix}/notifications` : workspacePrefix
-      },
-      {
         id: 'account',
         label: 'Profile & account',
         icon: <UserCog aria-hidden="true" className={iconClassName} />,
         path: storePrefix ? `${storePrefix}/account` : workspacePrefix
-      },
-      {
-        id: 'team',
-        label: 'Team',
-        icon: <UserCog aria-hidden="true" className={iconClassName} />,
-        path: storePrefix ? `${storePrefix}/users` : workspacePrefix
       }
     ]
   });

@@ -26,6 +26,8 @@ type stubCore struct {
 	subject string
 	// sellerID records the seller identifier the last call addressed.
 	sellerID string
+	// merchantID records the merchant identifier the last call addressed.
+	merchantID string
 	// storeID records the store identifier the last call addressed.
 	storeID string
 	// page records the forwarded pagination window.
@@ -80,6 +82,16 @@ func (s *stubCore) ListSellerStores(ctx context.Context, sellerID, subject strin
 func (s *stubCore) CreateSellerStore(ctx context.Context, sellerID, subject string, create coreclient.StoreCreate) (coreclient.Store, error) {
 	s.sellerID, s.subject = sellerID, subject
 	return s.store, s.err
+}
+
+func (s *stubCore) CreateMerchantStore(ctx context.Context, merchantID, subject string, create coreclient.StoreCreate) (coreclient.Store, error) {
+	s.merchantID, s.subject = merchantID, subject
+	return s.store, s.err
+}
+
+func (s *stubCore) EnsureRetailWorkspace(ctx context.Context, subject, code, legalName string) (coreclient.RetailWorkspace, error) {
+	s.subject = subject
+	return coreclient.RetailWorkspace{ID: "merchant-1", Code: code, LegalName: legalName, Status: "active"}, s.err
 }
 
 func (s *stubCore) GetStore(ctx context.Context, storeID, subject string) (coreclient.Store, error) {
@@ -641,6 +653,39 @@ func TestSellerStoreCreateReturns201(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMerchantStoreCreateUsesMerchantScopedCoreRoute(t *testing.T) {
+	core := &stubCore{store: coreclient.Store{ID: "store-1", Code: "store-a"}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodPost, "/v1/merchants/merchant-1/stores", `{"market_code":"EG","code":"store-a","name":"Store A","status":"draft"}`)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body %q)", rec.Code, rec.Body.String())
+	}
+	if core.merchantID != "merchant-1" {
+		t.Fatalf("merchant id = %q, want merchant-1", core.merchantID)
+	}
+	if core.sellerID != "" {
+		t.Fatalf("legacy seller id should not be resolved for merchant-scoped create, got %q", core.sellerID)
+	}
+	if core.subject != testSubject {
+		t.Fatalf("subject = %q, want %q", core.subject, testSubject)
+	}
+}
+
+func TestRetailWorkspaceEnsureForwardsAuthenticatedSubject(t *testing.T) {
+	core := &stubCore{}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodPost, "/v1/merchants/self/retail-workspace", `{"code":"merchant-store-a","legal_name":"Store A"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	if core.subject != testSubject {
+		t.Fatalf("subject = %q, want %q", core.subject, testSubject)
 	}
 }
 
