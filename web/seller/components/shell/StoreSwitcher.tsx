@@ -82,9 +82,12 @@ export function StoreSwitcher({
     }
   };
 
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const handleCreateStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStoreName || !newStoreCode) return;
+    setCreateError(null);
     try {
       const workspace = workspaceMerchantId
         ? { id: workspaceMerchantId }
@@ -106,7 +109,7 @@ export function StoreSwitcher({
       setIsOpen(false);
       router.push(`/dashboard/merchants/${merchantId}/stores/${created.id}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to create store');
+      setCreateError(err.message || 'Failed to create store');
     }
   };
 
@@ -204,6 +207,11 @@ export function StoreSwitcher({
               </button>
             ) : (
               <form onSubmit={handleCreateStore} className="space-y-2 p-1">
+                {createError && (
+                  <div className="text-[11px] text-rose-600 bg-rose-50 p-1.5 rounded border border-rose-200">
+                    {createError}
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Store Name"
