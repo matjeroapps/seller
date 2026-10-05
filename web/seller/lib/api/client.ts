@@ -11,8 +11,12 @@ import type {
   Payout,
   Product,
   ProductMediaReference,
+  ProductSku,
+  ProductTranslation,
+  ProductVariant,
   OrderTransitionPayload,
   SellerListing,
+  SellerProductDetail,
   SellerOrder,
   SellerOrderDetail,
   SellerOrderListResponse,
@@ -55,6 +59,23 @@ type SellerProductListPayload = {
   }>;
   items?: Product[];
 };
+
+function productFromDetail(detail: SellerProductDetail, storeId: string): Product {
+  const primaryTranslation =
+    detail.translations.find((translation) => translation.locale === 'en') ||
+    detail.translations[0];
+
+  return {
+    id: detail.product.id,
+    store_id: storeId,
+    source: detail.source === 'supplier_backed' ? 'supplier_backed' : 'seller_owned',
+    slug: detail.product.slug,
+    name: primaryTranslation?.name || detail.product.slug || 'Unnamed product',
+    status: (detail.product.status || 'draft') as Product['status'],
+    created_at: detail.product.created_at,
+    updated_at: detail.product.updated_at
+  };
+}
 
 type CollectionPayload<T> = { items?: T[] | null } | T[] | null;
 
@@ -253,14 +274,43 @@ export const sellerApi = {
   },
 
   async createStoreProduct(storeId: string, data: { name: string; slug: string; category_id?: string }): Promise<Product> {
-    return request<Product>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
+    const detail = await request<SellerProductDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        slug: data.slug,
+        translations: [{ locale: 'en', name: data.name, description: '' }],
+        category_ids: data.category_id ? [data.category_id] : []
+      })
     });
+    return productFromDetail(detail, storeId);
   },
 
-  async updateProductStatus(storeId: string, productId: string, status: string): Promise<Product> {
-    return request<Product>(
+  async getStoreProductDetail(storeId: string, productId: string): Promise<SellerProductDetail> {
+    return request<SellerProductDetail>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}`
+    );
+  },
+
+  async updateStoreProduct(
+    storeId: string,
+    productId: string,
+    data: { slug: string; translations: ProductTranslation[]; category_ids?: string[] }
+  ): Promise<SellerProductDetail> {
+    return request<SellerProductDetail>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          slug: data.slug,
+          translations: data.translations,
+          category_ids: data.category_ids || []
+        })
+      }
+    );
+  },
+
+  async updateProductStatus(storeId: string, productId: string, status: string): Promise<{ status: string }> {
+    return request<{ status: string }>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/status`,
       {
         method: 'POST',
@@ -269,10 +319,78 @@ export const sellerApi = {
     );
   },
 
-  async archiveProduct(storeId: string, productId: string): Promise<Product> {
-    return request<Product>(
+  async archiveProduct(storeId: string, productId: string): Promise<{ status: string }> {
+    return request<{ status: string }>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/archive`,
       { method: 'POST' }
+    );
+  },
+
+  async createProductVariant(
+    storeId: string,
+    productId: string,
+    data: { code: string; status: string }
+  ): Promise<ProductVariant> {
+    return request<ProductVariant>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }
+    );
+  },
+
+  async updateProductVariant(
+    storeId: string,
+    productId: string,
+    variantId: string,
+    data: { code: string; status: string }
+  ): Promise<ProductVariant> {
+    return request<ProductVariant>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }
+    );
+  },
+
+  async createProductSku(
+    storeId: string,
+    productId: string,
+    variantId: string,
+    data: { code: string; barcode?: string; status: string }
+  ): Promise<ProductSku> {
+    return request<ProductSku>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/skus`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          code: data.code,
+          barcode: data.barcode || null,
+          status: data.status
+        })
+      }
+    );
+  },
+
+  async updateProductSku(
+    storeId: string,
+    productId: string,
+    variantId: string,
+    skuId: string,
+    data: { code: string; barcode?: string; status: string }
+  ): Promise<ProductSku> {
+    return request<ProductSku>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/skus/${encodeURIComponent(skuId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          code: data.code,
+          barcode: data.barcode || null,
+          status: data.status
+        })
+      }
     );
   },
 
@@ -375,6 +493,16 @@ export const sellerApi = {
         body: JSON.stringify(data)
       }
     );
+  },
+
+  async listProductMediaReferences(storeId: string, productId: string): Promise<{ items: ProductMediaReference[] }> {
+    const payload = await request<{ references?: ProductMediaReference[] | null; items?: ProductMediaReference[] | null } | ProductMediaReference[] | null>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/media-references`
+    );
+    if (Array.isArray(payload)) {
+      return { items: payload };
+    }
+    return { items: Array.isArray(payload?.references) ? payload.references : Array.isArray(payload?.items) ? payload.items : [] };
   },
 
   async updateProductMediaReference(
