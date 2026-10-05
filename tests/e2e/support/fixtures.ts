@@ -1,3 +1,5 @@
+import type { APIRequestContext } from '@playwright/test';
+
 export const STORE_A_HOST = process.env.STORE_A_HOST || 'store-a.localhost:3000';
 export const STORE_B_HOST = process.env.STORE_B_HOST || 'store-b.localhost:3000';
 export const STORE_A_BASE_URL = process.env.STORE_A_BASE_URL || `http://${STORE_A_HOST}`;
@@ -74,6 +76,124 @@ export async function setExtraFieldsMode(enabled: boolean): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
   });
+}
+
+/**
+ * Creates a real order through the storefront checkout contract so Seller
+ * order-detail E2E tests never depend on removed frontend-only fixtures.
+ */
+export async function createTestOrder(request: APIRequestContext): Promise<{
+  storeId: string;
+  orderId: string;
+}> {
+  const cookieHeader = (setCookie: string | undefined): string => {
+    if (!setCookie) return '';
+    return setCookie
+      .split('\n')
+      .map((cookie) => cookie.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+  };
+
+  const cartResponse = await request.post(`${STOREFRONT_API_URL}/v1/storefront/carts`, {
+    headers: { Host: STORE_A_HOST }
+  });
+  if (!cartResponse.ok()) {
+    throw new Error(`Failed to create test cart: ${cartResponse.status()}`);
+  }
+
+  const cartCookie = cookieHeader(cartResponse.headers()['set-cookie']);
+  if (!cartCookie) {
+    throw new Error('Storefront cart did not return a session cookie');
+  }
+
+  const itemResponse = await request.post(`${STOREFRONT_API_URL}/v1/storefront/carts/items`, {
+    headers: { Host: STORE_A_HOST, Cookie: cartCookie },
+    data: { sku_id: 'sku-a-1', quantity: 1 }
+  });
+  if (!itemResponse.ok()) {
+    throw new Error(`Failed to add test item to cart: ${itemResponse.status()}`);
+  }
+
+  const sessionResponse = await request.post(`${STOREFRONT_API_URL}/v1/storefront/checkout/sessions`, {
+    headers: { Host: STORE_A_HOST, Cookie: cartCookie }
+  });
+  if (!sessionResponse.ok()) {
+    throw new Error(`Failed to create test checkout session: ${sessionResponse.status()}`);
+  }
+
+  const session = (await sessionResponse.json()) as { id?: string };
+  if (!session.id) {
+    throw new Error('Storefront checkout session did not return an id');
+  }
+
+  const sessionCookie = cookieHeader(sessionResponse.headers()['set-cookie']);
+  if (!sessionCookie) {
+    throw new Error('Storefront checkout session did not return a session cookie');
+  }
+
+  const finalizeResponse = await request.post(
+    `${STOREFRONT_API_URL}/v1/storefront/checkout/sessions/${session.id}/finalize`,
+    {
+      headers: { Host: STORE_A_HOST, Cookie: sessionCookie },
+      data: {
+        shipping_address: {
+          recipient_name: 'Seller E2E Buyer',
+          address_line_1: '1 Seller Test Street',
+          city: 'Cairo',
+          country_code: 'EG'
+        },
+        contact_email: 'seller-e2e@matjerhub.test'
+      }
+    }
+  );
+  if (!finalizeResponse.ok()) {
+    throw new Error(`Failed to finalize test order: ${finalizeResponse.status()}`);
+  }
+
+  const order = (await finalizeResponse.json()) as { id?: string };
+  if (!order.id) {
+    throw new Error('Storefront checkout did not return an order id');
+  }
+
+  return { storeId: 'store-a', orderId: order.id };
+}
+
+export async function getTestAccessToken(request: APIRequestContext): Promise<string> {
+  const coreControlUrl = process.env.FAKE_CORE_CONTROL_URL || 'http://127.0.0.1:18080';
+  const response = await request.post(`${coreControlUrl}/test-control/token`, {
+    data: { subject: process.env.FAKE_CORE_SELLER_SUBJECT || 'usr_seller_dev' }
+  });
+  if (!response.ok()) {
+    throw new Error(`Failed to mint test access token: ${response.status()}`);
+  }
+  const payload = (await response.json()) as { access_token?: string };
+  if (!payload.access_token) {
+    throw new Error('Fake Core did not return a test access token');
+  }
+  return payload.access_token;
+}
+
+export async function prepareOrderForShipment(
+  request: APIRequestContext,
+  storeId: string,
+  orderId: string,
+  accessToken: string
+): Promise<void> {
+  const sellerApiUrl =
+    process.env.SELLER_API_BASE_URL || `http://127.0.0.1:${process.env.SELLER_API_PORT || '18081'}`;
+  for (const targetStatus of ['confirmed', 'processing', 'ready_for_shipping']) {
+    const response = await request.post(
+      `${sellerApiUrl}/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/transition`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        data: { target_status: targetStatus }
+      }
+    );
+    if (!response.ok()) {
+      throw new Error(`Failed to transition test order to ${targetStatus}: ${response.status()} ${await response.text()}`);
+    }
+  }
 }
 
 import http from 'node:http';

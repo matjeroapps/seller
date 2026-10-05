@@ -2,12 +2,20 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { ChartNoAxesColumn, RefreshCw, Plus, Minus } from 'lucide-react';
+import { ChartNoAxesColumn, RefreshCw, Plus, Minus, AlertCircle } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { InventorySnapshot } from '@/lib/api/types';
 
-export default function StoreInventoryPage({ params }: { params: Promise<{ store_id: string }> }) {
-  const { store_id } = use(params);
+export default function StoreInventoryPage({
+  params
+}: {
+  params: Promise<{ store_id: string }> | { store_id: string };
+}) {
+  const unwrappedParams =
+    params && typeof (params as unknown as Promise<{ store_id: string }>).then === 'function'
+      ? use(params as Promise<{ store_id: string }>)
+      : (params as unknown as { store_id: string }) || {};
+  const { store_id } = unwrappedParams;
 
   const [snapshots, setSnapshots] = useState<InventorySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,9 +24,11 @@ export default function StoreInventoryPage({ params }: { params: Promise<{ store
   const [locationId, setLocationId] = useState('');
   const [delta, setDelta] = useState<number>(10);
   const [adjusting, setAdjusting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadInventory = () => {
     setLoading(true);
+    setActionError(null);
     sellerApi
       .listStoreInventory(store_id)
       .then((res) => {
@@ -36,6 +46,7 @@ export default function StoreInventoryPage({ params }: { params: Promise<{ store
     e.preventDefault();
     if (!selectedSkuId || !locationId) return;
     setAdjusting(true);
+    setActionError(null);
     try {
       await sellerApi.adjustInventory(store_id, {
         fulfillment_location_id: locationId,
@@ -44,7 +55,7 @@ export default function StoreInventoryPage({ params }: { params: Promise<{ store
       });
       loadInventory();
     } catch (err: any) {
-      alert(err.message || 'Failed to adjust inventory');
+      setActionError(err.message || 'Failed to adjust inventory');
     } finally {
       setAdjusting(false);
     }
@@ -52,6 +63,12 @@ export default function StoreInventoryPage({ params }: { params: Promise<{ store
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3 text-xs text-rose-700">
+          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

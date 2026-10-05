@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
   poweredByHeader: false,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   serverExternalPackages: ['ioredis'],
   transpilePackages: ['@matjerhub/ui-sdk'],
   async rewrites() {

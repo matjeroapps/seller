@@ -31,6 +31,8 @@ export default function StoreListingDetailPage({
   const [estimatedShipping, setEstimatedShipping] = useState<string>('15');
   const [updatingPrice, setUpdatingPrice] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const loadData = () => {
     setLoading(true);
     setActionError(null);
@@ -165,14 +167,12 @@ export default function StoreListingDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Error Banner */}
       {actionError && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3 text-xs text-rose-700">
           <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
           <span>{actionError}</span>
         </div>
       )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
