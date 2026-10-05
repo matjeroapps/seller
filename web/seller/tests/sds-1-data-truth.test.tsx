@@ -20,6 +20,7 @@ vi.mock('../lib/api/client', () => ({
   sellerApi: {
     getStoreOrderDetail: vi.fn(),
     getStoreListing: vi.fn(),
+    getStoreListingLifecycle: vi.fn(),
     getListingReadiness: vi.fn(),
     updateListingPrice: vi.fn(),
     publishListing: vi.fn(),
@@ -82,6 +83,7 @@ describe('SDS-1 — Seller Dashboard P0 Data Truth', () => {
         created_at: '2026-10-01',
         updated_at: '2026-10-01'
       });
+      vi.mocked(sellerApi.getStoreListingLifecycle).mockResolvedValue(null as any);
       vi.mocked(sellerApi.getListingReadiness).mockResolvedValue({ is_ready: true, reasons: [] });
       vi.mocked(sellerApi.publishListing).mockRejectedValue(new Error('Failed to publish listing: Missing price'));
 
