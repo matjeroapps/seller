@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { Image as ImageIcon, Upload, Trash2, CheckCircle2, RefreshCw, Copy, ExternalLink, AlertCircle } from 'lucide-react';
+import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
 import type { StoreMediaAsset } from '@/lib/api/types';
 
@@ -22,6 +23,8 @@ export default function StoreMediaLibraryPage({
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadMedia = () => {
     setLoading(true);
@@ -103,14 +106,22 @@ export default function StoreMediaLibraryPage({
     }
   };
 
-  const handleDelete = async (assetId: string) => {
-    if (!confirm('Permanently delete this media asset? Safe delete will reject if product references exist.')) return;
+  const handleDelete = (assetId: string) => {
+    setDeletingAssetId(assetId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingAssetId) return;
+    setIsDeleting(true);
     setActionError(null);
     try {
-      await sellerApi.deleteStoreMedia(store_id, assetId);
+      await sellerApi.deleteStoreMedia(store_id, deletingAssetId);
+      setDeletingAssetId(null);
       loadMedia();
     } catch (err: any) {
       setActionError(err.message || 'Failed to delete media asset');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -197,6 +208,18 @@ export default function StoreMediaLibraryPage({
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deletingAssetId)}
+        title="Delete Media Asset"
+        description="Permanently delete this media asset? Safe delete will reject if product references exist."
+        confirmLabel="Delete Asset"
+        cancelLabel="Keep Asset"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingAssetId(null)}
+      />
     </div>
   );
 }

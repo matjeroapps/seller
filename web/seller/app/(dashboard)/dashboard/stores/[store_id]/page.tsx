@@ -152,14 +152,14 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       const ordersResponse = getValue('orders', ordersResult, { orders: [], total: 0, limit: 8, offset: 0 });
 
       setDashboard({
-        stores: storesResult.items || [],
-        products: getValue('products', productsResult, { items: [] }).items || [],
-        listings: getValue('listings', listingsResult, { items: [] }).items || [],
-        inventory: getValue('inventory', inventoryResult, { items: [] }).items || [],
-        orders: ordersResponse.orders || [],
-        orderTotal: ordersResponse.total || 0,
+        stores: storesResult?.items || [],
+        products: getValue('products', productsResult, { items: [] })?.items || [],
+        listings: getValue('listings', listingsResult, { items: [] })?.items || [],
+        inventory: getValue('inventory', inventoryResult, { items: [] })?.items || [],
+        orders: ordersResponse?.orders || [],
+        orderTotal: ordersResponse?.total || 0,
         balance: getValue<StoreBalance | null>('finance', balanceResult, null),
-        connections: getValue('integrations', connectionsResult, { items: [] }).items || [],
+        connections: getValue('integrations', connectionsResult, { items: [] })?.items || [],
         operationalState: getValue<StoreOperationalState | null>('operational-state', operationalStateResult, null),
         themeInstallation: themeResponse?.installation || null,
         themeRevision: themeResponse
