@@ -49,8 +49,25 @@ type SkuEdit = {
 const productStatusOptions = ['draft', 'active', 'archived'];
 const catalogItemStatusOptions = ['draft', 'active', 'inactive', 'archived'];
 
+function asArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function productTranslations(detail: SellerProductDetail | null): ProductTranslation[] {
+  return asArray(detail?.translations);
+}
+
+function productVariants(detail: SellerProductDetail | null): ProductVariant[] {
+  return asArray(detail?.variants);
+}
+
+function productSkus(detail: SellerProductDetail | null): ProductSku[] {
+  return asArray(detail?.skus);
+}
+
 function productFromDetail(detail: SellerProductDetail, storeId: string): Product {
-  const translation = detail.translations.find((item) => item.locale === 'en') || detail.translations[0];
+  const translations = productTranslations(detail);
+  const translation = translations.find((item) => item.locale === 'en') || translations[0];
   return {
     id: detail.product.id,
     store_id: storeId,
@@ -65,7 +82,7 @@ function productFromDetail(detail: SellerProductDetail, storeId: string): Produc
 
 function translationFor(detail: SellerProductDetail | null, locale: string): ProductTranslation {
   return (
-    detail?.translations.find((item) => item.locale === locale) || {
+    productTranslations(detail).find((item) => item.locale === locale) || {
       locale,
       name: '',
       description: ''
@@ -139,13 +156,13 @@ export default function StoreProductDetailPage({
   const resetEditableState = useCallback((nextDetail: SellerProductDetail) => {
     setForm(buildTranslationForm(nextDetail));
     setVariantEdits(
-      nextDetail.variants.reduce<Record<string, VariantEdit>>((acc, variant) => {
+      productVariants(nextDetail).reduce<Record<string, VariantEdit>>((acc, variant) => {
         acc[variant.id] = { code: variant.code, status: variant.status };
         return acc;
       }, {})
     );
     setSkuEdits(
-      nextDetail.skus.reduce<Record<string, SkuEdit>>((acc, sku) => {
+      productSkus(nextDetail).reduce<Record<string, SkuEdit>>((acc, sku) => {
         acc[sku.id] = { code: sku.code, barcode: sku.barcode || '', status: sku.status };
         return acc;
       }, {})
@@ -182,12 +199,12 @@ export default function StoreProductDetailPage({
   }, [loadDetail]);
 
   const skusByVariant = useMemo(() => {
-    return (detail?.skus || []).reduce<Record<string, ProductSku[]>>((acc, sku) => {
+    return productSkus(detail).reduce<Record<string, ProductSku[]>>((acc, sku) => {
       if (!acc[sku.variant_id]) acc[sku.variant_id] = [];
       acc[sku.variant_id].push(sku);
       return acc;
     }, {});
-  }, [detail?.skus]);
+  }, [detail]);
 
   const canManageProduct = product?.source === 'seller_owned' && product.status !== 'archived';
   const listing = detail?.listing;
@@ -616,7 +633,7 @@ export default function StoreProductDetailPage({
             </p>
           </div>
           <div className="text-xs text-slate-500">
-            {detail.variants.length} variants · {detail.skus.length} SKUs
+            {productVariants(detail).length} variants · {productSkus(detail).length} SKUs
           </div>
         </div>
 
@@ -650,12 +667,12 @@ export default function StoreProductDetailPage({
         </form>
 
         <div className="mt-5 space-y-4">
-          {detail.variants.length === 0 ? (
+          {productVariants(detail).length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
               No variants yet. Add the default variant before publishing this product.
             </div>
           ) : (
-            detail.variants.map((variant) => {
+            productVariants(detail).map((variant) => {
               const edit = variantEdits[variant.id] || { code: variant.code, status: variant.status };
               const skuDraft = newSkuByVariant[variant.id] || { code: '', barcode: '', status: 'active' };
               const variantSkus = skusByVariant[variant.id] || [];

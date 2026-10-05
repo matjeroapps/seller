@@ -142,6 +142,38 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
     });
   });
 
+  it('renders a safe fallback when product detail arrays are null from the API', async () => {
+    mockApi.getStoreProductDetail.mockResolvedValueOnce({
+      ...sampleDetail,
+      product: {
+        ...sampleDetail.product,
+        slug: 'fallback-product'
+      },
+      translations: null,
+      variants: null,
+      skus: null,
+      category_ids: null,
+      inventory_summary: {
+        total_on_hand: 0,
+        total_reserved: 0,
+        total_available: 0,
+        locations: null
+      }
+    });
+
+    await renderPage(
+      <StoreProductDetailPage
+        params={Promise.resolve({ store_id: 'store_123', product_id: 'prod_456' })}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'fallback-product' })).toBeInTheDocument();
+      expect(screen.getByText('No variants yet. Add the default variant before publishing this product.')).toBeInTheDocument();
+      expect(screen.getByText('No inventory snapshots linked to this product yet.')).toBeInTheDocument();
+    });
+  });
+
   it('triggers in-app ConfirmModal when clicking Archive without native window.confirm', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
 
