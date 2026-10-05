@@ -378,7 +378,7 @@ export const CANONICAL_SCREEN_REGISTRY: MappedScreenRecord[] = [
       { name: 'Manage 2FA / Passkeys', type: 'unavailable', description: 'Managing 2FA, active sessions, and passkeys is unavailable' },
     ],
     emptyBehavior: 'N/A',
-    unavailableReason: '2FA, passkey management, and session revocation are managed externally by Identity provider (ZITADEL).',
+    unavailableReason: '2FA, passkey management, and session revocation are managed by MatjerHub SSO.',
     testIdentifier: 'live-operations-screens.test.tsx',
   },
   {
