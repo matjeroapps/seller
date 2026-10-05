@@ -9,6 +9,7 @@ package sellerapi
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -29,6 +30,8 @@ type CoreCapabilities interface {
 	UpdateSellerProfile(ctx context.Context, sellerID, subject string, update coreclient.ProfileUpdate) (string, error)
 	ListSellerStores(ctx context.Context, sellerID, subject string, page coreclient.Page) (*coreclient.SellerStoreListResponse, error)
 	CreateSellerStore(ctx context.Context, sellerID, subject string, create coreclient.StoreCreate) (coreclient.Store, error)
+	CreateMerchantStore(ctx context.Context, merchantID, subject string, create coreclient.StoreCreate) (coreclient.Store, error)
+	EnsureRetailWorkspace(ctx context.Context, subject, code, legalName string) (coreclient.RetailWorkspace, error)
 	GetStore(ctx context.Context, storeID, subject string) (coreclient.Store, error)
 	UpdateStoreStatus(ctx context.Context, storeID, subject, status string) (*coreclient.Store, error)
 	GetStoreOperationalState(ctx context.Context, storeID, subject string) (*coreclient.StoreOperationalState, error)
@@ -169,6 +172,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Put("/seller/profile", deps.handleSellerProfileUpdate)
 			r.Get("/seller/stores", deps.handleSellerStores)
 			r.Post("/seller/stores", deps.handleSellerStoreCreate)
+			r.Post("/merchants/self/retail-workspace", deps.handleEnsureRetailWorkspace)
+			r.Post("/merchants/{merchant_id}/stores", deps.handleMerchantStoreCreate)
 			r.Post("/seller/stores/{store_id}/status", deps.handleUpdateStoreStatus)
 			r.Get("/seller/stores/{store_id}/operational-state", deps.handleGetStoreOperationalState)
 			r.Put("/seller/stores/{store_id}/operational-state", deps.handleUpdateStoreOperationalState)
@@ -380,6 +385,55 @@ func (deps Dependencies) handleSellerStoreCreate(w http.ResponseWriter, r *http.
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, store)
+}
+
+func (deps Dependencies) handleMerchantStoreCreate(w http.ResponseWriter, r *http.Request) {
+	subject, err := actorhttp.SubjectFrom(r)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	var body SellerStoreCreateRequest
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	store, err := deps.Core.CreateMerchantStore(r.Context(), chi.URLParam(r, "merchant_id"), subject, coreclient.StoreCreate{
+		MarketCode: body.MarketCode,
+		Code:       body.Code,
+		Name:       body.Name,
+		Status:     body.Status,
+		Settings:   body.Settings,
+	})
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, store)
+}
+
+func (deps Dependencies) handleEnsureRetailWorkspace(w http.ResponseWriter, r *http.Request) {
+	subject, err := actorhttp.SubjectFrom(r)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	var body struct {
+		Code      string `json:"code"`
+		LegalName string `json:"legal_name"`
+	}
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	if strings.TrimSpace(body.Code) == "" || strings.TrimSpace(body.LegalName) == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", "invalid input")
+		return
+	}
+	workspace, err := deps.Core.EnsureRetailWorkspace(r.Context(), subject, strings.TrimSpace(body.Code), strings.TrimSpace(body.LegalName))
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, workspace)
 }
 
 // handleSellerCatalogOffers browses the supplier offers available to one of the

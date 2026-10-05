@@ -122,6 +122,15 @@ type SellerStoreListResponse struct {
 	ActiveStoreCount int     `json:"active_store_count"`
 }
 
+type RetailWorkspace struct {
+	ID        string    `json:"id"`
+	Code      string    `json:"code"`
+	LegalName string    `json:"legal_name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type collectionResponse[T any] struct {
 	Items []T `json:"items"`
 }
@@ -200,6 +209,24 @@ func (c *Client) CreateSellerStore(ctx context.Context, sellerID, subject string
 	var payload Store
 	path := "/internal/v1/sellers/" + url.PathEscape(sellerID) + "/stores"
 	err := c.post(ctx, path, create, requestOptions{Subject: subject}, &payload)
+	return payload, err
+}
+
+// CreateMerchantStore creates a retail store under a canonical Merchant
+// workspace. Core authorizes the Merchant membership/capability and owns the
+// compatibility bridge to the legacy seller profile used by stores.
+func (c *Client) CreateMerchantStore(ctx context.Context, merchantID, subject string, create StoreCreate) (Store, error) {
+	var payload Store
+	path := "/internal/v1/merchants/" + url.PathEscape(merchantID) + "/stores"
+	err := c.post(ctx, path, create, requestOptions{Subject: subject}, &payload)
+	return payload, err
+}
+
+func (c *Client) EnsureRetailWorkspace(ctx context.Context, subject, code, legalName string) (RetailWorkspace, error) {
+	var payload RetailWorkspace
+	err := c.post(ctx, "/internal/v1/merchants/self/retail-workspace", map[string]string{
+		"code": code, "legal_name": legalName,
+	}, requestOptions{Subject: subject}, &payload)
 	return payload, err
 }
 

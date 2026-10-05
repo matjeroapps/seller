@@ -1,170 +1,261 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { CheckCircle2, IdCard, ShieldCheck, Store, User } from 'lucide-react';
+
 import { sellerClient } from '@/lib/api/client';
 import type { SellerProfile } from '@/lib/api/types';
-import { CapabilityState } from './CapabilityState';
-import { createUnavailableState } from '@/lib/screens/state';
-import { User, Shield, KeyRound, Smartphone } from 'lucide-react';
+import type { SellerUser } from '@/lib/auth';
+import { useSellerShellUser } from '@/components/shell/SellerShellContext';
 
-export function AccountScreen() {
+type AccountScreenProps = {
+  user?: SellerUser | null;
+};
+
+function getInitials(name?: string | null) {
+  return (name || 'Seller')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'S';
+}
+
+function formatStatus(value?: string) {
+  return value ? value.replace(/[_-]/g, ' ') : 'Unknown';
+}
+
+export function AccountScreen({ user }: AccountScreenProps) {
+  const shellUser = useSellerShellUser();
+  const currentUser = user || shellUser;
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState('');
+  const [sellerName, setSellerName] = useState('');
   const [phone, setPhone] = useState('');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfile() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await sellerClient.getProfile();
+        if (!isMounted) return;
+        setProfile(data);
+        setSellerName(data.name || '');
+        setPhone(data.phone || '');
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const message = err instanceof Error ? err.message : 'Failed to load seller profile.';
+        setError(
+          message === 'Actor authentication required'
+            ? 'Your session could not be used to load the seller profile. Refresh the dashboard or sign in again.'
+            : message
+        );
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
     loadProfile();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const loadProfile = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await sellerClient.getProfile();
-      setProfile(data);
-      setName(data.name || '');
-      setPhone(data.phone || '');
-    } catch (err: any) {
-      setError(err.message || 'Failed to load seller profile.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!profile) return;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
     setSaving(true);
     setSuccessMsg(null);
     setError(null);
     try {
-      const updated = await sellerClient.updateProfile({ name, phone });
-      setProfile(updated);
-      setSuccessMsg('Profile updated successfully.');
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile.');
+      await sellerClient.updateProfile({
+        name: sellerName,
+        status: profile.status || 'active',
+        phone,
+        settings: {
+          ...(profile.settings || {}),
+          phone
+        }
+      });
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              name: sellerName,
+              phone,
+              settings: { ...(current.settings || {}), phone }
+            }
+          : current
+      );
+      setSuccessMsg('Seller profile updated successfully.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update seller profile.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <CapabilityState
-        state={{
-          status: 'loading',
-          title: 'Loading Account Profile',
-          description: 'Fetching user details and security preferences...',
-        }}
-      />
-    );
-  }
-
-  const securityState = createUnavailableState(
-    '2FA, Passkeys & Session Revocation',
-    'Two-Factor Authentication, Passkey management, and active session termination are managed directly by your Identity Provider (ZITADEL).'
-  );
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Account Profile</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Manage your personal details and view identity security settings.
-        </p>
-      </div>
+    <div className="seller-dashboard">
+      <section className="seller-dashboard-hero">
+        <div>
+          <div className="seller-dashboard-hero__eyebrow">
+            <User aria-hidden="true" />
+            <span>Profile & account</span>
+          </div>
+          <div className="seller-dashboard-hero__title-row">
+            <h1>{currentUser?.name || 'Seller account'}</h1>
+            <span className={`seller-status-badge seller-status-badge--${profile?.status || 'neutral'}`}>
+              {formatStatus(profile?.status)}
+            </span>
+          </div>
+          <div className="seller-dashboard-hero__meta">
+            <span>{currentUser?.email || 'Email not provided'}</span>
+            <span>{currentUser?.roles?.[0] || 'Seller'}</span>
+            <span>{profile?.code || 'Seller profile loading'}</span>
+          </div>
+        </div>
+      </section>
 
       {error && (
-        <div className="rounded-md bg-rose-50 p-4 border border-rose-200 text-sm text-rose-700">
-          {error}
+        <div className="seller-alert seller-alert--danger" role="alert">
+          <span>{error}</span>
         </div>
       )}
 
       {successMsg && (
-        <div className="rounded-md bg-emerald-50 p-4 border border-emerald-200 text-sm text-emerald-700">
-          {successMsg}
+        <div className="seller-alert seller-alert--warning" role="status">
+          <CheckCircle2 aria-hidden="true" />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="rounded-lg border bg-white p-6 shadow-sm dark:bg-slate-900 space-y-4">
-        <div className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white border-b pb-3">
-          <User className="h-5 w-5 text-primary-600" />
-          Personal Information
+      <div className="seller-dashboard__grid">
+        <div className="seller-dashboard__main">
+          <section className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">MatjerHub SSO</span>
+                <h2>Account identity</h2>
+              </div>
+              <ShieldCheck aria-hidden="true" />
+            </div>
+
+            <div className="seller-account-identity">
+              <div className="seller-account-avatar">{getInitials(currentUser?.name)}</div>
+              <div>
+                <strong>{currentUser?.name || 'Signed-in seller'}</strong>
+                <span>{currentUser?.email || 'No email address on the active session'}</span>
+              </div>
+            </div>
+
+            <div className="seller-account-details">
+              <div>
+                <span>Account subject ID</span>
+                <strong>{currentUser?.id || 'Sign in again to refresh the account subject'}</strong>
+              </div>
+              <div>
+                <span>Assigned roles</span>
+                <div className="seller-role-list">
+                  {(currentUser?.roles?.length ? currentUser.roles : ['seller']).map((role) => (
+                    <em key={role}>{role}</em>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <form onSubmit={handleSave} className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">Seller profile</span>
+                <h2>Business display details</h2>
+              </div>
+              <Store aria-hidden="true" />
+            </div>
+
+            {loading ? (
+              <div className="seller-inline-empty">Loading seller profile...</div>
+            ) : !profile ? (
+              <div className="seller-profile-reconnect">
+                <p>
+                  Seller profile details could not be loaded for this browser session. Refresh the dashboard, or sign in again
+                  to reconnect profile editing.
+                </p>
+                <button
+                  type="button"
+                  className="seller-secondary-link"
+                  onClick={() => {
+                    window.location.href = '/logout';
+                  }}
+                >
+                  Sign in again
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="seller-form-grid">
+                  <label>
+                    <span>Seller profile ID</span>
+                    <input type="text" readOnly value={profile.id} />
+                  </label>
+                  <label>
+                    <span>Seller code</span>
+                    <input type="text" readOnly value={profile.code || ''} />
+                  </label>
+                  <label>
+                    <span>Business display name</span>
+                    <input
+                      type="text"
+                      required
+                      value={sellerName}
+                      onChange={(event) => setSellerName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Support phone</span>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      placeholder="+966500000000"
+                    />
+                  </label>
+                </div>
+
+                <div className="seller-form-actions">
+                  <button type="submit" className="seller-primary-action" disabled={saving || !profile}>
+                    {saving ? 'Saving...' : 'Save profile changes'}
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Account Subject ID</label>
-            <input
-              type="text"
-              readOnly
-              value={profile?.id || ''}
-              className="mt-1 block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:border-slate-700"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Email Address</label>
-            <input
-              type="text"
-              readOnly
-              value={profile?.email || ''}
-              className="mt-1 block w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:border-slate-700"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Phone Number</label>
-            <input
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+966500000000"
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Assigned Roles</label>
-          <div className="flex flex-wrap gap-2">
-            {profile?.roles?.map((role) => (
-              <span
-                key={role}
-                className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {role}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Profile Changes'}
-          </button>
-        </div>
-      </form>
-
-      <CapabilityState state={securityState} />
+        <aside className="seller-dashboard__rail">
+          <section className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">Security</span>
+                <h2>Managed by MatjerHub SSO</h2>
+              </div>
+              <IdCard aria-hidden="true" />
+            </div>
+            <p className="seller-account-note">
+              Passwords, multi-factor authentication, passkeys, and active session policies are controlled by MatjerHub SSO.
+              Use the SSO account flow when you need to change identity security settings.
+            </p>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

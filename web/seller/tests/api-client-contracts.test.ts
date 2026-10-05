@@ -8,10 +8,15 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
 
   it('fetches seller profile correctly via getProfile', async () => {
     const mockProfile = {
-      id: 'usr_seller_a_owner',
-      email: 'owner-a@matjerhub.test',
-      name: 'Seller A Owner',
-      roles: ['seller_owner'],
+      seller: {
+        id: 'sel_a',
+        code: 'seller-a',
+        name: 'Seller A',
+        status: 'active',
+        created_at: '2026-10-05T00:00:00Z',
+        updated_at: '2026-10-05T00:00:00Z'
+      },
+      settings: { phone: '+966500000000' }
     };
 
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url) => {
@@ -23,33 +28,30 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
     });
 
     const profile = await sellerClient.getProfile();
-    expect(profile.id).toBe('usr_seller_a_owner');
-    expect(profile.name).toBe('Seller A Owner');
-    expect(profile.roles).toContain('seller_owner');
+    expect(profile.id).toBe('sel_a');
+    expect(profile.code).toBe('seller-a');
+    expect(profile.name).toBe('Seller A');
+    expect(profile.status).toBe('active');
+    expect(profile.phone).toBe('+966500000000');
   });
 
   it('updates seller profile via updateProfile', async () => {
-    const updatedProfile = {
-      id: 'usr_seller_a_owner',
-      email: 'owner-a@matjerhub.test',
-      name: 'New Owner Name',
-      phone: '+966500000000',
-      roles: ['seller_owner'],
-    };
-
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (url, init) => {
       expect(String(url)).toContain('/v1/seller/profile');
       expect(init?.method).toBe('PUT');
-      expect(JSON.parse(init?.body as string)).toEqual({ name: 'New Owner Name', phone: '+966500000000' });
-      return new Response(JSON.stringify(updatedProfile), {
+      expect(JSON.parse(init?.body as string)).toEqual({
+        name: 'New Owner Name',
+        status: 'active',
+        settings: { phone: '+966500000000' }
+      });
+      return new Response(JSON.stringify({ status: 'active' }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
     });
 
-    const result = await sellerClient.updateProfile({ name: 'New Owner Name', phone: '+966500000000' });
-    expect(result.name).toBe('New Owner Name');
-    expect(result.phone).toBe('+966500000000');
+    const result = await sellerClient.updateProfile({ name: 'New Owner Name', status: 'active', phone: '+966500000000' });
+    expect(result.status).toBe('active');
   });
 
   it('throws typed error on API failure', async () => {
@@ -61,5 +63,54 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
     });
 
     await expect(sellerClient.getProfile()).rejects.toThrow('Token expired');
+  });
+
+  it('normalizes the Core product page into the seller product collection shape', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        products: [
+          {
+            product: {
+              id: 'product-1',
+              slug: 'coffee',
+              status: 'active',
+              created_at: '2026-10-05T00:00:00Z',
+              updated_at: '2026-10-05T00:00:00Z'
+            },
+            source: 'seller_owned',
+            name: 'Coffee'
+          }
+        ],
+        total: 1,
+        limit: 25,
+        offset: 0
+      })
+    });
+
+    await expect(sellerClient.listStoreProducts('store-1')).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          id: 'product-1',
+          store_id: 'store-1',
+          source: 'seller_owned',
+          name: 'Coffee',
+          status: 'active'
+        })
+      ]
+    });
+  });
+
+  it('treats null and legacy collection envelopes as empty collections', async () => {
+    const responses = [null, { items: null }];
+    global.fetch = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (String(url).endsWith('/inventory') ? responses[0] : responses[1])
+    }));
+
+    await expect(sellerClient.listStoreInventory('store-1')).resolves.toEqual({ items: [] });
+    await expect(sellerClient.listStoreListings('store-1')).resolves.toEqual({ items: [] });
   });
 });

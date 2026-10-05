@@ -3,21 +3,40 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountScreen } from '../components/seller/AccountScreen';
 import { SettingsScreen } from '../components/seller/SettingsScreen';
+import { TeamScreen } from '../components/seller/TeamScreen';
 import { OrderDocumentsScreen } from '../components/seller/OrderDocumentsScreen';
+import { SellerShellUserProvider } from '../components/shell/SellerShellContext';
 import { sellerClient } from '../lib/api/client';
 
 describe('Live & Operations Screens Verification (T020)', () => {
   it('renders AccountScreen title and form', async () => {
     vi.spyOn(sellerClient, 'getProfile').mockResolvedValueOnce({
       id: 'usr_seller_a_owner',
-      email: 'owner@matjerhub.test',
+      code: 'merchant-demo',
       name: 'Seller Owner',
+      status: 'active',
+      phone: '+966500000000',
       roles: ['seller_owner'],
+      settings: { phone: '+966500000000' },
     });
 
-    render(<AccountScreen />);
-    expect(await screen.findByText('Account Profile')).toBeInTheDocument();
-    expect(screen.getByText('2FA, Passkeys & Session Revocation Unavailable')).toBeInTheDocument();
+    render(
+      <AccountScreen
+        user={{
+          id: 'usr_seller_a_owner',
+          email: 'owner@matjerhub.test',
+          name: 'Seller Owner',
+          roles: ['seller_owner'],
+        }}
+      />
+    );
+
+    expect(await screen.findByText('Profile & account')).toBeInTheDocument();
+    expect(screen.getByText('Account identity')).toBeInTheDocument();
+    expect(screen.getByText('Business display details')).toBeInTheDocument();
+    expect(screen.getByText('Managed by MatjerHub SSO')).toBeInTheDocument();
+    expect(screen.queryByText(/Unavailable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ZITADEL/i)).not.toBeInTheDocument();
   });
 
   it('renders SettingsScreen with store settings', async () => {
@@ -34,8 +53,41 @@ describe('Live & Operations Screens Verification (T020)', () => {
     });
 
     render(<SettingsScreen storeId="str_a1_1001" />);
-    expect(await screen.findByText('Store Settings')).toBeInTheDocument();
-    expect(screen.getByText('Tax Rules & Custom Legal Policies Unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Store settings')).toBeInTheDocument();
+    expect(screen.getByText('Identity details')).toBeInTheDocument();
+    expect(screen.getByText('Checkout operations')).toBeInTheDocument();
+    expect(screen.getByText('Storefront availability')).toBeInTheDocument();
+    expect(screen.getByText('Save message')).toBeInTheDocument();
+    expect(screen.queryByText(/Unavailable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not supported by Core/i)).not.toBeInTheDocument();
+  });
+
+  it('renders TeamScreen with current MatjerHub SSO access context', async () => {
+    vi.spyOn(sellerClient, 'getStores').mockResolvedValueOnce({
+      items: [{ id: 'str_a1_1001', seller_id: 'sel_a', market_code: 'SA', code: 'store-a1', name: 'Store A1', status: 'active', created_at: '', updated_at: '' }],
+      active_store_limit: 5,
+      active_store_count: 1,
+    });
+
+    render(
+      <SellerShellUserProvider
+        user={{
+          id: 'usr_seller_a_owner',
+          email: 'owner@matjerhub.test',
+          name: 'Seller Owner',
+          roles: ['seller_owner'],
+        }}
+      >
+        <TeamScreen storeId="str_a1_1001" />
+      </SellerShellUserProvider>
+    );
+
+    expect(await screen.findByText('Team management')).toBeInTheDocument();
+    expect(screen.getByText('Signed-in team member')).toBeInTheDocument();
+    expect(screen.getByText('Access boundary')).toBeInTheDocument();
+    expect(screen.getByText('Managed by MatjerHub SSO')).toBeInTheDocument();
+    expect(screen.queryByText(/Unavailable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ZITADEL/i)).not.toBeInTheDocument();
   });
 
   it('renders OrderDocumentsScreen with printable markup', async () => {

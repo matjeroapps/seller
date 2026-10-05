@@ -8,10 +8,7 @@ describe('seller navigation foundation', () => {
       'dashboard',
       'catalog',
       'orders',
-      'shipments',
-      'customers',
       'storefront',
-      'analytics',
       'finance',
       'integrations',
       'settings'
@@ -31,6 +28,13 @@ describe('seller navigation foundation', () => {
     expect(catalogItem?.path).toBe('/dashboard/stores/store_123/catalog/products');
     expect(catalogItem?.children?.[0].path).toBe('/dashboard/stores/store_123/catalog/products');
     expect(catalogItem?.children?.[1].path).toBe('/dashboard/stores/store_123/catalog/supplier-offers');
+    expect(nav.find((item) => item.id === 'settings')?.children?.map((item) => item.id)).toContain('team');
+  });
+
+  it('does not emit tenant routes before a store is selected', () => {
+    const nav = getNavigationForStore();
+    expect(nav.map((item) => item.id)).toEqual(['dashboard']);
+    expect(nav.some((item) => item.path.includes('/catalog/'))).toBe(false);
   });
 
   it('keeps role filtering as an extension point', () => {

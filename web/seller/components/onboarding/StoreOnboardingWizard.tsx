@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Container, PageHeader, Stack, Badge } from '@matjerhub/ui-sdk';
 import { Store, Palette, Rocket, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Globe, Coins, ShieldCheck } from 'lucide-react';
 import { ThemeSelectionCard, type ThemeOption } from './ThemeSelectionCard';
 import { sellerApi } from '@/lib/api/client';
+import { fetchMerchantConsole, hasActiveCapability, isOperableWorkspace, type MerchantWorkspace } from '@/lib/api/merchant-console';
 
 const THEMES: ThemeOption[] = [
   {
@@ -42,6 +43,26 @@ export function StoreOnboardingWizard() {
   // UI / Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [merchantWorkspace, setMerchantWorkspace] = useState<MerchantWorkspace | null>(null);
+  const [merchantWorkspaceLoading, setMerchantWorkspaceLoading] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchMerchantConsole(undefined, controller.signal)
+      .then((bootstrap) => {
+        if (controller.signal.aborted) return;
+        const retailWorkspace =
+          bootstrap.workspaces.find((workspace) => isOperableWorkspace(workspace) && hasActiveCapability(workspace, 'retail')) || null;
+        setMerchantWorkspace(retailWorkspace);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setMerchantWorkspace(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setMerchantWorkspaceLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   // Auto-generate slug helper from store name if user hasn't explicitly edited slug
   const handleNameChange = (val: string) => {
@@ -95,16 +116,31 @@ export function StoreOnboardingWizard() {
   };
 
   const handleSubmit = async () => {
+    if (merchantWorkspaceLoading) {
+      setError('Please wait while we verify your merchant workspace.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // SSO registration can authenticate a Seller before Core has a
+      // canonical Merchant row. Complete that identity-to-tenant bridge
+      // idempotently before creating the first store.
+      const workspace = merchantWorkspace || (await sellerApi.ensureRetailWorkspace({
+        code: `merchant-${storeSlug.trim()}`,
+        legal_name: storeName.trim()
+      }));
+      const merchantId = 'merchant_id' in workspace ? workspace.merchant_id : workspace.id;
+
       // 1. Create the store
       const createdStore = await sellerApi.createStore({
         name: storeName.trim(),
         code: storeSlug.trim(),
         market_code: marketCode,
-        status: 'draft'
+        status: 'draft',
+        merchant_id: merchantId
       });
 
       // 2. Install the selected theme
@@ -120,9 +156,13 @@ export function StoreOnboardingWizard() {
       }
 
       // 3. Route directly to store dashboard
-      router.push(`/dashboard/stores/${createdStore.id}`);
+      router.push(
+        `/dashboard/merchants/${merchantId}/stores/${createdStore.id}`
+      );
     } catch (err: any) {
-      setError(err.message || 'Failed to create store. Please check the slug for uniqueness and try again.');
+      const message =
+        err.message || 'Failed to create store. Please check the slug for uniqueness and try again.';
+      setError(message);
       setIsSubmitting(false);
     }
   };

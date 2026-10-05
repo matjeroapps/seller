@@ -1,26 +1,39 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { CheckCircle2, PauseCircle, PlayCircle, RefreshCw, Settings, ShieldCheck, Store as StoreIcon } from 'lucide-react';
+
 import { sellerClient } from '@/lib/api/client';
 import type { Store, StoreOperationalState } from '@/lib/api/types';
-import { CapabilityState } from './CapabilityState';
-import { createUnavailableState } from '@/lib/screens/state';
-import { Settings, Store as StoreIcon, ShieldAlert } from 'lucide-react';
 
 interface SettingsScreenProps {
   storeId: string;
 }
 
+function formatStatus(value?: string) {
+  return value ? value.replace(/[_-]/g, ' ') : 'Unknown';
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Not recorded yet';
+  return new Date(value).toLocaleString();
+}
+
+function formatSettingsError(err: unknown) {
+  const message = err instanceof Error ? err.message : 'Failed to load store settings.';
+  return message === 'Actor authentication required'
+    ? 'Your session could not be used to load store settings. Refresh the dashboard or sign in again.'
+    : message;
+}
+
 export function SettingsScreen({ storeId }: SettingsScreenProps) {
   const [store, setStore] = useState<Store | null>(null);
   const [opState, setOpState] = useState<StoreOperationalState | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingCheckout, setUpdatingCheckout] = useState(false);
-
-  useEffect(() => {
-    loadSettings();
-  }, [storeId]);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -30,130 +43,245 @@ export function SettingsScreen({ storeId }: SettingsScreenProps) {
         sellerClient.getStores(),
         sellerClient.getStoreOperationalState(storeId),
       ]);
-      const currentStore = storesRes.items.find((s) => s.id === storeId);
+      const currentStore = storesRes.items.find((item) => item.id === storeId);
       setStore(currentStore || null);
       setOpState(opRes);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load store settings.');
+      setMaintenanceMessage(opRes.maintenance_message || '');
+    } catch (err: unknown) {
+      setError(formatSettingsError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleCheckout = async () => {
-    if (!opState) return;
-    setUpdatingCheckout(true);
-    const nextAccepting = !opState.checkout_accepting;
+  useEffect(() => {
+    let isMounted = true;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [storesRes, opRes] = await Promise.all([
+          sellerClient.getStores(),
+          sellerClient.getStoreOperationalState(storeId),
+        ]);
+        if (!isMounted) return;
+        const currentStore = storesRes.items.find((item) => item.id === storeId);
+        setStore(currentStore || null);
+        setOpState(opRes);
+        setMaintenanceMessage(opRes.maintenance_message || '');
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        setError(formatSettingsError(err));
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [storeId]);
+
+  const persistOperationalState = async (nextAccepting: boolean, message: string) => {
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
     try {
       const updated = await sellerClient.updateStoreOperationalState(storeId, {
         checkout_status: nextAccepting ? 'accepting' : 'paused',
-        maintenance_message: nextAccepting ? '' : 'Store checkout temporarily paused by seller.',
+        maintenance_message: message,
       });
       setOpState(updated);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update store operational state.');
+      setMaintenanceMessage(updated.maintenance_message || message);
+      setSuccessMsg('Store checkout settings updated successfully.');
+    } catch (err: unknown) {
+      setError(formatSettingsError(err));
     } finally {
-      setUpdatingCheckout(false);
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <CapabilityState
-        state={{
-          status: 'loading',
-          title: 'Loading Store Settings',
-          description: 'Fetching store configuration and operational details...',
-        }}
-      />
-    );
-  }
+  const handleToggleCheckout = async () => {
+    const accepting = opState?.checkout_accepting ?? true;
+    const nextAccepting = !accepting;
+    const nextMessage = nextAccepting
+      ? ''
+      : maintenanceMessage.trim() || 'Checkout is temporarily unavailable. Please try again later.';
 
-  const taxPolicyState = createUnavailableState(
-    'Tax Rules & Custom Legal Policies',
-    'Custom VAT rules, tax registration documents, and localized store return/refund policy editors are not supported by Core.'
-  );
+    await persistOperationalState(nextAccepting, nextMessage);
+  };
+
+  const handleSaveMessage = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await persistOperationalState(opState?.checkout_accepting ?? true, maintenanceMessage.trim());
+  };
+
+  const checkoutAccepting = opState?.checkout_accepting ?? true;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Store Settings</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          View store identity details and manage checkout availability.
-        </p>
-      </div>
+    <div className="seller-dashboard">
+      <section className="seller-dashboard-hero">
+        <div>
+          <div className="seller-dashboard-hero__eyebrow">
+            <Settings aria-hidden="true" />
+            <span>Store settings</span>
+          </div>
+          <div className="seller-dashboard-hero__title-row">
+            <h1>{store?.name || 'Store settings'}</h1>
+            <span className={`seller-status-badge seller-status-badge--${store?.status || 'neutral'}`}>
+              {formatStatus(store?.status)}
+            </span>
+          </div>
+          <div className="seller-dashboard-hero__meta">
+            <span>{store?.market_code || 'Market loading'}</span>
+            <span>{store?.code || 'Store code loading'}</span>
+            <span>{checkoutAccepting ? 'Checkout accepting orders' : 'Checkout paused'}</span>
+          </div>
+        </div>
+        <div className="seller-dashboard-hero__actions">
+          <button type="button" onClick={loadSettings} disabled={loading || saving}>
+            <RefreshCw aria-hidden="true" />
+            Refresh settings
+          </button>
+        </div>
+      </section>
 
       {error && (
-        <div className="rounded-md bg-rose-50 p-4 border border-rose-200 text-sm text-rose-700">
-          {error}
+        <div className="seller-alert seller-alert--danger" role="alert">
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="rounded-lg border bg-white p-6 shadow-sm dark:bg-slate-900 space-y-4">
-        <div className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white border-b pb-3">
-          <StoreIcon className="h-5 w-5 text-primary-600" />
-          Store Profile & Operational Facts
+      {successMsg && (
+        <div className="seller-alert seller-alert--warning" role="status">
+          <CheckCircle2 aria-hidden="true" />
+          <span>{successMsg}</span>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Store Name</label>
-            <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{store?.name || storeId}</div>
-          </div>
+      <div className="seller-dashboard__grid">
+        <div className="seller-dashboard__main">
+          <section className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">Store profile</span>
+                <h2>Identity details</h2>
+              </div>
+              <StoreIcon aria-hidden="true" />
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Store ID</label>
-            <div className="mt-1 text-xs font-mono text-slate-600 dark:text-slate-400">{storeId}</div>
-          </div>
+            {loading ? (
+              <div className="seller-inline-empty">Loading store settings...</div>
+            ) : (
+              <div className="seller-settings-facts">
+                <div>
+                  <span>Store name</span>
+                  <strong>{store?.name || 'Store not found'}</strong>
+                </div>
+                <div>
+                  <span>Store ID</span>
+                  <strong>{storeId}</strong>
+                </div>
+                <div>
+                  <span>Store code</span>
+                  <strong>{store?.code || 'Not assigned'}</strong>
+                </div>
+                <div>
+                  <span>Market code</span>
+                  <strong>{store?.market_code || 'Not assigned'}</strong>
+                </div>
+                <div>
+                  <span>Created</span>
+                  <strong>{formatDate(store?.created_at)}</strong>
+                </div>
+                <div>
+                  <span>Last updated</span>
+                  <strong>{formatDate(store?.updated_at)}</strong>
+                </div>
+              </div>
+            )}
+          </section>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Market Code</label>
-            <div className="mt-1 text-sm text-slate-900 dark:text-white">{store?.market_code || 'SA'}</div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">Store Status</label>
-            <div className="mt-1">
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                {store?.status || 'active'}
+          <form onSubmit={handleSaveMessage} className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">Checkout operations</span>
+                <h2>Storefront availability</h2>
+              </div>
+              <span className={`seller-checkout-pill ${checkoutAccepting ? 'seller-checkout-pill--active' : 'seller-checkout-pill--paused'}`}>
+                {checkoutAccepting ? 'Accepting orders' : 'Checkout paused'}
               </span>
             </div>
-          </div>
+
+            {loading ? (
+              <div className="seller-inline-empty">Loading checkout status...</div>
+            ) : (
+              <>
+                <div className="seller-checkout-summary">
+                  <ShieldCheck aria-hidden="true" />
+                  <div>
+                    <strong>{checkoutAccepting ? 'Checkout is active' : 'Checkout is paused'}</strong>
+                    <span>
+                      {checkoutAccepting
+                        ? 'Customers can complete purchases from this storefront.'
+                        : 'Customers can browse the storefront, but checkout is currently disabled.'}
+                    </span>
+                  </div>
+                </div>
+
+                <label className="seller-settings-field">
+                  <span>Customer-facing message</span>
+                  <textarea
+                    value={maintenanceMessage}
+                    onChange={(event) => setMaintenanceMessage(event.target.value)}
+                    maxLength={240}
+                    rows={3}
+                    placeholder="Checkout is temporarily unavailable. Please try again later."
+                  />
+                </label>
+
+                <div className="seller-settings-actions">
+                  <button type="submit" className="seller-secondary-link" disabled={saving || !opState}>
+                    {saving ? 'Saving...' : 'Save message'}
+                  </button>
+                  <button type="button" className="seller-primary-action" onClick={handleToggleCheckout} disabled={saving || !opState}>
+                    {checkoutAccepting ? <PauseCircle aria-hidden="true" /> : <PlayCircle aria-hidden="true" />}
+                    {saving ? 'Updating...' : checkoutAccepting ? 'Pause checkout' : 'Resume checkout'}
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
         </div>
 
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Storefront Checkout Status</h4>
-              <p className="text-xs text-slate-500">
-                {opState?.checkout_accepting ? 'Checkout is active and accepting buyer orders.' : 'Checkout is paused.'}
-              </p>
+        <aside className="seller-dashboard__rail">
+          <section className="seller-panel">
+            <div className="seller-panel__header">
+              <div>
+                <span className="seller-section-kicker">Operational summary</span>
+                <h2>Current state</h2>
+              </div>
+              <ShieldCheck aria-hidden="true" />
             </div>
-            <button
-              type="button"
-              onClick={handleToggleCheckout}
-              disabled={updatingCheckout}
-              className={`rounded-md px-3.5 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 ${
-                opState?.checkout_accepting ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'
-              }`}
-            >
-              {updatingCheckout
-                ? 'Updating...'
-                : opState?.checkout_accepting
-                ? 'Pause Store Checkout'
-                : 'Resume Store Checkout'}
-            </button>
-          </div>
-
-          {opState?.maintenance_message && (
-            <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded border border-amber-200">
-              Notice: {opState.maintenance_message}
+            <div className="seller-settings-rail">
+              <div>
+                <span>Checkout status</span>
+                <strong>{opState?.checkout_status || 'accepting'}</strong>
+              </div>
+              <div>
+                <span>State updated</span>
+                <strong>{formatDate(opState?.updated_at)}</strong>
+              </div>
+              <div>
+                <span>Updated by</span>
+                <strong>{opState?.updated_by || 'System default'}</strong>
+              </div>
             </div>
-          )}
-        </div>
+          </section>
+        </aside>
       </div>
-
-      <CapabilityState state={taxPolicyState} />
     </div>
   );
 }
