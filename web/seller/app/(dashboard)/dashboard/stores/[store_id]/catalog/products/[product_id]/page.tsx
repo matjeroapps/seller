@@ -14,6 +14,7 @@ import {
   Save,
   Trash2
 } from 'lucide-react';
+import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
 import { formatMoney } from '@/lib/money';
 import type {
@@ -120,6 +121,7 @@ export default function StoreProductDetailPage({
   const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [form, setForm] = useState<TranslationForm>({
     enName: '',
     enDescription: '',
@@ -251,20 +253,19 @@ export default function StoreProductDetailPage({
     }
   };
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (!product || !canManageProduct) return;
-    if (
-      !confirm(
-        'Archive this product? It will be removed from active catalog management. Published listings may need to be unpublished first.'
-      )
-    ) {
-      return;
-    }
+    setShowArchiveModal(true);
+  };
+
+  const confirmArchive = async () => {
+    if (!product || !canManageProduct) return;
     setWorking(true);
     setError(null);
     setNotice(null);
     try {
       await sellerApi.archiveProduct(store_id, product_id);
+      setShowArchiveModal(false);
       await refreshAfterMutation('Product archived.');
     } catch (err: any) {
       setError(err.message || 'Failed to archive product');
@@ -925,7 +926,8 @@ export default function StoreProductDetailPage({
             <option value="">Select an asset from store media library...</option>
             {mediaAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
-                {asset.original_filename} ({asset.checksum_sha256.substring(0, 8)}...)
+                {asset.original_filename || 'Media asset'}
+                {asset.checksum_sha256 ? ` (${asset.checksum_sha256.substring(0, 8)}...)` : ''}
               </option>
             ))}
           </select>
@@ -975,6 +977,18 @@ export default function StoreProductDetailPage({
           </div>
         )}
       </section>
+
+      <ConfirmModal
+        isOpen={showArchiveModal}
+        title="Archive Product"
+        description="Archive this product? It will be removed from active catalog management. Published listings may need to be unpublished first."
+        confirmLabel="Archive Product"
+        cancelLabel="Keep Product"
+        variant="danger"
+        loading={working}
+        onConfirm={confirmArchive}
+        onCancel={() => setShowArchiveModal(false)}
+      />
     </div>
   );
 }

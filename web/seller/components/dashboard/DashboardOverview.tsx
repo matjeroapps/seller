@@ -20,9 +20,12 @@ export function DashboardOverview() {
     Promise.allSettled([sellerApi.getStores(), fetchMerchantConsole()])
       .then(([storesResult, consoleResult]) => {
         if (!isMounted) return;
-        const items = storesResult.status === 'fulfilled' ? storesResult.value.items || [] : [];
+        const items =
+          storesResult.status === 'fulfilled' && storesResult.value ? storesResult.value.items || [] : [];
         const merchantWorkspaces =
-          consoleResult.status === 'fulfilled' ? consoleResult.value.workspaces.filter(isOperableWorkspace) : [];
+          consoleResult.status === 'fulfilled' && consoleResult.value?.workspaces
+            ? consoleResult.value.workspaces.filter(isOperableWorkspace)
+            : [];
 
         setLoading(false);
         setStores(items);

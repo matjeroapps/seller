@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers, Key, Webhook, Copy, Trash2, ShieldCheck } from 'lucide-react';
+import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
 import type { IntegrationConnection, ExternalEntityMapping, SellerSyncJob, ApiKey, WebhookSubscription } from '@/lib/api/types';
 
@@ -37,6 +38,12 @@ export default function StoreIntegrationsPage({
   const [showWebhookModal, setShowWebhookModal] = useState(false);
   const [targetUrl, setTargetUrl] = useState('');
   const [subscribedEvents, setSubscribedEvents] = useState<string[]>(['product.updated', 'order.created']);
+
+  // Modal confirmation states
+  const [revokeKeyId, setRevokeKeyId] = useState<string | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [deleteWebhookId, setDeleteWebhookId] = useState<string | null>(null);
+  const [isDeletingWebhook, setIsDeletingWebhook] = useState(false);
 
   const AVAILABLE_SCOPES = [
     'products:read', 'products:write',
@@ -174,10 +181,19 @@ export default function StoreIntegrationsPage({
   };
 
   const handleRevokeApiKey = (keyId: string) => {
-    if (!confirm('Are you sure you want to revoke this API key? External systems using it will be denied access.')) return;
-    sellerApi.revokeStoreAPIKey(store_id, keyId).then(() => {
+    setRevokeKeyId(keyId);
+  };
+
+  const confirmRevokeApiKey = async () => {
+    if (!revokeKeyId) return;
+    setIsRevoking(true);
+    try {
+      await sellerApi.revokeStoreAPIKey(store_id, revokeKeyId);
+      setRevokeKeyId(null);
       fetchApiKeys();
-    });
+    } finally {
+      setIsRevoking(false);
+    }
   };
 
   const handleCreateWebhook = (e: React.FormEvent) => {
@@ -196,10 +212,19 @@ export default function StoreIntegrationsPage({
   };
 
   const handleDeleteWebhook = (subId: string) => {
-    if (!confirm('Are you sure you want to delete this webhook subscription?')) return;
-    sellerApi.deleteStoreWebhookSubscription(store_id, subId).then(() => {
+    setDeleteWebhookId(subId);
+  };
+
+  const confirmDeleteWebhook = async () => {
+    if (!deleteWebhookId) return;
+    setIsDeletingWebhook(true);
+    try {
+      await sellerApi.deleteStoreWebhookSubscription(store_id, deleteWebhookId);
+      setDeleteWebhookId(null);
       fetchWebhooks();
-    });
+    } finally {
+      setIsDeletingWebhook(false);
+    }
   };
 
   const toggleScope = (scope: string) => {
@@ -855,6 +880,32 @@ export default function StoreIntegrationsPage({
           </div>
         </div>
       )}
+
+      {/* Revoke API Key Modal */}
+      <ConfirmModal
+        isOpen={Boolean(revokeKeyId)}
+        title="Revoke Developer API Key"
+        description="Are you sure you want to revoke this API key? External systems and applications using this key will immediately be denied access."
+        confirmLabel="Revoke Key"
+        cancelLabel="Keep Key"
+        variant="danger"
+        loading={isRevoking}
+        onConfirm={confirmRevokeApiKey}
+        onCancel={() => setRevokeKeyId(null)}
+      />
+
+      {/* Delete Webhook Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteWebhookId)}
+        title="Delete Webhook Subscription"
+        description="Are you sure you want to delete this webhook subscription? Live event push notifications to this destination URL will stop immediately."
+        confirmLabel="Delete Webhook"
+        cancelLabel="Keep Webhook"
+        variant="danger"
+        loading={isDeletingWebhook}
+        onConfirm={confirmDeleteWebhook}
+        onCancel={() => setDeleteWebhookId(null)}
+      />
     </div>
   );
 }

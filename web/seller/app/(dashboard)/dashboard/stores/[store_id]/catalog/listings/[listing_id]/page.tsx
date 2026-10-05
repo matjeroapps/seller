@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, AlertCircle, RefreshCw, DollarSign, Upload, Eye, TrendingUp, Percent, ShieldAlert } from 'lucide-react';
+import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
 import type { SellerListing, SellerListingLifecycle, StructuredPublishReadiness } from '@/lib/api/types';
 import { majorToMinor, minorAmount, minorToMajor } from '@/lib/money';
@@ -24,6 +25,7 @@ export default function StoreListingDetailPage({
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
 
   const [priceAmount, setPriceAmount] = useState<string>('');
   const [priceCurrency, setPriceCurrency] = useState<string>('SAR');
@@ -129,13 +131,17 @@ export default function StoreListingDetailPage({
     }
   };
 
-  const handleArchive = async () => {
-    if (!confirm('Archive this listing? Listing must be unpublished first.')) return;
+  const handleArchive = () => {
+    setShowArchiveModal(true);
+  };
+
+  const confirmArchive = async () => {
     setActionLoading(true);
     setActionError(null);
     try {
       const updated = await sellerApi.archiveListing(store_id, listing_id);
       setListing(updated);
+      setShowArchiveModal(false);
       loadData();
     } catch (err: any) {
       setActionError(err.message || 'Failed to archive listing');
@@ -499,6 +505,18 @@ export default function StoreListingDetailPage({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showArchiveModal}
+        title="Archive Listing"
+        description="Archive this listing? Listing must be unpublished first."
+        confirmLabel="Archive Listing"
+        cancelLabel="Keep Listing"
+        variant="danger"
+        loading={actionLoading}
+        onConfirm={confirmArchive}
+        onCancel={() => setShowArchiveModal(false)}
+      />
     </div>
   );
 }
