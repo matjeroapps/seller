@@ -413,12 +413,13 @@ export const sellerApi = {
     );
   },
 
-  async updateListingPrice(storeId: string, listingId: string, price: { currency: string; amount: number }): Promise<SellerListing> {
-    return request<SellerListing>(
+  /** Sets the retail price. `amount_minor` is in minor units (e.g. halalas). */
+  async updateListingPrice(storeId: string, listingId: string, price: { currency: string; amount_minor: number }): Promise<{ status: string }> {
+    return request<{ status: string }>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(listingId)}/price`,
       {
         method: 'PUT',
-        body: JSON.stringify({ price })
+        body: JSON.stringify({ amount_minor: price.amount_minor, currency: price.currency })
       }
     );
   },

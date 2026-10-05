@@ -1,6 +1,8 @@
+/** Minor-unit money. Core emits `amount_minor`; some seller-api DTOs emit `amount`. Use lib/money helpers. */
 export interface Money {
   currency: string;
-  amount: number;
+  amount?: number;
+  amount_minor?: number;
 }
 
 export interface Store {
@@ -153,14 +155,8 @@ export interface SellerListingLifecycle {
   supplier_offer_id?: string;
   supplier_offer_status?: string;
   has_margin_warning: boolean;
-  current_retail_price?: {
-    currency: string;
-    amount: number;
-  };
-  upstream_wholesale_price?: {
-    currency: string;
-    amount: number;
-  };
+  current_retail_price?: Money;
+  upstream_wholesale_price?: Money;
   last_synced_at: string;
 }
 

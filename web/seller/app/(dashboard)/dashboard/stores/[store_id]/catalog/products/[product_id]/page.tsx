@@ -15,6 +15,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
+import { formatMoney } from '@/lib/money';
 import type {
   Product,
   ProductMediaReference,
@@ -517,7 +518,7 @@ export default function StoreProductDetailPage({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current price</div>
           <div className="mt-2 text-sm font-bold text-slate-900">
-            {detail.current_price ? `${detail.current_price.amount} ${detail.current_price.currency}` : 'Not set'}
+            {formatMoney(detail.current_price, "Not set")}
           </div>
           <p className="mt-2 text-xs text-slate-500">Created: {formatDate(product.created_at)}</p>
         </div>

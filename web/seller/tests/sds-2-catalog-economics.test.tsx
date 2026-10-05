@@ -50,8 +50,8 @@ describe('SDS-2 — Seller Catalog Economics', () => {
         effective_availability: 'available',
         is_upstream_available: true,
         has_margin_warning: false,
-        current_retail_price: { currency: 'SAR', amount: 12000 },
-        upstream_wholesale_price: { currency: 'SAR', amount: 10000 },
+        current_retail_price: { currency: 'SAR', amount_minor: 12000 },
+        upstream_wholesale_price: { currency: 'SAR', amount_minor: 10000 },
         last_synced_at: '2026-10-01'
       });
       vi.mocked(sellerApi.getListingReadiness).mockResolvedValue({ is_ready: true, reasons: [] });
@@ -82,8 +82,8 @@ describe('SDS-2 — Seller Catalog Economics', () => {
         effective_availability: 'available',
         is_upstream_available: true,
         has_margin_warning: true,
-        current_retail_price: { currency: 'SAR', amount: 8000 }, // Retail 80 SAR
-        upstream_wholesale_price: { currency: 'SAR', amount: 10000 }, // Wholesale 100 SAR -> Loss!
+        current_retail_price: { currency: 'SAR', amount_minor: 8000 }, // Retail 80 SAR
+        upstream_wholesale_price: { currency: 'SAR', amount_minor: 10000 }, // Wholesale 100 SAR -> Loss!
         last_synced_at: '2026-10-01'
       });
       vi.mocked(sellerApi.getListingReadiness).mockResolvedValue({ is_ready: true, reasons: [] });
@@ -114,7 +114,7 @@ describe('SDS-2 — Seller Catalog Economics', () => {
             supplier_id: 'sup_1',
             supplier_code: 'sup-a',
             supplier_name: 'Arabian Oils Co',
-            price: { currency: 'SAR', amount: 200 },
+            price: { currency: 'SAR', amount_minor: 20000 },
             is_available: true,
             available_qty: 50,
             fulfillment_count: 1,
@@ -149,6 +149,15 @@ describe('SDS-2 — Seller Catalog Economics', () => {
 
       await waitFor(() => {
         expect(sellerApi.importSupplierOffer).toHaveBeenCalledWith('str_1', 'off_99');
+      });
+
+      // Wholesale 200.00 SAR (20000 minor) + default 20% markup => 24000 minor
+      await waitFor(() => {
+        expect(sellerApi.updateListingPrice).toHaveBeenCalledWith('str_1', 'lst_imported_99', {
+          currency: 'SAR',
+          amount_minor: 24000
+        });
+        expect(screen.getByText(/shipping policy is a preview only/i)).toBeInTheDocument();
       });
     });
   });
