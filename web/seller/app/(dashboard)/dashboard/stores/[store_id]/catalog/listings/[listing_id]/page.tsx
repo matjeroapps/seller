@@ -9,9 +9,13 @@ import type { SellerListing, StructuredPublishReadiness } from '@/lib/api/types'
 export default function StoreListingDetailPage({
   params
 }: {
-  params: Promise<{ store_id: string; listing_id: string }>;
+  params: Promise<{ store_id: string; listing_id: string }> | { store_id: string; listing_id: string };
 }) {
-  const { store_id, listing_id } = use(params);
+  const unwrappedParams =
+    params && typeof (params as unknown as Promise<{ store_id: string; listing_id: string }>).then === 'function'
+      ? use(params as Promise<{ store_id: string; listing_id: string }>)
+      : (params as unknown as { store_id: string; listing_id: string }) || {};
+  const { store_id, listing_id } = unwrappedParams;
 
   const [listing, setListing] = useState<SellerListing | null>(null);
   const [readiness, setReadiness] = useState<StructuredPublishReadiness | null>(null);
@@ -22,8 +26,11 @@ export default function StoreListingDetailPage({
   const [priceCurrency, setPriceCurrency] = useState<string>('SAR');
   const [updatingPrice, setUpdatingPrice] = useState(false);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const loadData = () => {
     setLoading(true);
+    setActionError(null);
     Promise.all([
       sellerApi.getStoreListing(store_id, listing_id),
       sellerApi.getListingReadiness(store_id, listing_id).catch(() => null)
@@ -45,6 +52,7 @@ export default function StoreListingDetailPage({
     const amount = parseFloat(priceAmount);
     if (isNaN(amount) || amount <= 0) return;
     setUpdatingPrice(true);
+    setActionError(null);
     try {
       await sellerApi.updateListingPrice(store_id, listing_id, {
         currency: priceCurrency,
@@ -52,7 +60,7 @@ export default function StoreListingDetailPage({
       });
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to update retail price');
+      setActionError(err.message || 'Failed to update retail price');
     } finally {
       setUpdatingPrice(false);
     }
@@ -60,12 +68,13 @@ export default function StoreListingDetailPage({
 
   const handlePublish = async () => {
     setActionLoading(true);
+    setActionError(null);
     try {
       const updated = await sellerApi.publishListing(store_id, listing_id);
       setListing(updated);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to publish listing');
+      setActionError(err.message || 'Failed to publish listing');
     } finally {
       setActionLoading(false);
     }
@@ -73,12 +82,13 @@ export default function StoreListingDetailPage({
 
   const handleUnpublish = async () => {
     setActionLoading(true);
+    setActionError(null);
     try {
       const updated = await sellerApi.unpublishListing(store_id, listing_id);
       setListing(updated);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to unpublish listing');
+      setActionError(err.message || 'Failed to unpublish listing');
     } finally {
       setActionLoading(false);
     }
@@ -87,12 +97,13 @@ export default function StoreListingDetailPage({
   const handleArchive = async () => {
     if (!confirm('Archive this listing? Listing must be unpublished first.')) return;
     setActionLoading(true);
+    setActionError(null);
     try {
       const updated = await sellerApi.archiveListing(store_id, listing_id);
       setListing(updated);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to archive listing');
+      setActionError(err.message || 'Failed to archive listing');
     } finally {
       setActionLoading(false);
     }
@@ -115,6 +126,12 @@ export default function StoreListingDetailPage({
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3 text-xs text-rose-700">
+          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">

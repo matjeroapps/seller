@@ -2,20 +2,30 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { Image as ImageIcon, Upload, Trash2, CheckCircle2, RefreshCw, Copy, ExternalLink } from 'lucide-react';
+import { Image as ImageIcon, Upload, Trash2, CheckCircle2, RefreshCw, Copy, ExternalLink, AlertCircle } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { StoreMediaAsset } from '@/lib/api/types';
 
-export default function StoreMediaLibraryPage({ params }: { params: Promise<{ store_id: string }> }) {
-  const { store_id } = use(params);
+export default function StoreMediaLibraryPage({
+  params
+}: {
+  params: Promise<{ store_id: string }> | { store_id: string };
+}) {
+  const unwrappedParams =
+    params && typeof (params as unknown as Promise<{ store_id: string }>).then === 'function'
+      ? use(params as Promise<{ store_id: string }>)
+      : (params as unknown as { store_id: string }) || {};
+  const { store_id } = unwrappedParams;
 
   const [assets, setAssets] = useState<StoreMediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadMedia = () => {
     setLoading(true);
+    setActionError(null);
     sellerApi
       .listStoreMedia(store_id)
       .then((res) => {
@@ -85,7 +95,7 @@ export default function StoreMediaLibraryPage({ params }: { params: Promise<{ st
         loadMedia();
       }
     } catch (err: any) {
-      alert(err.message || 'Media upload failed');
+      setActionError(err.message || 'Media upload failed');
     } finally {
       setUploading(false);
       setUploadStatus('');
@@ -95,16 +105,23 @@ export default function StoreMediaLibraryPage({ params }: { params: Promise<{ st
 
   const handleDelete = async (assetId: string) => {
     if (!confirm('Permanently delete this media asset? Safe delete will reject if product references exist.')) return;
+    setActionError(null);
     try {
       await sellerApi.deleteStoreMedia(store_id, assetId);
       loadMedia();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete media asset');
+      setActionError(err.message || 'Failed to delete media asset');
     }
   };
 
   return (
     <div className="space-y-6">
+      {actionError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-3 text-xs text-rose-700">
+          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -34,28 +34,8 @@ export default function StoreOrderDetailPage({
       : (params as unknown as { store_id: string; order_id: string }) || {};
   const { store_id, order_id } = unwrappedParams;
 
-  const [order, setOrder] = useState<SellerOrderDetail>(() => ({
-    id: order_id || 'ord_dev_01',
-    order_number: 'ORD-DEV-001',
-    status: 'ready_for_shipping',
-    currency: 'SAR',
-    subtotal: 15000,
-    total: 16500,
-    item_count: 2,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    contact_email: 'dev@example.com',
-    shipping_address: { recipient_name: 'Dev Customer', address_line_1: 'King Fahd Rd', city: 'Riyadh', country_code: 'SA', phone: '+966500000000' },
-    items: [
-      { id: 'item_dev_01', product_name: 'Sample Product A', sku_code: 'SKU-PROD-A', quantity: 2, unit_price: 5000, total_price: 10000, source: 'seller_owned' },
-      { id: 'item_dev_02', product_name: 'Sample Product B', sku_code: 'SKU-PROD-B', quantity: 1, unit_price: 5000, total_price: 5000, source: 'seller_owned' }
-    ],
-    timeline: [
-      { id: 't1', type: 'confirmed', detail: 'Order confirmed', created_at: new Date().toISOString() }
-    ],
-    allowed_next_actions: ['shipped', 'cancelled']
-  }));
-  const [loading, setLoading] = useState(false);
+  const [order, setOrder] = useState<SellerOrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -69,15 +49,17 @@ export default function StoreOrderDetailPage({
 
   const fetchOrderDetail = async () => {
     if (!store_id || !order_id) return;
+    setLoading(true);
     setError(null);
     try {
       const data = await sellerApi.getStoreOrderDetail(store_id, order_id);
       setOrder(data);
     } catch (err: unknown) {
-      if (!order_id.startsWith('ord_dev')) {
-        const msg = err instanceof Error ? err.message : 'Failed to load order details';
-        setError(msg);
-      }
+      const msg = err instanceof Error ? err.message : 'Failed to load order details';
+      setError(msg);
+      setOrder(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,7 +121,22 @@ export default function StoreOrderDetailPage({
     );
   }
 
-  if (!order) return null;
+  if (!order) {
+    return (
+      <div className="max-w-4xl space-y-4">
+        <Link
+          href={`/dashboard/stores/${store_id}/orders`}
+          className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to Orders
+        </Link>
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-3 text-xs text-slate-600">
+          <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <span>Order not found or access denied.</span>
+        </div>
+      </div>
+    );
+  }
 
   const formattedCreated = new Date(order.created_at).toLocaleDateString(undefined, {
     month: 'short',
