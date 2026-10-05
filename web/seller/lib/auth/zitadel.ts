@@ -20,6 +20,17 @@ export interface ZitadelEndpoints {
   forwardedProto?: string;
 }
 
+export type LoginPrompt = 'login' | 'create';
+
+export class SellerAuthorizationError extends Error {
+  readonly status = 403;
+
+  constructor(message = 'Authentication bootstrap verification failed') {
+    super(message);
+    this.name = 'SellerAuthorizationError';
+  }
+}
+
 export function getZitadelConfig(): ZitadelConfig {
   const issuer = (process.env.ZITADEL_ISSUER || process.env.NEXT_PUBLIC_ZITADEL_ISSUER || 'http://localhost:8081').replace(/\/$/, '');
   const internalIssuer = (process.env.ZITADEL_INTERNAL_ISSUER || issuer).replace(/\/$/, '');
@@ -81,7 +92,13 @@ function forwardedIssuerHeaders(endpoints: ZitadelEndpoints): Record<string, str
   };
 }
 
-export function getAuthorizationUrl(config: ZitadelConfig, endpoints: ZitadelEndpoints, state: string, codeChallenge: string) {
+export function getAuthorizationUrl(
+  config: ZitadelConfig,
+  endpoints: ZitadelEndpoints,
+  state: string,
+  codeChallenge: string,
+  prompt?: LoginPrompt
+) {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: config.clientId,
@@ -91,6 +108,10 @@ export function getAuthorizationUrl(config: ZitadelConfig, endpoints: ZitadelEnd
     code_challenge: codeChallenge,
     code_challenge_method: 'S256'
   });
+
+  if (prompt) {
+    params.set('prompt', prompt);
+  }
 
   return `${endpoints.authorization}?${params.toString()}`;
 }
@@ -178,6 +199,9 @@ export async function verifySellerApiAccess(accessToken: string, expectedSubject
   if (!response.ok) {
     const errorText = typeof response.text === 'function' ? await response.text().catch(() => '') : '';
     console.warn('seller auth bootstrap verification failed', { status: response.status, body: errorText });
+    if (response.status === 401 || response.status === 403) {
+      throw new SellerAuthorizationError();
+    }
     throw new Error('Authentication bootstrap verification failed');
   }
 

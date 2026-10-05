@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCodeChallenge, createCodeVerifier } from '../lib/auth/pkce';
 import { createEmptySession, parseSessionCookie, serializeSessionCookie } from '../lib/auth/session-cookie';
-import { getZitadelConfig, getZitadelEndpoints, verifySellerApiAccess } from '../lib/auth/zitadel';
+import { getAuthorizationUrl, getZitadelConfig, getZitadelEndpoints, verifySellerApiAccess } from '../lib/auth/zitadel';
 
 describe('seller auth foundation', () => {
   it('round trips authenticated session cookies without token material', async () => {
@@ -88,6 +88,28 @@ describe('seller auth foundation', () => {
     else delete process.env.ZITADEL_PROJECT_ID;
     if (previousAppUrl !== undefined) process.env.NEXT_PUBLIC_SELLER_APP_URL = previousAppUrl;
     else delete process.env.NEXT_PUBLIC_SELLER_APP_URL;
+  });
+
+  it('adds an explicit OIDC prompt only for account recovery actions', () => {
+    const config = {
+      issuer: 'http://localhost:8081',
+      internalIssuer: 'http://localhost:8081',
+      clientId: 'seller-client',
+      clientSecret: '',
+      projectId: 'seller-project',
+      redirectUri: 'http://localhost:5174/auth/callback',
+      postLogoutRedirectUri: 'http://localhost:5174',
+      scopes: ['openid']
+    };
+    const endpoints = getZitadelEndpoints(config);
+
+    const signInAgain = new URL(getAuthorizationUrl(config, endpoints, 'state', 'challenge', 'login'));
+    const createAccount = new URL(getAuthorizationUrl(config, endpoints, 'state', 'challenge', 'create'));
+    const regularLogin = new URL(getAuthorizationUrl(config, endpoints, 'state', 'challenge'));
+
+    expect(signInAgain.searchParams.get('prompt')).toBe('login');
+    expect(createAccount.searchParams.get('prompt')).toBe('create');
+    expect(regularLogin.searchParams.has('prompt')).toBe(false);
   });
 });
 
