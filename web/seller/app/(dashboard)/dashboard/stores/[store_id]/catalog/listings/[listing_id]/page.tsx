@@ -31,8 +31,6 @@ export default function StoreListingDetailPage({
   const [estimatedShipping, setEstimatedShipping] = useState<string>('15');
   const [updatingPrice, setUpdatingPrice] = useState(false);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-
   const loadData = () => {
     setLoading(true);
     setActionError(null);
