@@ -149,12 +149,6 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
           label: 'Profile & account',
           icon: <UserCog aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/account`
-        },
-        {
-          id: 'team',
-          label: 'Team',
-          icon: <UsersRound aria-hidden="true" className={iconClassName} />,
-          path: `${storePrefix}/users`
         }
       ]
     }
