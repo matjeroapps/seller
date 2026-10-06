@@ -1084,27 +1084,3 @@ func (deps Dependencies) handleTransitionStoreOrder(w http.ResponseWriter, r *ht
 	httpx.WriteJSON(w, http.StatusOK, detail)
 }
 
-// handleListStoreCategories passes through Core's global category list so the
-// seller dashboard can render a category picker for product assignment.
-// Categories are platform-global records, so the store_id path parameter is
-// only a namespacing convention for the frontend; the response is a bare JSON
-// array of {id, slug, status} objects.
-func (deps Dependencies) handleListStoreCategories(w http.ResponseWriter, r *http.Request) {
-	subject, _, ok := deps.sellerID(w, r)
-	if !ok {
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-
-	categories, err := deps.Core.ListCategories(r.Context(), subject, limit, offset)
-	if err != nil {
-		actorhttp.WriteCoreError(w, err)
-		return
-	}
-	if categories == nil {
-		// A bare-array contract must serialize as [] rather than null.
-		categories = []coreclient.SellerCategory{}
-	}
-	httpx.WriteJSON(w, http.StatusOK, categories)
-}

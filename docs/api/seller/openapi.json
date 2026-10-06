@@ -3769,7 +3769,7 @@
     },
     "/v1/seller/stores/{store_id}/categories": {
       "get": {
-        "description": "Returns the platform categories as a bare JSON array of {id, slug, status} objects, sufficient for category pickers on the product form. Categories are platform-global records; the store path segment only namespaces the frontend route.",
+        "description": "Returns the store's own categories as a flat tree of nodes (assemble the hierarchy via parent_category_id). Categories are store-scoped records owned by the store; visibility into other stores' categories is not possible.",
         "operationId": "listStoreCategories",
         "parameters": [
           {
@@ -3785,6 +3785,14 @@
             "in": "path",
             "name": "store_id",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by category status: active, inactive or archived",
+            "in": "query",
+            "name": "status",
             "schema": {
               "type": "string"
             }
@@ -3813,30 +3821,105 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "properties": {
-                      "id": {
-                        "type": "string"
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "child_count": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "created_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "parent_category_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "product_count": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "sort_order": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "store_id": {
+                            "type": "string"
+                          },
+                          "translations": {
+                            "additionalProperties": {
+                              "properties": {
+                                "description": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "description",
+                                "name"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "object"
+                          },
+                          "updated_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "child_count",
+                          "created_at",
+                          "id",
+                          "product_count",
+                          "slug",
+                          "sort_order",
+                          "status",
+                          "store_id",
+                          "translations",
+                          "updated_at"
+                        ],
+                        "type": "object"
                       },
-                      "slug": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      }
+                      "type": "array"
                     },
-                    "required": [
-                      "id",
-                      "slug",
-                      "status"
-                    ],
-                    "type": "object"
+                    "limit": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "total": {
+                      "format": "int32",
+                      "type": "integer"
+                    }
                   },
-                  "type": "array"
+                  "required": [
+                    "items",
+                    "limit",
+                    "offset",
+                    "total"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "Category collection"
+            "description": "Store category collection"
           },
           "401": {
             "content": {
@@ -3964,7 +4047,1610 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List platform categories for assignment",
+        "summary": "List a store's categories",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "post": {
+        "description": "Creates a category owned by the store. Requires an English (en) name; Arabic (ar) is optional. Slug must be unique within the store (409 conflict otherwise). parent_category_id must reference a category of the same store.",
+        "operationId": "createStoreCategory",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "child_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "parent_category_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "product_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "sort_order": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "translations": {
+                      "additionalProperties": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "object"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "child_count",
+                    "created_at",
+                    "id",
+                    "product_count",
+                    "slug",
+                    "sort_order",
+                    "status",
+                    "store_id",
+                    "translations",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created store category"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a store category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/categories/reorder": {
+      "post": {
+        "description": "Applies explicit (id, sort_order) pairs atomically. Every id must belong to the store.",
+        "operationId": "reorderStoreCategories",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Reorder acknowledged"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reorder store categories",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/categories/{category_id}": {
+      "delete": {
+        "description": "Permanently deletes the category only when it has no child categories and no product assignments; otherwise returns a validation error directing the caller to archive it.",
+        "operationId": "deleteStoreCategory",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Category identifier",
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deletion acknowledged"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an empty leaf store category",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "get": {
+        "operationId": "getStoreCategory",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Category identifier",
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "child_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "parent_category_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "product_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "sort_order": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "translations": {
+                      "additionalProperties": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "object"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "child_count",
+                    "created_at",
+                    "id",
+                    "product_count",
+                    "slug",
+                    "sort_order",
+                    "status",
+                    "store_id",
+                    "translations",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Store category"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get a store category",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "put": {
+        "description": "Updates slug, parent, sort order and translations. Circular reparenting and cross-store parents are rejected.",
+        "operationId": "updateStoreCategory",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Category identifier",
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "child_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "parent_category_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "product_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "sort_order": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "translations": {
+                      "additionalProperties": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "object"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "child_count",
+                    "created_at",
+                    "id",
+                    "product_count",
+                    "slug",
+                    "sort_order",
+                    "status",
+                    "store_id",
+                    "translations",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Updated store category"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a store category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/categories/{category_id}/status": {
+      "post": {
+        "description": "Applies active/inactive/archived to the category itself. Children keep their own status; product assignments are preserved.",
+        "operationId": "transitionStoreCategoryStatus",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Category identifier",
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "child_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "parent_category_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "product_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "sort_order": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "translations": {
+                      "additionalProperties": {
+                        "properties": {
+                          "description": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "description",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "object"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "child_count",
+                    "created_at",
+                    "id",
+                    "product_count",
+                    "slug",
+                    "sort_order",
+                    "status",
+                    "store_id",
+                    "translations",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Updated store category"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Transition a store category status",
         "tags": [
           "Categories"
         ]
