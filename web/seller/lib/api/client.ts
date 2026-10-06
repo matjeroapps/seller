@@ -21,6 +21,10 @@ import type {
   OrderTransitionPayload,
   SellerListing,
   SellerCategory,
+  StoreCategory,
+  StoreCategoryInput,
+  StoreCategoryUpdateInput,
+  StoreCategoryReorderEntry,
   SellerProductDetail,
   SellerOrder,
   SellerOrderDetail,
@@ -287,11 +291,75 @@ export const sellerApi = {
     };
   },
 
-  async listStoreCategories(storeId: string): Promise<SellerCategory[]> {
-    const payload = await request<SellerCategory[] | { items?: SellerCategory[] }>(
-      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories?limit=100`
+  async listStoreCategories(
+    storeId: string,
+    options: { status?: string; limit?: number; offset?: number } = {}
+  ): Promise<StoreCategory[]> {
+    const params = new URLSearchParams();
+    if (options.status) params.set('status', options.status);
+    params.set('limit', String(options.limit ?? 100));
+    if (options.offset) params.set('offset', String(options.offset));
+    const payload = await request<{ items?: StoreCategory[] } | StoreCategory[]>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories?${params.toString()}`
     );
     return normalizeItems(payload);
+  },
+
+  async createStoreCategory(storeId: string, input: StoreCategoryInput): Promise<StoreCategory> {
+    return request<StoreCategory>(`/v1/seller/stores/${encodeURIComponent(storeId)}/categories`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async getStoreCategory(storeId: string, categoryId: string): Promise<StoreCategory> {
+    return request<StoreCategory>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories/${encodeURIComponent(categoryId)}`
+    );
+  },
+
+  async updateStoreCategory(
+    storeId: string,
+    categoryId: string,
+    input: StoreCategoryUpdateInput
+  ): Promise<StoreCategory> {
+    return request<StoreCategory>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories/${encodeURIComponent(categoryId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input)
+      }
+    );
+  },
+
+  async updateStoreCategoryStatus(storeId: string, categoryId: string, status: string): Promise<StoreCategory> {
+    return request<StoreCategory>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories/${encodeURIComponent(categoryId)}/status`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ status })
+      }
+    );
+  },
+
+  async deleteStoreCategory(storeId: string, categoryId: string): Promise<{ status: string }> {
+    return request<{ status: string }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories/${encodeURIComponent(categoryId)}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  async reorderStoreCategories(
+    storeId: string,
+    order: StoreCategoryReorderEntry[]
+  ): Promise<{ status: string }> {
+    return request<{ status: string }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories/reorder`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ order })
+      }
+    );
   },
 
   async createStoreProduct(storeId: string, data: { name: string; slug: string; category_id?: string }): Promise<Product> {

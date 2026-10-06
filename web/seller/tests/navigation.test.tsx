@@ -17,6 +17,7 @@ describe('seller navigation foundation', () => {
       'products',
       'supplier-offers',
       'listings',
+      'categories',
       'inventory',
       'media'
     ]);
