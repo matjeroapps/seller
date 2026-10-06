@@ -11221,6 +11221,12 @@
                   "slug": {
                     "type": "string"
                   },
+                  "store_category_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
                   "translations": {
                     "items": {
                       "properties": {
@@ -11627,6 +11633,41 @@
                     "source": {
                       "type": "string"
                     },
+                    "store_categories": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "name_ar": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "store_category_ids": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "translations": {
                       "items": {
                         "properties": {
@@ -11703,6 +11744,8 @@
                     "purchase_behavior",
                     "skus",
                     "source",
+                    "store_categories",
+                    "store_category_ids",
                     "translations",
                     "variants"
                   ],
@@ -12303,6 +12346,41 @@
                     "source": {
                       "type": "string"
                     },
+                    "store_categories": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "name_ar": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "store_category_ids": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "translations": {
                       "items": {
                         "properties": {
@@ -12379,6 +12457,8 @@
                     "purchase_behavior",
                     "skus",
                     "source",
+                    "store_categories",
+                    "store_category_ids",
                     "translations",
                     "variants"
                   ],
@@ -12971,6 +13051,41 @@
                     "source": {
                       "type": "string"
                     },
+                    "store_categories": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "name_ar": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "store_category_ids": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "translations": {
                       "items": {
                         "properties": {
@@ -13047,6 +13162,8 @@
                     "purchase_behavior",
                     "skus",
                     "source",
+                    "store_categories",
+                    "store_category_ids",
                     "translations",
                     "variants"
                   ],
