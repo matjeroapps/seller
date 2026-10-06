@@ -611,7 +611,8 @@ type StoreMediaAsset struct {
 
 // StoreMediaListResponse is the paginated response for ready store media assets.
 type StoreMediaListResponse struct {
-	Assets []StoreMediaAsset `json:"assets"`
+	Items  []StoreMediaAsset `json:"items"`
+	Assets []StoreMediaAsset `json:"assets,omitempty"`
 	Total  int               `json:"total"`
 	Limit  int               `json:"limit"`
 	Offset int               `json:"offset"`
@@ -637,6 +638,10 @@ func (c *Client) ListStoreMedia(ctx context.Context, subject, storeID, filename,
 	if err := c.get(ctx, path, values, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
+	if len(res.Items) == 0 && len(res.Assets) > 0 {
+		res.Items = res.Assets
+	}
+	res.Assets = nil
 	return &res, nil
 }
 
