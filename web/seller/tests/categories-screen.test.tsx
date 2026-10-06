@@ -66,14 +66,16 @@ const childCategory: StoreCategory = {
   updated_at: '2026-01-02T00:00:00Z'
 };
 
-function renderPage() {
-  return act(async () => {
-    render(
+async function renderPage() {
+  let utils: ReturnType<typeof render>;
+  await act(async () => {
+    utils = render(
       <LocaleProvider>
         <StoreCategoriesPage params={{ store_id: 'store_123' }} />
       </LocaleProvider>
     );
   });
+  return utils!;
 }
 
 describe('store categories screen', () => {
@@ -241,5 +243,27 @@ describe('store categories screen', () => {
         { id: 'cat_a', sort_order: 1 }
       ]);
     });
+  });
+
+  it('resets state and refetches when switching stores (no cache bleed)', async () => {
+    mockApi.listStoreCategories.mockResolvedValue([rootCategory]);
+    const view = await renderPage();
+    expect(await screen.findByRole('tree')).toBeInTheDocument();
+
+    mockApi.listStoreCategories.mockResolvedValue([]);
+    await act(async () => {
+      view.rerender(
+        <LocaleProvider>
+          <StoreCategoriesPage params={{ store_id: 'store_456' }} />
+        </LocaleProvider>
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockApi.listStoreCategories).toHaveBeenCalledWith('store_456');
+    });
+    // The empty state of the new store replaces the previous store's tree.
+    expect(screen.getByText('No categories yet')).toBeInTheDocument();
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument();
   });
 });
