@@ -15,8 +15,10 @@ vi.mock('next/navigation', () => ({
 const { mockApi } = vi.hoisted(() => {
   const mockApi = {
     getStoreProductDetail: vi.fn(),
+    listStoreCategories: vi.fn(),
     listStoreMedia: vi.fn(),
     listProductMediaReferences: vi.fn(),
+    updateStoreProduct: vi.fn(),
     updateProductTranslations: vi.fn(),
     updateProductSlug: vi.fn(),
     updateProductStatus: vi.fn(),
@@ -99,6 +101,10 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApi.getStoreProductDetail.mockResolvedValue(sampleDetail);
+    mockApi.listStoreCategories.mockResolvedValue([
+      { id: 'cat-electronics', slug: 'electronics', status: 'active' },
+      { id: 'cat-accessories', slug: 'accessories', status: 'active' }
+    ]);
     mockApi.listStoreMedia.mockResolvedValue({
       items: [
         {
@@ -224,6 +230,36 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
 
     await waitFor(() => {
       expect(mockApi.detachProductMedia).toHaveBeenCalledWith('store_123', 'prod_456', 'ref_1');
+    });
+  });
+
+  it('renders category options and persists the selected category IDs', async () => {
+    mockApi.updateStoreProduct.mockResolvedValue(sampleDetail);
+
+    await renderPage(
+      <StoreProductDetailPage
+        params={Promise.resolve({ store_id: 'store_123', product_id: 'prod_456' })}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('listbox', { name: 'Category IDs' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'electronics' })).toBeInTheDocument();
+    });
+
+    const categorySelect = screen.getByRole('listbox', { name: 'Category IDs' }) as HTMLSelectElement;
+    Array.from(categorySelect.options).forEach((option) => {
+      option.selected = option.value.startsWith('cat-');
+    });
+    fireEvent.change(categorySelect);
+    fireEvent.click(screen.getByRole('button', { name: /save product details/i }));
+
+    await waitFor(() => {
+      expect(mockApi.updateStoreProduct).toHaveBeenCalledWith(
+        'store_123',
+        'prod_456',
+        expect.objectContaining({ category_ids: ['cat-electronics', 'cat-accessories'] })
+      );
     });
   });
 });

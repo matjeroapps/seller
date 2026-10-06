@@ -27,6 +27,7 @@ import type {
   ProductTranslation,
   ProductVariant,
   SellerProductDetail,
+  SellerCategory,
   StoreMediaAsset
 } from '@/lib/api/types';
 
@@ -40,6 +41,7 @@ type TranslationForm = {
   arMetaTitle: string;
   arMetaDescription: string;
   slug: string;
+  categoryIds: string[];
 };
 
 type VariantEdit = {
@@ -109,7 +111,8 @@ function buildTranslationForm(detail: SellerProductDetail): TranslationForm {
     arDescription: ar.description || '',
     arMetaTitle: ar.meta_title || '',
     arMetaDescription: ar.meta_description || '',
-    slug: detail.product.slug
+    slug: detail.product.slug,
+    categoryIds: detail.category_ids || []
   };
 }
 
@@ -142,6 +145,8 @@ export default function StoreProductDetailPage({
   const [detail, setDetail] = useState<SellerProductDetail | null>(null);
   const [mediaAssets, setMediaAssets] = useState<StoreMediaAsset[]>([]);
   const [references, setReferences] = useState<ProductMediaReference[]>([]);
+  const [categories, setCategories] = useState<SellerCategory[]>([]);
+  const [categoryLoadError, setCategoryLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
@@ -160,7 +165,8 @@ export default function StoreProductDetailPage({
     arDescription: '',
     arMetaTitle: '',
     arMetaDescription: '',
-    slug: ''
+    slug: '',
+    categoryIds: []
   });
   const [variantEdits, setVariantEdits] = useState<Record<string, VariantEdit>>({});
   const [skuEdits, setSkuEdits] = useState<Record<string, SkuEdit>>({});
@@ -187,14 +193,20 @@ export default function StoreProductDetailPage({
 
   const loadDetail = useCallback(async () => {
     setError(null);
-    const [nextDetail, mediaRes, refsRes] = await Promise.all([
+    const [nextDetail, mediaRes, refsRes, categoriesRes] = await Promise.all([
       sellerApi.getStoreProductDetail(store_id, product_id),
       sellerApi.listStoreMedia(store_id).catch(() => ({ items: [] })),
-      sellerApi.listProductMediaReferences(store_id, product_id).catch(() => ({ items: [] }))
+      sellerApi.listProductMediaReferences(store_id, product_id).catch(() => ({ items: [] })),
+      sellerApi.listStoreCategories(store_id).catch((err: any) => {
+        setCategoryLoadError(err.message || 'Failed to load categories');
+        return [];
+      })
     ]);
     setDetail(nextDetail);
     setMediaAssets(mediaRes.items || []);
     setReferences(refsRes.items || []);
+    setCategories(categoriesRes);
+    if (categoriesRes.length > 0) setCategoryLoadError(null);
     resetEditableState(nextDetail);
   }, [product_id, resetEditableState, store_id]);
 
@@ -265,7 +277,7 @@ export default function StoreProductDetailPage({
       const updated = await sellerApi.updateStoreProduct(store_id, product_id, {
         slug: form.slug.trim(),
         translations,
-        category_ids: detail.category_ids || []
+        category_ids: form.categoryIds
       });
       setDetail(updated);
       resetEditableState(updated);
@@ -663,11 +675,39 @@ export default function StoreProductDetailPage({
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-slate-700">Category IDs</span>
-            <input
-              value={(detail.category_ids || []).join(', ') || 'No categories assigned'}
-              readOnly
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-            />
+            <select
+              aria-label="Category IDs"
+              multiple
+              value={form.categoryIds}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  categoryIds: Array.from(event.target.selectedOptions, (option) => option.value)
+                }))
+              }
+              disabled={!canManageProduct || categories.length === 0}
+              size={Math.min(Math.max(categories.length, 2), 5)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
+            >
+              {categories.length === 0 ? (
+                <option value="" disabled>
+                  {categoryLoadError ? 'Categories unavailable' : 'No categories available'}
+                </option>
+              ) : (
+                categories.map((category) => (
+                  <option key={category.id} value={category.id} disabled={category.status !== 'active'}>
+                    {category.slug}
+                    {category.status !== 'active' ? ` (${category.status})` : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="text-[11px] text-slate-500">
+              {categories.length > 0
+                ? 'Select one or more active platform categories.'
+                : 'No categories are available. Ask a platform administrator to create one before assigning this product.'}
+              {' '}Categories are managed by platform administrators.
+            </p>
           </label>
           <label className="space-y-1.5 lg:col-span-2">
             <span className="text-xs font-semibold text-slate-700">Arabic description</span>

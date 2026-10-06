@@ -46,6 +46,12 @@ export interface Product {
   updated_at: string;
 }
 
+export interface SellerCategory {
+  id: string;
+  slug: string;
+  status: string;
+}
+
 export interface ProductTranslation {
   locale: string;
   name: string;

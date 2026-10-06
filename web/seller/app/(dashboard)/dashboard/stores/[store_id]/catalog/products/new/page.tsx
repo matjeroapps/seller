@@ -12,12 +12,13 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!slug) {
+    if (!slugManuallyEdited) {
       setSlug(
         val
           .toLowerCase()
@@ -82,7 +83,10 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
             type="text"
             required
             value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            onChange={(e) => {
+              setSlugManuallyEdited(true);
+              setSlug(e.target.value);
+            }}
             placeholder="e.g. premium-cotton-t-shirt"
             className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
