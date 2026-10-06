@@ -23,22 +23,22 @@ const (
 )
 
 type sellerProduct struct {
-	id            string
-	slug          string
-	status        string
-	createdAt     time.Time
-	updatedAt     time.Time
-	translations  []map[string]any // {product_id, locale, name, description}
+	id               string
+	slug             string
+	status           string
+	createdAt        time.Time
+	updatedAt        time.Time
+	translations     []map[string]any // {product_id, locale, name, description}
 	categoryIDs      []string
 	storeCategoryIDs []string
 	listingID        string
-	listingStatus string
-	priceAmount   int64
-	priceCurrency string
-	hasPrice      bool
-	variants      []*sellerVariant
-	media         []*sellerMediaRecord
-	presentation  *sellerPresentation
+	listingStatus    string
+	priceAmount      int64
+	priceCurrency    string
+	hasPrice         bool
+	variants         []*sellerVariant
+	media            []*sellerMediaRecord
+	presentation     *sellerPresentation
 }
 
 type sellerVariant struct {
@@ -753,21 +753,21 @@ func (s *fakeCoreServer) productDetailLocked(p *sellerProduct) map[string]any {
 	presentation := s.presentationShape(p)
 
 	return map[string]any{
-		"product":           s.productShape(p),
-		"source":            "seller_owned",
-		"translations":      translations,
-		"category_ids":      p.categoryIDs,
+		"product":            s.productShape(p),
+		"source":             "seller_owned",
+		"translations":       translations,
+		"category_ids":       p.categoryIDs,
 		"store_category_ids": p.storeCategoryIDs,
-		"store_categories":  s.storeCategoryRefsLocked(p),
-		"variants":          variants,
-		"skus":              skus,
-		"media":             media,
-		"listing":           s.listingFor(p),
-		"current_price":     s.priceShape(p),
-		"inventory_summary": s.inventorySummaryFor(p),
-		"presentation":      presentation,
-		"purchase_behavior": presentation["purchase_behavior"],
-		"publish_readiness": s.publishReadiness(p),
+		"store_categories":   s.storeCategoryRefsLocked(p),
+		"variants":           variants,
+		"skus":               skus,
+		"media":              media,
+		"listing":            s.listingFor(p),
+		"current_price":      s.priceShape(p),
+		"inventory_summary":  s.inventorySummaryFor(p),
+		"presentation":       presentation,
+		"purchase_behavior":  presentation["purchase_behavior"],
+		"publish_readiness":  s.publishReadiness(p),
 	}
 }
 

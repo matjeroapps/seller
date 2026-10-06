@@ -48,7 +48,8 @@ test.describe('Seller Catalog Operations E2E', () => {
   test('Seller can view store media library and presigned upload UI', async ({ page }) => {
     await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/media`);
     await expect(page.getByRole('heading', { name: 'Store Media Library' })).toBeVisible();
-    await expect(page.getByText(/Upload Media/)).toBeVisible();
+    // Exact match: the empty-state message also mentions "Upload Media".
+    await expect(page.getByText('Upload Media', { exact: true })).toBeVisible();
   });
 
   test('Seller can view inventory snapshots and stock adjustment interface', async ({ page }) => {

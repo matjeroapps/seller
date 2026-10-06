@@ -19,25 +19,25 @@ import (
 )
 
 type storeData struct {
-	code             string
-	name             string
-	domain           string
-	market           string
-	currencyCode     string
-	currencySymbol   string
-	currencyMinor    int
-	timezone         string
-	defaultLocale    string
-	supportedLocales []string
-	settings         map[string]any
-	theme            map[string]any
-	draftTheme       map[string]any
-	previewToken     string
-	revision         int64
-	categories       []map[string]any
-	storeCategories  []map[string]any
+	code              string
+	name              string
+	domain            string
+	market            string
+	currencyCode      string
+	currencySymbol    string
+	currencyMinor     int
+	timezone          string
+	defaultLocale     string
+	supportedLocales  []string
+	settings          map[string]any
+	theme             map[string]any
+	draftTheme        map[string]any
+	previewToken      string
+	revision          int64
+	categories        []map[string]any
+	storeCategories   []map[string]any
 	storeCategoryRefs []map[string]any
-	products         []map[string]any
+	products          []map[string]any
 }
 
 type fakeCoreServer struct {
@@ -55,14 +55,14 @@ type fakeCoreServer struct {
 	sellerSubject string
 
 	// P5.8 in-memory seller catalog state. Guarded by mu.
-	sellerProducts   []*sellerProduct
-	sellerLocations  []*sellerLocation
-	sellerInventory  []*sellerInventorySnapshot
-	mediaIntents     map[string]*mediaIntent
-	sellerCategories []map[string]any
-	storeCategories  []map[string]any
+	sellerProducts    []*sellerProduct
+	sellerLocations   []*sellerLocation
+	sellerInventory   []*sellerInventorySnapshot
+	mediaIntents      map[string]*mediaIntent
+	sellerCategories  []map[string]any
+	storeCategories   []map[string]any
 	storeCategoryRefs []map[string]any
-	idSeq            atomic.Uint64
+	idSeq             atomic.Uint64
 	// revisionWatermark guarantees each reset hands out a strictly higher
 	// revision than any earlier test run, so stale storefront cache entries
 	// (keyed by revision) can never be served after a reset.

@@ -1084,4 +1084,3 @@ func (deps Dependencies) handleTransitionStoreOrder(w http.ResponseWriter, r *ht
 	}
 	httpx.WriteJSON(w, http.StatusOK, detail)
 }
-
