@@ -1,9 +1,13 @@
 import type {
   ApiKey,
+  CreateProductVariantPayload,
   CreateShipmentPayload,
+  CreateStoreShipmentPayload,
   ExternalEntityMapping,
   InitializePaymentPayload,
   IntegrationConnection,
+  InventoryAdjustmentPayload,
+  InventoryAdjustmentResponse,
   InventorySnapshot,
   LedgerEntry,
   MediaPresignResponse,
@@ -27,6 +31,8 @@ import type {
   Shipment,
   Store,
   StoreBalance,
+  StoreShipmentsResponse,
+  StoreLocation,
   StoreMediaAsset,
   StoreOperationalState,
   StructuredPublishReadiness,
@@ -242,10 +248,17 @@ export const sellerApi = {
     return request<{ items: SupplierCatalogItem[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/supplier-offers${q}`);
   },
 
-  async importSupplierOffer(storeId: string, offerId: string): Promise<SellerListing> {
+  async importSupplierOffer(
+    storeId: string,
+    offerId: string,
+    params?: import('./types').SupplierOfferImportParams
+  ): Promise<SellerListing> {
     return request<SellerListing>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/supplier-offers/${encodeURIComponent(offerId)}/imports`,
-      { method: 'POST' }
+      {
+        method: 'POST',
+        ...(params ? { body: JSON.stringify(params) } : {})
+      }
     );
   },
 
@@ -329,7 +342,7 @@ export const sellerApi = {
   async createProductVariant(
     storeId: string,
     productId: string,
-    data: { code: string; status: string }
+    data: CreateProductVariantPayload | { code: string; status: string }
   ): Promise<ProductVariant> {
     return request<ProductVariant>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants`,
@@ -414,14 +427,32 @@ export const sellerApi = {
   },
 
   /** Sets the retail price. `amount_minor` is in minor units (e.g. halalas). */
-  async updateListingPrice(storeId: string, listingId: string, price: { currency: string; amount_minor: number }): Promise<{ status: string }> {
+  async updateListingPrice(
+    storeId: string,
+    listingId: string,
+    price: import('./types').ListingPriceUpdateRequest
+  ): Promise<{ status: string }> {
     return request<{ status: string }>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/listings/${encodeURIComponent(listingId)}/price`,
       {
         method: 'PUT',
-        body: JSON.stringify({ amount_minor: price.amount_minor, currency: price.currency })
+        body: JSON.stringify({
+          amount_minor: price.retail_price_minor_units ?? price.amount_minor,
+          currency: price.currency,
+          retail_price_minor_units: price.retail_price_minor_units,
+          allow_sub_wholesale: price.allow_sub_wholesale,
+          audit_reason: price.audit_reason
+        })
       }
     );
+  },
+
+  async setStoreListingPrice(
+    storeId: string,
+    listingId: string,
+    price: import('./types').ListingPriceUpdateRequest
+  ): Promise<{ status: string }> {
+    return this.updateListingPrice(storeId, listingId, price);
   },
 
   async getListingReadiness(storeId: string, listingId: string): Promise<StructuredPublishReadiness> {
@@ -531,7 +562,23 @@ export const sellerApi = {
     );
   },
 
-  // Inventory
+  // Inventory & Locations
+  async listStoreLocations(storeId: string): Promise<{ items: StoreLocation[] }> {
+    const payload = await request<{ locations?: StoreLocation[]; items?: StoreLocation[] } | StoreLocation[] | null>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/locations`
+    );
+    if (Array.isArray(payload)) {
+      return { items: payload };
+    }
+    return {
+      items: Array.isArray(payload?.locations)
+        ? payload.locations
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : []
+    };
+  },
+
   async listStoreInventory(storeId: string): Promise<{ items: InventorySnapshot[] }> {
     const payload = await request<
       | { items?: InventorySnapshot[] | null; inventory?: InventorySnapshot[] | null }
@@ -554,11 +601,17 @@ export const sellerApi = {
 
   async adjustInventory(
     storeId: string,
-    data: { fulfillment_location_id: string; sku_id: string; qty_delta: number; idempotency_key?: string }
-  ): Promise<InventorySnapshot> {
-    return request<InventorySnapshot>(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory/adjustments`, {
+    data: InventoryAdjustmentPayload
+  ): Promise<InventoryAdjustmentResponse> {
+    const { idempotency_key, ...body } = data;
+    const headers: Record<string, string> = {};
+    if (idempotency_key) {
+      headers['Idempotency-Key'] = idempotency_key;
+    }
+    return request<InventoryAdjustmentResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/inventory/adjustments`, {
       method: 'POST',
-      body: JSON.stringify(data)
+      headers,
+      body: JSON.stringify(body)
     });
   },
 
@@ -583,6 +636,30 @@ export const sellerApi = {
 
   async transitionStoreOrder(storeId: string, orderId: string, data: OrderTransitionPayload): Promise<SellerOrderDetail> {
     return request<SellerOrderDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/orders/${encodeURIComponent(orderId)}/transition`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async listStoreShipments(
+    storeId: string,
+    params?: { status?: string; page?: number; limit?: number; page_size?: number }
+  ): Promise<StoreShipmentsResponse> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.page_size || params?.limit) query.set('limit', String(params?.page_size || params?.limit));
+    const qs = query.toString();
+    return request<StoreShipmentsResponse>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/shipments${qs ? `?${qs}` : ''}`
+    );
+  },
+
+  async createStoreShipment(
+    storeId: string,
+    data: CreateStoreShipmentPayload
+  ): Promise<Shipment> {
+    return request<Shipment>(`/v1/seller/stores/${encodeURIComponent(storeId)}/shipments`, {
       method: 'POST',
       body: JSON.stringify(data)
     });

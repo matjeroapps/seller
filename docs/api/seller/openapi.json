@@ -2317,12 +2317,23 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "allow_sub_wholesale": {
+                    "type": "boolean"
+                  },
                   "amount_minor": {
                     "format": "int64",
                     "type": "integer"
                   },
+                  "audit_reason": {
+                    "type": "string"
+                  },
                   "currency": {
                     "type": "string"
+                  },
+                  "retail_price_minor_units": {
+                    "format": "int64",
+                    "nullable": true,
+                    "type": "integer"
                   }
                 },
                 "required": [
@@ -9870,8 +9881,23 @@
                             "format": "date-time",
                             "type": "string"
                           },
+                          "height_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
                           "id": {
                             "type": "string"
+                          },
+                          "length_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "price_minor_units": {
+                            "format": "int64",
+                            "nullable": true,
+                            "type": "integer"
                           },
                           "status": {
                             "type": "string"
@@ -9882,6 +9908,16 @@
                           },
                           "variant_id": {
                             "type": "string"
+                          },
+                          "weight_grams": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "width_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -10515,8 +10551,23 @@
                             "format": "date-time",
                             "type": "string"
                           },
+                          "height_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
                           "id": {
                             "type": "string"
+                          },
+                          "length_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "price_minor_units": {
+                            "format": "int64",
+                            "nullable": true,
+                            "type": "integer"
                           },
                           "status": {
                             "type": "string"
@@ -10527,6 +10578,16 @@
                           },
                           "variant_id": {
                             "type": "string"
+                          },
+                          "weight_grams": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "width_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -11146,8 +11207,23 @@
                             "format": "date-time",
                             "type": "string"
                           },
+                          "height_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
                           "id": {
                             "type": "string"
+                          },
+                          "length_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "price_minor_units": {
+                            "format": "int64",
+                            "nullable": true,
+                            "type": "integer"
                           },
                           "status": {
                             "type": "string"
@@ -11158,6 +11234,16 @@
                           },
                           "variant_id": {
                             "type": "string"
+                          },
+                          "weight_grams": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "width_mm": {
+                            "format": "int32",
+                            "nullable": true,
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -13663,8 +13749,23 @@
                       "format": "date-time",
                       "type": "string"
                     },
+                    "height_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "id": {
                       "type": "string"
+                    },
+                    "length_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "price_minor_units": {
+                      "format": "int64",
+                      "nullable": true,
+                      "type": "integer"
                     },
                     "status": {
                       "type": "string"
@@ -13675,6 +13776,16 @@
                     },
                     "variant_id": {
                       "type": "string"
+                    },
+                    "weight_grams": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "width_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -13975,8 +14086,23 @@
                       "format": "date-time",
                       "type": "string"
                     },
+                    "height_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "id": {
                       "type": "string"
+                    },
+                    "length_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "price_minor_units": {
+                      "format": "int64",
+                      "nullable": true,
+                      "type": "integer"
                     },
                     "status": {
                       "type": "string"
@@ -13987,6 +14113,16 @@
                     },
                     "variant_id": {
                       "type": "string"
+                    },
+                    "weight_grams": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "width_mm": {
+                      "format": "int32",
+                      "nullable": true,
+                      "type": "integer"
                     }
                   },
                   "required": [

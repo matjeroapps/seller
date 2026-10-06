@@ -38,8 +38,11 @@ type SellerListingImportRequest struct {
 }
 
 type SellerListingPriceRequest struct {
-	AmountMinor int64  `json:"amount_minor"`
-	Currency    string `json:"currency"`
+	AmountMinor           int64  `json:"amount_minor"`
+	Currency              string `json:"currency"`
+	RetailPriceMinorUnits *int64 `json:"retail_price_minor_units,omitempty"`
+	AllowSubWholesale     bool   `json:"allow_sub_wholesale,omitempty"`
+	AuditReason           string `json:"audit_reason,omitempty"`
 }
 
 type StorefrontHostResponse struct {

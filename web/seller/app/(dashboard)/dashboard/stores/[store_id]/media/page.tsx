@@ -25,6 +25,8 @@ export default function StoreMediaLibraryPage({
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState<string>('');
 
   const loadMedia = () => {
     setLoading(true);
@@ -119,7 +121,22 @@ export default function StoreMediaLibraryPage({
       setDeletingAssetId(null);
       loadMedia();
     } catch (err: any) {
-      setActionError(err.message || 'Failed to delete media asset');
+      const isConflict =
+        err?.status === 409 ||
+        err?.code === 'media_in_use' ||
+        err?.code === 'conflict' ||
+        err?.message?.toLowerCase().includes('in use') ||
+        err?.message?.toLowerCase().includes('referenced');
+      if (isConflict) {
+        setConflictMessage(
+          err.message ||
+            'This media asset cannot be deleted because it is currently referenced by one or more products or variants. Please detach or replace the media reference before deleting.'
+        );
+        setDeletingAssetId(null);
+        setConflictModalOpen(true);
+      } else {
+        setActionError(err.message || 'Failed to delete media asset');
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -219,6 +236,20 @@ export default function StoreMediaLibraryPage({
         loading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeletingAssetId(null)}
+      />
+
+      <ConfirmModal
+        isOpen={conflictModalOpen}
+        title="Asset In Use"
+        description={
+          conflictMessage ||
+          'This media asset cannot be deleted because it is currently referenced by one or more products or variants. Please detach or replace the media reference before deleting.'
+        }
+        confirmLabel="Understood"
+        cancelLabel="Close"
+        variant="warning"
+        onConfirm={() => setConflictModalOpen(false)}
+        onCancel={() => setConflictModalOpen(false)}
       />
     </div>
   );

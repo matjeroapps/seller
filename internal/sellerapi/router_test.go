@@ -126,7 +126,7 @@ func (s *stubCore) ListStoreSupplierOffers(ctx context.Context, storeID, subject
 	return s.catalog, s.err
 }
 
-func (s *stubCore) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*coreclient.SellerListing, error) {
+func (s *stubCore) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string, params ...coreclient.SupplierOfferImportParams) (*coreclient.SellerListing, error) {
 	s.storeID, s.subject = storeID, subject
 	return &s.listing, s.err
 }
@@ -257,6 +257,9 @@ func (s *stubCore) ArchiveProduct(ctx context.Context, subject, storeID, product
 func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }
+func (s *stubCore) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error) {
+	return &coreclient.VariantWithDetails{}, s.err
+}
 func (s *stubCore) UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }
@@ -317,6 +320,9 @@ func (s *stubCore) CreateInventorySnapshot(ctx context.Context, subject, storeID
 func (s *stubCore) AdjustInventory(ctx context.Context, subject, storeID, snapshotID string, req coreclient.AdjustInventoryRequest) (*coreclient.InventorySnapshot, error) {
 	return &coreclient.InventorySnapshot{}, s.err
 }
+func (s *stubCore) AdjustStoreInventoryDualMode(ctx context.Context, subject, storeID string, req coreclient.DualModeAdjustmentRequest, idempotencyKey string) (*coreclient.DualModeAdjustmentResponse, error) {
+	return &coreclient.DualModeAdjustmentResponse{}, s.err
+}
 func (s *stubCore) GetListingPresentation(ctx context.Context, subject, storeID, listingID string) (*coreclient.SellerListingPresentation, error) {
 	return &coreclient.SellerListingPresentation{}, s.err
 }
@@ -356,6 +362,17 @@ func (s *stubCore) UpdateShipmentStatus(ctx context.Context, subject, shipmentID
 func (s *stubCore) ListOrderShipments(ctx context.Context, subject, orderID string) ([]coreclient.ShipmentResponse, error) {
 	s.subject = subject
 	return []coreclient.ShipmentResponse{{ID: "shp_test_1", OrderID: orderID, Status: "PENDING"}}, s.err
+}
+func (s *stubCore) ListStoreShipments(ctx context.Context, subject, storeID string, status string, page, pageSize int) (*coreclient.StoreShipmentsResponse, error) {
+	s.subject = subject
+	return &coreclient.StoreShipmentsResponse{
+		Items: []coreclient.ShipmentResponse{
+			{ID: "shp_test_1", OrderID: "ord-1", Status: "PENDING"},
+		},
+		TotalCount: 1,
+		Page:       page,
+		PageSize:   pageSize,
+	}, s.err
 }
 
 func (s *stubCore) InitializeOrderPayment(ctx context.Context, subject, orderID string, req coreclient.InitializePaymentRequest) (*coreclient.PaymentResponse, error) {

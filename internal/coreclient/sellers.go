@@ -316,11 +316,23 @@ func (c *Client) ListStoreSupplierOffers(ctx context.Context, storeID, subject s
 	return payload.Items, err
 }
 
-// ImportSupplierOffer idempotently creates a seller listing from a supplier offer.
-func (c *Client) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*SellerListing, error) {
+// SupplierOfferImportParams carries optional pricing parameters for supplier offer import.
+type SupplierOfferImportParams struct {
+	MarkupPercentage          *float64 `json:"markup_percentage,omitempty"`
+	RetailPriceMinorUnits     *int64   `json:"retail_price_minor_units,omitempty"`
+	ShippingSubsidyMinorUnits *int64   `json:"shipping_subsidy_minor_units,omitempty"`
+	ShippingSubsidyPolicy     string   `json:"shipping_subsidy_policy,omitempty"`
+}
+
+// ImportSupplierOffer creates a seller listing from a supplier offer with optional pricing parameters.
+func (c *Client) ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string, params ...SupplierOfferImportParams) (*SellerListing, error) {
 	var payload SellerListing
 	path := "/internal/v1/stores/" + url.PathEscape(storeID) + "/supplier-offers/" + url.PathEscape(offerID) + "/imports"
-	err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &payload)
+	var body any
+	if len(params) > 0 {
+		body = params[0]
+	}
+	err := c.post(ctx, path, body, requestOptions{Subject: subject}, &payload)
 	if err != nil {
 		return nil, err
 	}
@@ -389,10 +401,13 @@ func (c *Client) ImportListing(ctx context.Context, storeID, subject string, imp
 	return payload, err
 }
 
-// PriceUpdate sets a listing price in minor units.
+// PriceUpdate sets a listing price in minor units with optional margin guardrail parameters.
 type PriceUpdate struct {
-	AmountMinor int64  `json:"amount_minor"`
-	Currency    string `json:"currency"`
+	AmountMinor           int64  `json:"amount_minor"`
+	Currency              string `json:"currency"`
+	RetailPriceMinorUnits *int64 `json:"retail_price_minor_units,omitempty"`
+	AllowSubWholesale     bool   `json:"allow_sub_wholesale,omitempty"`
+	AuditReason           string `json:"audit_reason,omitempty"`
 }
 
 // SetListingPrice sets a seller listing price.

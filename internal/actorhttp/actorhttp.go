@@ -165,6 +165,12 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 			msg = coreErr.Message
 		}
 		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodePublishNotReady, msg)
+	case coreclient.CodeUnsafeMargin:
+		msg := "retail price cannot be lower than wholesale cost"
+		if coreErr.Message != "" {
+			msg = coreErr.Message
+		}
+		httpx.WriteError(w, http.StatusUnprocessableEntity, coreclient.CodeUnsafeMargin, msg)
 	case coreclient.CodeUnauthorized:
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 	case coreclient.CodeForbidden:

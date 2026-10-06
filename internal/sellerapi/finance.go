@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"seller/internal/actorhttp"
 	"seller/internal/httpx"
 )
 
@@ -42,7 +43,7 @@ func (deps Dependencies) handleListStoreLedgerEntries(w http.ResponseWriter, r *
 
 	entries, err := deps.Core.ListStoreLedgerEntries(r.Context(), subject, storeID)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		actorhttp.WriteCoreError(w, err)
 		return
 	}
 
@@ -61,7 +62,7 @@ func (deps Dependencies) handleListStoreSettlements(w http.ResponseWriter, r *ht
 
 	settlements, err := deps.Core.ListStoreSettlements(r.Context(), subject, storeID)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		actorhttp.WriteCoreError(w, err)
 		return
 	}
 
@@ -80,7 +81,7 @@ func (deps Dependencies) handleListStorePayouts(w http.ResponseWriter, r *http.R
 
 	payouts, err := deps.Core.ListStorePayouts(r.Context(), subject, storeID)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		actorhttp.WriteCoreError(w, err)
 		return
 	}
 

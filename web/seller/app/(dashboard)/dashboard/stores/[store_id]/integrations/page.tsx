@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+import Link from 'next/link';
 import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers, Key, Webhook, Copy, Trash2, ShieldCheck } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
@@ -19,7 +20,7 @@ export default function StoreIntegrationsPage({
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookSubscription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'CONNECTIONS' | 'API_KEYS' | 'WEBHOOKS' | 'MAPPINGS' | 'SYNC_JOBS'>('CONNECTIONS');
+  const [activeTab, setActiveTab] = useState<'API_KEYS' | 'WEBHOOKS' | 'CONNECTIONS' | 'MAPPINGS' | 'SYNC_JOBS'>('API_KEYS');
   
   // Connection state
   const [selectedConnection, setSelectedConnection] = useState<string>('');
@@ -286,9 +287,30 @@ export default function StoreIntegrationsPage({
         </div>
       </div>
 
+      {/* Merchant Hub Navigation Banner */}
+      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-start gap-2.5">
+          <Layers className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-indigo-900 block">
+              Multi-Channel Supply & Retail Integrations Managed in Merchant Hub
+            </span>
+            <span className="text-indigo-700">
+              This store console is dedicated to direct Store API Keys and Webhook subscriptions. Channel connections (Salla, Shopify, WooCommerce) and catalog sync jobs are configured centrally in Merchant Workspace.
+            </span>
+          </div>
+        </div>
+        <Link
+          href="/dashboard"
+          className="px-3.5 py-1.5 bg-white text-indigo-700 font-semibold border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors shrink-0 text-center shadow-sm"
+        >
+          Open Merchant Hub
+        </Link>
+      </div>
+
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        {(['CONNECTIONS', 'API_KEYS', 'WEBHOOKS', 'MAPPINGS', 'SYNC_JOBS'] as const).map((tab) => (
+        {(['API_KEYS', 'WEBHOOKS', 'CONNECTIONS', 'MAPPINGS', 'SYNC_JOBS'] as const).map((tab) => (
           <button
             key={tab}
             type="button"

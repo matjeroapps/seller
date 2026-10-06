@@ -1,0 +1,88 @@
+{
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "create": "إنشاء",
+    "refresh": "تحديث",
+    "search": "بحث",
+    "filter": "تصفية",
+    "loading": "جار التحميل...",
+    "actions": "إجراءات",
+    "status": "الحالة",
+    "currency": "العملة",
+    "total": "المجموع",
+    "back": "رجوع",
+    "view": "عرض",
+    "all": "الكل",
+    "active": "نشط",
+    "draft": "مسودة",
+    "archived": "مؤرشف"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "catalog": "الكتالوج",
+    "products": "المنتجات",
+    "listings": "العروض المعروضة",
+    "supplierOffers": "عروض الموردين",
+    "media": "مكتبة الوسائط",
+    "inventory": "المخزون",
+    "orders": "الطلبات",
+    "shipments": "الشحنات",
+    "storefront": "واجهة المتجر",
+    "theme": "مسودة القالب",
+    "settings": "الإعدادات",
+    "integrations": "التكاملات",
+    "team": "فريق العمل",
+    "account": "الحساب",
+    "switchWorkspace": "تبديل مساحة العمل",
+    "signOut": "تسجيل الخروج"
+  },
+  "header": {
+    "searchCatalog": "البحث في الكتالوج",
+    "switchToArabic": "العربية",
+    "switchToEnglish": "English",
+    "toggleTheme": "تبديل المظهر",
+    "helpAndSettings": "المساعدة والإعدادات"
+  },
+  "inventory": {
+    "title": "إدارة مخزون المتجر",
+    "subtitle": "مراقبة مستويات المخزون، وضع حدود تنبيه المخزون المنخفض، وتسجيل تعديلات المخزون القابلة للتدقيق",
+    "onHand": "المخزون الفعلي",
+    "reserved": "المحجوز",
+    "available": "المتاح",
+    "adjustStock": "تعديل المخزون",
+    "reason": "سبب التعديل",
+    "delta": "كمية التعديل",
+    "idempotencyKey": "مفتاح عدم التكرار",
+    "auditNote": "ملاحظة التدقيق"
+  },
+  "catalog": {
+    "productsTitle": "المنتجات",
+    "listingsTitle": "عروض المتجر",
+    "supplierOffersTitle": "كتالوج عروض الموردين",
+    "variantsTitle": "الخيارات ووحدات حفظ المخزون",
+    "wholesaleCost": "سعر الجملة",
+    "retailPrice": "سعر التجزئة",
+    "markupPercent": "نسبة الهامش %",
+    "unsafeMarginWarning": "تحذير: هامش ربح غير آمن",
+    "ownerOverride": "تجاوز الهامش بتفويض مالك المتجر",
+    "auditReason": "سبب التدقيق"
+  },
+  "shipping": {
+    "title": "قائمة شحنات المتجر",
+    "subtitle": "مراقبة وإرسال شحنات الطرود عبر جميع طلبات المتجر",
+    "createShipment": "إنشاء شحنة",
+    "trackingCode": "رمز التتبع",
+    "carrier": "شركة الشحن",
+    "orderId": "رقم الطلب",
+    "autoTrackingNotice": "اتركه فارغاً لإنشاء رمز تتبع داخلي تلقائياً (TRK-...)"
+  },
+  "errors": {
+    "generic": "حدث خطأ غير متوقع. يرجى إعادة المحاولة.",
+    "retry": "إعادة المحاولة",
+    "notFound": "الصفحة أو المورد غير موجود.",
+    "unauthorized": "غير مصرح لك بالوصول. يرجى تسجيل الدخول مجدداً."
+  }
+}

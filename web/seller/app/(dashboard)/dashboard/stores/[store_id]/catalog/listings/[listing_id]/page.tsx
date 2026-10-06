@@ -32,6 +32,8 @@ export default function StoreListingDetailPage({
   const [markupPercent, setMarkupPercent] = useState<string>('20');
   const [shippingSubsidy, setShippingSubsidy] = useState<'buyer_paid' | 'seller_free'>('buyer_paid');
   const [estimatedShipping, setEstimatedShipping] = useState<string>('15');
+  const [allowSubWholesale, setAllowSubWholesale] = useState(false);
+  const [auditReason, setAuditReason] = useState('');
   const [updatingPrice, setUpdatingPrice] = useState(false);
 
   const loadData = () => {
@@ -84,16 +86,24 @@ export default function StoreListingDetailPage({
     e.preventDefault();
     const amount = parseFloat(priceAmount);
     if (isNaN(amount) || amount <= 0) return;
-    if (priceIsUnsafe) {
+    if (wholesaleVal !== null && amount < wholesaleVal && (!allowSubWholesale || !auditReason.trim())) {
+      setActionError('Sub-wholesale retail price requires store owner authorization and an audit reason.');
+      return;
+    }
+    if (priceIsUnsafe && !allowSubWholesale) {
       setActionError('Free shipping is not covered by this margin. Raise the price or switch to buyer-paid shipping.');
       return;
     }
     setUpdatingPrice(true);
     setActionError(null);
     try {
+      const amountMinor = majorToMinor(amount, priceCurrency);
       await sellerApi.updateListingPrice(store_id, listing_id, {
         currency: priceCurrency,
-        amount_minor: majorToMinor(amount, priceCurrency)
+        amount_minor: amountMinor,
+        retail_price_minor_units: amountMinor,
+        allow_sub_wholesale: allowSubWholesale,
+        audit_reason: auditReason.trim()
       });
       loadData();
     } catch (err: any) {
@@ -440,6 +450,45 @@ export default function StoreListingDetailPage({
                   </div>
                 )}
               </div>
+
+              {/* Store Owner Margin Override (rendered when retail < wholesale) */}
+              {wholesaleVal !== null && currentRetailVal < wholesaleVal && (
+                <div className="p-4 bg-amber-50 border border-amber-300 rounded-md space-y-3 text-xs" data-testid="sub-wholesale-override-panel">
+                  <div className="flex items-center gap-2 font-bold text-amber-900">
+                    <ShieldAlert className="w-4 h-4 text-amber-700" />
+                    Store Owner Sub-Wholesale Margin Override
+                  </div>
+                  <p className="text-amber-800">
+                    Retail price is below wholesale cost ({wholesaleVal.toFixed(2)} {priceCurrency}). To save this price, you must be a store owner and provide an audit justification.
+                  </p>
+                  <label className="flex items-center gap-2 font-medium text-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allowSubWholesale}
+                      onChange={(e) => setAllowSubWholesale(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      data-testid="allow-sub-wholesale-checkbox"
+                    />
+                    I confirm store owner authorization to sell below wholesale cost
+                  </label>
+                  {allowSubWholesale && (
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Audit Reason <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Clearance liquidation, promotional loss leader"
+                        value={auditReason}
+                        onChange={(e) => setAuditReason(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        data-testid="audit-reason-input"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end pt-2">
                 <button

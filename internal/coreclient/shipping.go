@@ -14,6 +14,7 @@ type CreateShipmentItemRequest struct {
 
 type CreateShipmentRequest struct {
 	FulfillmentLocationID string                      `json:"fulfillment_location_id"`
+	CarrierName           string                      `json:"carrier_name,omitempty"`
 	TrackingNumber        string                      `json:"tracking_number,omitempty"`
 	ShippingCostMinor     int64                       `json:"shipping_cost_minor"`
 	CodAmountMinor        int64                       `json:"cod_amount_minor"`
@@ -48,6 +49,7 @@ type ShipmentResponse struct {
 	OrderID               string                  `json:"order_id"`
 	FulfillmentLocationID string                  `json:"fulfillment_location_id"`
 	Status                string                  `json:"status"`
+	CarrierName           string                  `json:"carrier_name,omitempty"`
 	TrackingNumber        string                  `json:"tracking_number,omitempty"`
 	ShippingCostMinor     int64                   `json:"shipping_cost_minor"`
 	CodAmountMinor        int64                   `json:"cod_amount_minor"`
@@ -60,6 +62,13 @@ type ShipmentResponse struct {
 
 type OrderShipmentsResponse struct {
 	Shipments []ShipmentResponse `json:"shipments"`
+}
+
+type StoreShipmentsResponse struct {
+	Items      []ShipmentResponse `json:"items"`
+	TotalCount int                `json:"total_count"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"page_size"`
 }
 
 func (c *Client) CreateOrderShipment(ctx context.Context, subject, orderID string, req CreateShipmentRequest) (*ShipmentResponse, error) {
@@ -96,4 +105,24 @@ func (c *Client) ListOrderShipments(ctx context.Context, subject, orderID string
 		return nil, err
 	}
 	return res.Shipments, nil
+}
+
+func (c *Client) ListStoreShipments(ctx context.Context, subject, storeID string, status string, page, pageSize int) (*StoreShipmentsResponse, error) {
+	q := url.Values{}
+	if status != "" {
+		q.Set("status", status)
+	}
+	if page > 0 {
+		q.Set("page", fmt.Sprintf("%d", page))
+	}
+	if pageSize > 0 {
+		q.Set("limit", fmt.Sprintf("%d", pageSize))
+		q.Set("page_size", fmt.Sprintf("%d", pageSize))
+	}
+	path := fmt.Sprintf("/internal/v1/stores/%s/shipments", url.PathEscape(storeID))
+	var res StoreShipmentsResponse
+	if err := c.get(ctx, path, q, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }

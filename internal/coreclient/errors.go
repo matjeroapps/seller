@@ -38,6 +38,7 @@ const (
 	CodePublishNotReady          = "publish_not_ready"
 	CodeOfferUnavailable         = "offer_unavailable"
 	CodeResourceInUse            = "resource_in_use"
+	CodeUnsafeMargin             = "unsafe_margin"
 	CodeUnavailable              = "unavailable"
 	CodeInternalError            = "internal_error"
 )

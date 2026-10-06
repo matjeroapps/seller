@@ -92,19 +92,19 @@ describe('Live & Operations Screens Verification (T020)', () => {
   });
 
   it('renders ShipmentsOverviewScreen with status filters', async () => {
-    vi.spyOn(sellerClient, 'listStoreOrders').mockResolvedValueOnce({
-      orders: [],
-      total: 0,
-      limit: 25,
-      offset: 0,
+    vi.spyOn(sellerClient, 'listStoreShipments').mockResolvedValueOnce({
+      items: [],
+      total_count: 0,
+      page: 1,
+      page_size: 50,
     });
 
     render(<ShipmentsOverviewScreen storeId="str_a1_1001" />);
 
-    expect(await screen.findByText('Store Shipments Overview')).toBeInTheDocument();
+    expect(await screen.findByText('Store Shipments Queue')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ALL' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'PENDING' })).toBeInTheDocument();
-    expect(screen.getByText('No shipment-ready orders found')).toBeInTheDocument();
+    expect(screen.getByText('No shipments found in this status')).toBeInTheDocument();
   });
 
   it('renders OrderDocumentsScreen with printable markup', async () => {

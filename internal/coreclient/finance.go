@@ -99,7 +99,7 @@ func (c *Client) ListStorePayouts(ctx context.Context, subject, storeID string) 
 	path := fmt.Sprintf("/internal/v1/stores/%s/finance/payouts", url.PathEscape(storeID))
 	var res CoreCollectionResponse[PayoutResponse]
 	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
-		return []PayoutResponse{}, nil
+		return nil, err
 	}
 	return res.Items, nil
 }
