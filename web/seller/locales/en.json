@@ -125,6 +125,11 @@
     "saved": "Category saved.",
     "deleted": "Category deleted.",
     "reordered": "Order saved.",
-    "parentSelfError": "A category cannot be nested under itself."
+    "parentSelfError": "A category cannot be nested under itself.",
+    "pickerLabel": "Categories",
+    "pickerHint": "Select one or more active categories. Inactive and archived ones are kept if already assigned.",
+    "pickerEmptyTitle": "No store categories yet",
+    "pickerEmptyBody": "Create categories first, then assign them to this product.",
+    "pickerEmptyLink": "Manage categories"
   }
 }

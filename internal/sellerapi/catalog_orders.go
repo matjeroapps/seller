@@ -594,9 +594,10 @@ func (deps Dependencies) handleGetStoreProductDetail(w http.ResponseWriter, r *h
 }
 
 type updateProductRequest struct {
-	Slug         string                                `json:"slug"`
-	Translations []coreclient.SellerProductTranslation `json:"translations"`
-	CategoryIDs  []string                              `json:"category_ids"`
+	Slug             string                                `json:"slug"`
+	Translations     []coreclient.SellerProductTranslation `json:"translations"`
+	CategoryIDs      []string                              `json:"category_ids"`
+	StoreCategoryIDs []string                              `json:"store_category_ids"`
 }
 
 func (deps Dependencies) handleUpdateStoreProduct(w http.ResponseWriter, r *http.Request) {
@@ -612,7 +613,7 @@ func (deps Dependencies) handleUpdateStoreProduct(w http.ResponseWriter, r *http
 		return
 	}
 
-	detail, err := deps.Core.UpdateSellerProduct(r.Context(), subject, storeID, productID, body.Slug, body.Translations, body.CategoryIDs)
+	detail, err := deps.Core.UpdateSellerProduct(r.Context(), subject, storeID, productID, body.Slug, body.Translations, body.CategoryIDs, body.StoreCategoryIDs)
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
 		return

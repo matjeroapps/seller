@@ -34,6 +34,16 @@ type StoreCategory struct {
 	UpdatedAt        time.Time                           `json:"updated_at"`
 }
 
+// StoreCategoryRef is a readable product-assignment reference. The English
+// name is always present; NameAr is empty when no Arabic translation exists.
+type StoreCategoryRef struct {
+	ID     string `json:"id"`
+	Slug   string `json:"slug"`
+	Status string `json:"status"`
+	Name   string `json:"name"`
+	NameAr string `json:"name_ar,omitempty"`
+}
+
 // StoreCategoryListResponse is Core's list envelope for store categories.
 type StoreCategoryListResponse struct {
 	Items  []StoreCategory `json:"items"`

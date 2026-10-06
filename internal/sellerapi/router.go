@@ -56,7 +56,7 @@ type CoreCapabilities interface {
 	ListStoreProducts(ctx context.Context, subject, storeID, status, source, query string, limit, offset int) (*coreclient.SellerProductListResponse, error)
 	CreateSellerProduct(ctx context.Context, subject, storeID string, draft coreclient.SellerProductDraft) (*coreclient.SellerProductDetail, error)
 	GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error)
-	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error)
+	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*coreclient.SellerProductDetail, error)
 	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
 	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)

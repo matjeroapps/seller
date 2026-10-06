@@ -207,6 +207,8 @@ export interface SellerProductDetail {
   source: Product['source'];
   translations: ProductTranslation[];
   category_ids: string[];
+  store_category_ids: string[];
+  store_categories: StoreCategoryRef[];
   variants: ProductVariant[];
   skus: ProductSku[];
   media: Array<{

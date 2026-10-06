@@ -250,7 +250,7 @@ func (s *stubCore) CreateSellerProduct(ctx context.Context, subject, storeID str
 func (s *stubCore) GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error) {
 	return &coreclient.SellerProductDetail{}, s.err
 }
-func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error) {
+func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*coreclient.SellerProductDetail, error) {
 	return &coreclient.SellerProductDetail{}, s.err
 }
 func (s *stubCore) TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error) {

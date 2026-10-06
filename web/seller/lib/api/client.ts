@@ -362,13 +362,17 @@ export const sellerApi = {
     );
   },
 
-  async createStoreProduct(storeId: string, data: { name: string; slug: string; category_id?: string }): Promise<Product> {
+  async createStoreProduct(
+    storeId: string,
+    data: { name: string; slug: string; category_id?: string; store_category_ids?: string[] }
+  ): Promise<Product> {
     const detail = await request<SellerProductDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
       method: 'POST',
       body: JSON.stringify({
         slug: data.slug,
         translations: [{ locale: 'en', name: data.name, description: '' }],
-        category_ids: data.category_id ? [data.category_id] : []
+        category_ids: data.category_id ? [data.category_id] : [],
+        store_category_ids: data.store_category_ids ?? []
       })
     });
     return productFromDetail(detail, storeId);
@@ -383,7 +387,7 @@ export const sellerApi = {
   async updateStoreProduct(
     storeId: string,
     productId: string,
-    data: { slug: string; translations: ProductTranslation[]; category_ids?: string[] }
+    data: { slug: string; translations: ProductTranslation[]; category_ids?: string[]; store_category_ids?: string[] }
   ): Promise<SellerProductDetail> {
     return request<SellerProductDetail>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}`,
@@ -392,7 +396,8 @@ export const sellerApi = {
         body: JSON.stringify({
           slug: data.slug,
           translations: data.translations,
-          category_ids: data.category_ids || []
+          category_ids: data.category_ids,
+          store_category_ids: data.store_category_ids
         })
       }
     );
