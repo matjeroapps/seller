@@ -50,6 +50,18 @@ export interface ProductTranslation {
   locale: string;
   name: string;
   description: string;
+  meta_title?: string;
+  meta_description?: string;
+}
+
+export interface VariantAttributeValueDetail {
+  id: string;
+  attribute_id: string;
+  attribute_name: string;
+  attribute_code: string;
+  value_id: string;
+  value_name: string;
+  value_code: string;
 }
 
 export interface ProductVariant {
@@ -57,6 +69,8 @@ export interface ProductVariant {
   product_id: string;
   code: string;
   status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  attribute_values?: VariantAttributeValueDetail[];
+  sku?: ProductSku;
   created_at: string;
   updated_at: string;
 }
@@ -67,8 +81,31 @@ export interface ProductSku {
   code: string;
   barcode?: string;
   status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  weight_grams?: number | null;
+  length_mm?: number | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  price_minor_units?: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateProductVariantPayload {
+  code: string;
+  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  sku_code?: string;
+  barcode?: string;
+  attribute_values?: Array<{
+    attribute_id: string;
+    attribute_value_id: string;
+  }>;
+  weight_grams?: number;
+  dimensions?: {
+    length_mm?: number;
+    width_mm?: number;
+    height_mm?: number;
+  };
+  price_minor_units?: number;
 }
 
 export interface InventorySummary {
@@ -144,6 +181,35 @@ export interface SellerListing {
   status: 'draft' | 'published' | 'unpublished' | 'archived';
   created_at: string;
   updated_at: string;
+}
+
+export interface ListingPriceUpdateRequest {
+  currency: string;
+  amount_minor: number;
+  retail_price_minor_units?: number;
+  allow_sub_wholesale?: boolean;
+  audit_reason?: string;
+}
+
+export interface SupplierOfferImportParams {
+  markup_percentage?: number;
+  retail_price_minor_units?: number;
+  shipping_subsidy_minor_units?: number;
+  shipping_subsidy_policy?: string;
+}
+
+export interface ImportedOfferResult {
+  id: string;
+  listing_id: string;
+  store_id: string;
+  product_id: string;
+  supplier_offer_id?: string;
+  retail_price_minor_units: number;
+  wholesale_price_minor_units: number;
+  currency: string;
+  margin_percentage: number;
+  status: string;
+  created_at: string;
 }
 
 export interface SellerListingLifecycle {
@@ -229,6 +295,16 @@ export interface MediaPresignResponse {
   asset?: StoreMediaAsset;
 }
 
+export interface StoreLocation {
+  id: string;
+  store_id?: string;
+  code: string;
+  name: string;
+  location_type: string;
+  status: string;
+  created_at?: string;
+}
+
 export interface InventorySnapshot {
   id: string;
   fulfillment_location_id: string;
@@ -239,6 +315,29 @@ export interface InventorySnapshot {
   reserved_qty: number;
   available_qty: number;
   version: number;
+  updated_at: string;
+}
+
+export interface InventoryAdjustmentPayload {
+  fulfillment_location_id: string;
+  sku_id: string;
+  qty_delta?: number;
+  target_qty?: number;
+  reason_code: 'damaged' | 'received_stock' | 'cycle_count_reconciliation' | 'theft_loss' | 'customer_return_manual' | 'correction' | string;
+  note?: string;
+  idempotency_key?: string;
+}
+
+export interface InventoryAdjustmentResponse {
+  snapshot_id: string;
+  fulfillment_location_id: string;
+  sku_id: string;
+  on_hand_qty: number;
+  reserved_qty: number;
+  available_qty: number;
+  quantity_delta: number;
+  movement_id: string;
+  reason_code: string;
   updated_at: string;
 }
 
@@ -263,6 +362,7 @@ export interface Shipment {
   order_id: string;
   fulfillment_location_id: string;
   status: 'PENDING' | 'PROCESSING' | 'READY_FOR_PICKUP' | 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED' | 'RETURNED';
+  carrier_name?: string;
   tracking_number?: string;
   shipping_cost_minor: number;
   cod_amount_minor: number;
@@ -273,8 +373,16 @@ export interface Shipment {
   updated_at: string;
 }
 
+export interface StoreShipmentsResponse {
+  items: Shipment[];
+  total_count: number;
+  page: number;
+  page_size: number;
+}
+
 export interface CreateShipmentPayload {
   fulfillment_location_id: string;
+  carrier_name?: string;
   tracking_number?: string;
   shipping_cost_minor: number;
   cod_amount_minor: number;
@@ -283,6 +391,10 @@ export interface CreateShipmentPayload {
     order_item_id: string;
     quantity: number;
   }>;
+}
+
+export interface CreateStoreShipmentPayload extends CreateShipmentPayload {
+  order_id: string;
 }
 
 export interface UpdateShipmentStatusPayload {

@@ -125,6 +125,8 @@ type requestOptions struct {
 	GuestOrderToken string
 	// Locale overrides locale negotiation when set.
 	Locale string
+	// IdempotencyKey prevents duplicate mutating operations.
+	IdempotencyKey string
 }
 
 // get performs a GET against a Core path and decodes the response into dst.
@@ -214,6 +216,9 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 		}
 		query.Set("locale", opts.Locale)
 		req.URL.RawQuery = query.Encode()
+	}
+	if opts.IdempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", opts.IdempotencyKey)
 	}
 	c.propagateCorrelation(ctx, req)
 

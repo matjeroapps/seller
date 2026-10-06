@@ -1,6 +1,7 @@
 package sellerapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -124,7 +125,12 @@ func (deps Dependencies) handleImportSupplierOffer(w http.ResponseWriter, r *htt
 	storeID := chi.URLParam(r, "store_id")
 	offerID := chi.URLParam(r, "offer_id")
 
-	listing, err := deps.Core.ImportSupplierOffer(r.Context(), storeID, offerID, subject)
+	var params coreclient.SupplierOfferImportParams
+	if r.Body != nil && r.ContentLength > 0 {
+		_ = json.NewDecoder(r.Body).Decode(&params)
+	}
+
+	listing, err := deps.Core.ImportSupplierOffer(r.Context(), storeID, offerID, subject, params)
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
 		return
@@ -203,13 +209,27 @@ func (deps Dependencies) handleSetStoreListingPrice(w http.ResponseWriter, r *ht
 	if !actorhttp.DecodeJSON(w, r, &body) {
 		return
 	}
-	if _, err := money.New(body.AmountMinor, body.Currency); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+	priceMinor := body.AmountMinor
+	if body.RetailPriceMinorUnits != nil {
+		priceMinor = *body.RetailPriceMinorUnits
+	}
+	if priceMinor < 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "validation_error", "retail price cannot be negative")
 		return
 	}
+	if body.Currency != "" {
+		if _, err := money.New(priceMinor, body.Currency); err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
+			return
+		}
+	}
+
 	err := deps.Core.SetStoreListingPrice(r.Context(), storeID, listingID, subject, coreclient.PriceUpdate{
-		AmountMinor: body.AmountMinor,
-		Currency:    body.Currency,
+		AmountMinor:           priceMinor,
+		Currency:              body.Currency,
+		RetailPriceMinorUnits: &priceMinor,
+		AllowSubWholesale:     body.AllowSubWholesale,
+		AuditReason:           body.AuditReason,
 	})
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
@@ -601,8 +621,14 @@ func (deps Dependencies) handleUpdateStoreProduct(w http.ResponseWriter, r *http
 }
 
 type variantRequest struct {
-	Code   string `json:"code"`
-	Status string `json:"status"`
+	Code            string                             `json:"code"`
+	Status          string                             `json:"status"`
+	SKUCode         *string                            `json:"sku_code,omitempty"`
+	Barcode         *string                            `json:"barcode,omitempty"`
+	AttributeValues []coreclient.AttributeValueMapping `json:"attribute_values,omitempty"`
+	WeightGrams     *int                               `json:"weight_grams,omitempty"`
+	Dimensions      *coreclient.VariantDimensionsDTO   `json:"dimensions,omitempty"`
+	PriceMinorUnits *int64                             `json:"price_minor_units,omitempty"`
 }
 
 func (deps Dependencies) handleCreateVariant(w http.ResponseWriter, r *http.Request) {
@@ -615,6 +641,25 @@ func (deps Dependencies) handleCreateVariant(w http.ResponseWriter, r *http.Requ
 
 	var body variantRequest
 	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+
+	if (body.SKUCode != nil && *body.SKUCode != "") || len(body.AttributeValues) > 0 || body.WeightGrams != nil || body.Dimensions != nil {
+		v, err := deps.Core.CreateVariantWithOptions(r.Context(), subject, storeID, productID, coreclient.CreateVariantParams{
+			Code:            body.Code,
+			Status:          body.Status,
+			SKUCode:         body.SKUCode,
+			Barcode:         body.Barcode,
+			AttributeValues: body.AttributeValues,
+			WeightGrams:     body.WeightGrams,
+			Dimensions:      body.Dimensions,
+			PriceMinorUnits: body.PriceMinorUnits,
+		})
+		if err != nil {
+			actorhttp.WriteCoreError(w, err)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusCreated, v)
 		return
 	}
 
@@ -881,6 +926,31 @@ func (deps Dependencies) handleAdjustInventory(w http.ResponseWriter, r *http.Re
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, snap)
+}
+
+func (deps Dependencies) handleAdjustStoreInventoryDualMode(w http.ResponseWriter, r *http.Request) {
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	storeID := chi.URLParam(r, "store_id")
+
+	var req coreclient.DualModeAdjustmentRequest
+	if !actorhttp.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+	if idempotencyKey == "" {
+		idempotencyKey = r.Header.Get("X-Idempotency-Key")
+	}
+
+	result, err := deps.Core.AdjustStoreInventoryDualMode(r.Context(), subject, storeID, req, idempotencyKey)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func (deps Dependencies) handleGetListingPresentation(w http.ResponseWriter, r *http.Request) {

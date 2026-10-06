@@ -11,9 +11,11 @@ import (
 // DTOs for Seller Catalog & Order operations
 
 type SellerProductTranslation struct {
-	Locale      string `json:"locale"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Locale          string `json:"locale"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	MetaTitle       string `json:"meta_title,omitempty"`
+	MetaDescription string `json:"meta_description,omitempty"`
 }
 
 type SellerProductDraft struct {
@@ -39,14 +41,73 @@ type Variant struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type AttributeValueMapping struct {
+	AttributeID      string `json:"attribute_id"`
+	AttributeValueID string `json:"attribute_value_id"`
+}
+
+type VariantDimensionsDTO struct {
+	LengthMM *int `json:"length_mm,omitempty"`
+	WidthMM  *int `json:"width_mm,omitempty"`
+	HeightMM *int `json:"height_mm,omitempty"`
+}
+
+type CreateVariantParams struct {
+	Code            string                  `json:"code"`
+	Status          string                  `json:"status"`
+	SKUCode         *string                 `json:"sku_code,omitempty"`
+	Barcode         *string                 `json:"barcode,omitempty"`
+	AttributeValues []AttributeValueMapping `json:"attribute_values,omitempty"`
+	WeightGrams     *int                    `json:"weight_grams,omitempty"`
+	Dimensions      *VariantDimensionsDTO   `json:"dimensions,omitempty"`
+	PriceMinorUnits *int64                  `json:"price_minor_units,omitempty"`
+}
+
+type VariantAttributeValueDetail struct {
+	ID            string `json:"id"`
+	AttributeID   string `json:"attribute_id"`
+	AttributeName string `json:"attribute_name"`
+	AttributeCode string `json:"attribute_code"`
+	ValueID       string `json:"value_id"`
+	ValueName     string `json:"value_name"`
+	ValueCode     string `json:"value_code"`
+}
+
+type VariantWithDetails struct {
+	ID              string                        `json:"id"`
+	ProductID       string                        `json:"product_id"`
+	Code            string                        `json:"code"`
+	Status          string                        `json:"status"`
+	AttributeValues []VariantAttributeValueDetail `json:"attribute_values,omitempty"`
+	SKU             *SKU                          `json:"sku,omitempty"`
+	CreatedAt       time.Time                     `json:"created_at,omitempty"`
+	UpdatedAt       time.Time                     `json:"updated_at,omitempty"`
+}
+
 type SKU struct {
-	ID        string    `json:"id"`
-	VariantID string    `json:"variant_id"`
-	Code      string    `json:"code"`
-	Barcode   *string   `json:"barcode,omitempty"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              string    `json:"id"`
+	VariantID       string    `json:"variant_id"`
+	Code            string    `json:"code"`
+	Barcode         *string   `json:"barcode,omitempty"`
+	Status          string    `json:"status"`
+	WeightGrams     *int      `json:"weight_grams,omitempty"`
+	LengthMM        *int      `json:"length_mm,omitempty"`
+	WidthMM         *int      `json:"width_mm,omitempty"`
+	HeightMM        *int      `json:"height_mm,omitempty"`
+	PriceMinorUnits *int64    `json:"price_minor_units,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type CreateSKUParams struct {
+	Code            string  `json:"code"`
+	Barcode         *string `json:"barcode,omitempty"`
+	Status          string  `json:"status"`
+	WeightGrams     *int    `json:"weight_grams,omitempty"`
+	LengthMM        *int    `json:"length_mm,omitempty"`
+	WidthMM         *int    `json:"width_mm,omitempty"`
+	HeightMM        *int    `json:"height_mm,omitempty"`
+	PriceMinorUnits *int64  `json:"price_minor_units,omitempty"`
 }
 
 type MediaMetadata struct {
@@ -232,6 +293,28 @@ type AdjustInventoryRequest struct {
 	Reason        *string `json:"reason,omitempty"`
 }
 
+type DualModeAdjustmentRequest struct {
+	FulfillmentLocationID string `json:"fulfillment_location_id"`
+	SKUID                 string `json:"sku_id"`
+	QtyDelta              *int64 `json:"qty_delta,omitempty"`
+	TargetQty             *int64 `json:"target_qty,omitempty"`
+	ReasonCode            string `json:"reason_code"`
+	Note                  string `json:"note,omitempty"`
+}
+
+type DualModeAdjustmentResponse struct {
+	SnapshotID            string    `json:"snapshot_id"`
+	FulfillmentLocationID string    `json:"fulfillment_location_id"`
+	SKUID                 string    `json:"sku_id"`
+	OnHandQty             int64     `json:"on_hand_qty"`
+	ReservedQty           int64     `json:"reserved_qty"`
+	AvailableQty          int64     `json:"available_qty"`
+	QuantityDelta         int64     `json:"quantity_delta"`
+	MovementID            string    `json:"movement_id"`
+	ReasonCode            string    `json:"reason_code"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
 type SellerOrderItem struct {
 	ID          string `json:"id"`
 	ProductName string `json:"product_name"`
@@ -358,10 +441,26 @@ func (c *Client) UpdateSellerProduct(ctx context.Context, subject, storeID, prod
 }
 
 func (c *Client) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*Variant, error) {
+	return c.CreateVariantWithAttributes(ctx, subject, storeID, productID, code, status, nil)
+}
+
+func (c *Client) CreateVariantWithAttributes(ctx context.Context, subject, storeID, productID, code, status string, attributeValues []AttributeValueMapping) (*Variant, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants", url.PathEscape(storeID), url.PathEscape(productID))
 	body := map[string]any{"code": code, "status": status}
+	if len(attributeValues) > 0 {
+		body["attribute_values"] = attributeValues
+	}
 	var res Variant
 	if err := c.post(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *Client) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params CreateVariantParams) (*VariantWithDetails, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants", url.PathEscape(storeID), url.PathEscape(productID))
+	var res VariantWithDetails
+	if err := c.post(ctx, path, params, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -378,20 +477,34 @@ func (c *Client) UpdateVariant(ctx context.Context, subject, storeID, productID,
 }
 
 func (c *Client) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*SKU, error) {
+	return c.CreateSKUWithSpecs(ctx, subject, storeID, productID, variantID, CreateSKUParams{
+		Code:    code,
+		Barcode: barcode,
+		Status:  status,
+	})
+}
+
+func (c *Client) CreateSKUWithSpecs(ctx context.Context, subject, storeID, productID, variantID string, params CreateSKUParams) (*SKU, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s/skus", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
-	body := map[string]any{"code": code, "barcode": barcode, "status": status}
 	var res SKU
-	if err := c.post(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
+	if err := c.post(ctx, path, params, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
 }
 
 func (c *Client) UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*SKU, error) {
+	return c.UpdateSKUWithSpecs(ctx, subject, storeID, productID, variantID, skuID, CreateSKUParams{
+		Code:    code,
+		Barcode: barcode,
+		Status:  status,
+	})
+}
+
+func (c *Client) UpdateSKUWithSpecs(ctx context.Context, subject, storeID, productID, variantID, skuID string, params CreateSKUParams) (*SKU, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s/skus/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID), url.PathEscape(skuID))
-	body := map[string]any{"code": code, "barcode": barcode, "status": status}
 	var res SKU
-	if err := c.put(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
+	if err := c.put(ctx, path, params, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -471,6 +584,19 @@ func (c *Client) AdjustInventory(ctx context.Context, subject, storeID, snapshot
 	path := fmt.Sprintf("/internal/v1/stores/%s/inventory/%s/adjustments", url.PathEscape(storeID), url.PathEscape(snapshotID))
 	var res InventorySnapshot
 	if err := c.post(ctx, path, reqDTO, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *Client) AdjustStoreInventoryDualMode(ctx context.Context, subject, storeID string, reqDTO DualModeAdjustmentRequest, idempotencyKey string) (*DualModeAdjustmentResponse, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/inventory/adjustments", url.PathEscape(storeID))
+	var res DualModeAdjustmentResponse
+	opts := requestOptions{
+		Subject:        subject,
+		IdempotencyKey: idempotencyKey,
+	}
+	if err := c.post(ctx, path, reqDTO, opts, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil

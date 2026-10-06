@@ -39,7 +39,7 @@ type CoreCapabilities interface {
 	GetStorefrontHost(ctx context.Context, storeID, subject string) (string, error)
 	ListSupplierCatalog(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error)
 	ListStoreSupplierOffers(ctx context.Context, storeID, subject string, filter coreclient.SupplierCatalogFilter) ([]coreclient.SupplierCatalogItem, error)
-	ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string) (*coreclient.SellerListing, error)
+	ImportSupplierOffer(ctx context.Context, storeID, offerID, subject string, params ...coreclient.SupplierOfferImportParams) (*coreclient.SellerListing, error)
 	ListStoreListings(ctx context.Context, storeID, subject string, page coreclient.Page) ([]coreclient.SellerListing, error)
 	GetStoreListing(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListing, error)
 	GetStoreListingLifecycle(ctx context.Context, storeID, listingID, subject string) (*coreclient.SellerListingLifecycle, error)
@@ -60,6 +60,7 @@ type CoreCapabilities interface {
 	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
 	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)
+	CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error)
 	UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error)
 	CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error)
 	UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error)
@@ -80,6 +81,7 @@ type CoreCapabilities interface {
 	ListStoreInventory(ctx context.Context, subject, storeID string) ([]coreclient.SellerInventorySummary, error)
 	CreateInventorySnapshot(ctx context.Context, subject, storeID string, req coreclient.CreateSnapshotRequest) (*coreclient.InventorySnapshot, error)
 	AdjustInventory(ctx context.Context, subject, storeID, snapshotID string, req coreclient.AdjustInventoryRequest) (*coreclient.InventorySnapshot, error)
+	AdjustStoreInventoryDualMode(ctx context.Context, subject, storeID string, req coreclient.DualModeAdjustmentRequest, idempotencyKey string) (*coreclient.DualModeAdjustmentResponse, error)
 	GetListingPresentation(ctx context.Context, subject, storeID, listingID string) (*coreclient.SellerListingPresentation, error)
 	UpdateListingPresentation(ctx context.Context, subject, storeID, listingID string, pres coreclient.SellerListingPresentation) (*coreclient.SellerListingPresentation, error)
 	PublishSellerProduct(ctx context.Context, subject, storeID, productID string) error
@@ -93,6 +95,7 @@ type CoreCapabilities interface {
 	GetShipment(ctx context.Context, subject, shipmentID string) (*coreclient.ShipmentResponse, error)
 	UpdateShipmentStatus(ctx context.Context, subject, shipmentID string, req coreclient.UpdateShipmentStatusRequest) (*coreclient.ShipmentResponse, error)
 	ListOrderShipments(ctx context.Context, subject, orderID string) ([]coreclient.ShipmentResponse, error)
+	ListStoreShipments(ctx context.Context, subject, storeID string, status string, page, pageSize int) (*coreclient.StoreShipmentsResponse, error)
 
 	InitializeOrderPayment(ctx context.Context, subject, orderID string, req coreclient.InitializePaymentRequest) (*coreclient.PaymentResponse, error)
 	GetPayment(ctx context.Context, subject, paymentID string) (*coreclient.PaymentResponse, error)
@@ -235,6 +238,7 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Get("/seller/stores/{store_id}/inventory", deps.handleListStoreInventory)
 			r.Post("/seller/stores/{store_id}/inventory/snapshots", deps.handleCreateInventorySnapshot)
 			r.Post("/seller/stores/{store_id}/inventory/{snapshot_id}/adjustments", deps.handleAdjustInventory)
+			r.Post("/seller/stores/{store_id}/inventory/adjustments", deps.handleAdjustStoreInventoryDualMode)
 
 			r.Get("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleGetListingPresentation)
 			r.Put("/seller/stores/{store_id}/listings/{listing_id}/presentation", deps.handleUpdateListingPresentation)
@@ -247,6 +251,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Post("/seller/stores/{store_id}/orders/{order_id}/transition", deps.handleTransitionStoreOrder)
 
 			// Store-Scoped Shipping Operations
+			r.Get("/seller/stores/{store_id}/shipments", deps.handleListStoreShipments)
+			r.Post("/seller/stores/{store_id}/shipments", deps.handleCreateStoreShipment)
 			r.Post("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleCreateShipment)
 			r.Get("/seller/stores/{store_id}/orders/{order_id}/shipments", deps.handleListOrderShipments)
 			r.Get("/seller/stores/{store_id}/shipments/{shipment_id}", deps.handleGetShipment)

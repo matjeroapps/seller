@@ -148,16 +148,15 @@ describe('SDS-2 — Seller Catalog Economics', () => {
       fireEvent.click(screen.getByText('Confirm & Import to Store Catalog'));
 
       await waitFor(() => {
-        expect(sellerApi.importSupplierOffer).toHaveBeenCalledWith('str_1', 'off_99');
+        expect(sellerApi.importSupplierOffer).toHaveBeenCalledWith('str_1', 'off_99', {
+          markup_percentage: 20,
+          retail_price_minor_units: 24000,
+          shipping_subsidy_policy: 'buyer_paid'
+        });
       });
 
-      // Wholesale 200.00 SAR (20000 minor) + default 20% markup => 24000 minor
       await waitFor(() => {
-        expect(sellerApi.updateListingPrice).toHaveBeenCalledWith('str_1', 'lst_imported_99', {
-          currency: 'SAR',
-          amount_minor: 24000
-        });
-        expect(screen.getByText(/shipping policy is a preview only/i)).toBeInTheDocument();
+        expect(screen.getByText(/Offer imported atomically with 20% markup/i)).toBeInTheDocument();
       });
     });
   });

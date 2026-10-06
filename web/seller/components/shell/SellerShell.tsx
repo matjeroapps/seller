@@ -34,6 +34,7 @@ import { MerchantAccessDenied } from './MerchantAccessDenied';
 import { MerchantWorkspaceSwitcher } from './MerchantWorkspaceSwitcher';
 import { SellerShellUserProvider } from './SellerShellContext';
 import { StoreSwitcher } from './StoreSwitcher';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 // Console state for the merchant-aware shell. `status` reflects the bootstrap
 // resolution of the URL-selected workspace; the data always comes from the
@@ -60,10 +61,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [direction, setDirection] = useState<'ltr' | 'rtl'>(() => {
-    if (typeof document === 'undefined') return 'ltr';
-    return document.documentElement.dir === 'rtl' || document.documentElement.lang.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr';
-  });
+  const { locale, toggleLocale, direction } = useTranslation();
   const [profileOpen, setProfileOpen] = useState(false);
   const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'legacy' });
 
@@ -257,7 +255,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
             <button
               type="button"
               className="seller-icon-button"
-              onClick={() => setDirection((value) => (value === 'ltr' ? 'rtl' : 'ltr'))}
+              onClick={toggleLocale}
               aria-label={direction === 'ltr' ? 'Switch to Arabic layout' : 'Switch to English layout'}
             >
               <Globe2 aria-hidden="true" />

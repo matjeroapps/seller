@@ -30,6 +30,6 @@ test.describe('Seller Integration Foundation E2E', () => {
   test('Seller can view store integrations dashboard and mapping registry', async ({ page }) => {
     await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/integrations`);
     await expect(page.getByRole('heading', { name: /External Integration Foundation/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Add Integration Connection/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Generate New API Key/ })).toBeVisible();
   });
 });

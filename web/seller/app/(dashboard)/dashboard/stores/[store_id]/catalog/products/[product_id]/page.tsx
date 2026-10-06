@@ -9,15 +9,18 @@ import {
   CheckCircle2,
   ExternalLink,
   Image as ImageIcon,
+  Layers,
   Package,
   Plus,
   Save,
   Trash2
 } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
+import { VariantOptionsModal } from '@/components/seller/VariantOptionsModal';
 import { sellerApi } from '@/lib/api/client';
 import { formatMoney } from '@/lib/money';
 import type {
+  CreateProductVariantPayload,
   Product,
   ProductMediaReference,
   ProductSku,
@@ -30,8 +33,12 @@ import type {
 type TranslationForm = {
   enName: string;
   enDescription: string;
+  enMetaTitle: string;
+  enMetaDescription: string;
   arName: string;
   arDescription: string;
+  arMetaTitle: string;
+  arMetaDescription: string;
   slug: string;
 };
 
@@ -96,8 +103,12 @@ function buildTranslationForm(detail: SellerProductDetail): TranslationForm {
   return {
     enName: en.name,
     enDescription: en.description || '',
+    enMetaTitle: en.meta_title || '',
+    enMetaDescription: en.meta_description || '',
     arName: ar.name,
     arDescription: ar.description || '',
+    arMetaTitle: ar.meta_title || '',
+    arMetaDescription: ar.meta_description || '',
     slug: detail.product.slug
   };
 }
@@ -139,11 +150,16 @@ export default function StoreProductDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showVariantOptionsModal, setShowVariantOptionsModal] = useState(false);
   const [form, setForm] = useState<TranslationForm>({
     enName: '',
     enDescription: '',
+    enMetaTitle: '',
+    enMetaDescription: '',
     arName: '',
     arDescription: '',
+    arMetaTitle: '',
+    arMetaDescription: '',
     slug: ''
   });
   const [variantEdits, setVariantEdits] = useState<Record<string, VariantEdit>>({});
@@ -206,7 +222,9 @@ export default function StoreProductDetailPage({
     }, {});
   }, [detail]);
 
-  const canManageProduct = product?.source === 'seller_owned' && product.status !== 'archived';
+  const canManageProduct =
+    (product?.source === 'seller_owned' || detail?.source === 'seller_owned') &&
+    product?.status !== 'archived';
   const listing = detail?.listing;
 
   const refreshAfterMutation = async (message: string) => {
@@ -229,14 +247,18 @@ export default function StoreProductDetailPage({
         {
           locale: 'en',
           name: form.enName.trim(),
-          description: form.enDescription.trim()
+          description: form.enDescription.trim(),
+          meta_title: form.enMetaTitle?.trim() || undefined,
+          meta_description: form.enMetaDescription?.trim() || undefined
         }
       ];
       if (form.arName.trim()) {
         translations.push({
           locale: 'ar',
           name: form.arName.trim(),
-          description: form.arDescription.trim()
+          description: form.arDescription.trim(),
+          meta_title: form.arMetaTitle?.trim() || undefined,
+          meta_description: form.arMetaDescription?.trim() || undefined
         });
       }
 
@@ -306,6 +328,23 @@ export default function StoreProductDetailPage({
       await refreshAfterMutation('Variant added.');
     } catch (err: any) {
       setError(err.message || 'Failed to add variant');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleCreateVariantWithOptions = async (payload: CreateProductVariantPayload) => {
+    if (!canManageProduct) return;
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await sellerApi.createProductVariant(store_id, product_id, payload);
+      setShowVariantOptionsModal(false);
+      await refreshAfterMutation('Variant and SKU specifications created.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create variant with specifications');
+      throw err;
     } finally {
       setWorking(false);
     }
@@ -593,6 +632,26 @@ export default function StoreProductDetailPage({
             />
           </label>
           <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-slate-700">English SEO meta title</span>
+            <input
+              value={form.enMetaTitle}
+              onChange={(event) => setForm((prev) => ({ ...prev, enMetaTitle: event.target.value }))}
+              disabled={!canManageProduct}
+              placeholder="SEO meta title for search engines"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-slate-700">English SEO meta description</span>
+            <input
+              value={form.enMetaDescription}
+              onChange={(event) => setForm((prev) => ({ ...prev, enMetaDescription: event.target.value }))}
+              disabled={!canManageProduct}
+              placeholder="SEO meta description snippet"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
+            />
+          </label>
+          <label className="space-y-1.5">
             <span className="text-xs font-semibold text-slate-700">Arabic title</span>
             <input
               value={form.arName}
@@ -621,6 +680,28 @@ export default function StoreProductDetailPage({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
             />
           </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-slate-700">Arabic SEO meta title</span>
+            <input
+              value={form.arMetaTitle}
+              onChange={(event) => setForm((prev) => ({ ...prev, arMetaTitle: event.target.value }))}
+              disabled={!canManageProduct}
+              dir="rtl"
+              placeholder="عنوان SEO باللغة العربية"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold text-slate-700">Arabic SEO meta description</span>
+            <input
+              value={form.arMetaDescription}
+              onChange={(event) => setForm((prev) => ({ ...prev, arMetaDescription: event.target.value }))}
+              disabled={!canManageProduct}
+              dir="rtl"
+              placeholder="وصف SEO باللغة العربية"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
+            />
+          </label>
         </div>
       </form>
 
@@ -632,8 +713,18 @@ export default function StoreProductDetailPage({
               Manage sellable product variants and their SKU records. At least one active variant with one active SKU is required for publishing.
             </p>
           </div>
-          <div className="text-xs text-slate-500">
-            {productVariants(detail).length} variants · {productSkus(detail).length} SKUs
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowVariantOptionsModal(true)}
+              disabled={!canManageProduct || working}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              <Layers className="h-3.5 w-3.5" /> Configure Variant & Specs
+            </button>
+            <div className="text-xs text-slate-500">
+              {productVariants(detail).length} variants · {productSkus(detail).length} SKUs
+            </div>
           </div>
         </div>
 
@@ -718,12 +809,26 @@ export default function StoreProductDetailPage({
                     </button>
                   </div>
 
+                  {variant.attribute_values && variant.attribute_values.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {variant.attribute_values.map((av) => (
+                        <span
+                          key={av.id || `${av.attribute_id}-${av.value_id}`}
+                          className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700"
+                        >
+                          {av.attribute_name || av.attribute_code}: {av.value_name || av.value_code}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="mt-4 overflow-hidden rounded-lg border border-slate-100">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 text-slate-500">
                         <tr>
                           <th className="px-3 py-2 font-semibold">SKU code</th>
                           <th className="px-3 py-2 font-semibold">Barcode</th>
+                          <th className="px-3 py-2 font-semibold">Weight & Specs</th>
                           <th className="px-3 py-2 font-semibold">Status</th>
                           <th className="px-3 py-2 font-semibold text-right">Actions</th>
                         </tr>
@@ -763,6 +868,15 @@ export default function StoreProductDetailPage({
                                   className="w-full rounded border border-slate-200 px-2 py-1 disabled:bg-slate-50"
                                 />
                               </td>
+                              <td className="px-3 py-2 text-slate-600">
+                                {sku.weight_grams ? <span>{sku.weight_grams}g</span> : null}
+                                {sku.length_mm && sku.width_mm && sku.height_mm ? (
+                                  <span className="block text-[11px] text-slate-400">
+                                    {sku.length_mm}×{sku.width_mm}×{sku.height_mm}mm
+                                  </span>
+                                ) : null}
+                                {!sku.weight_grams && !sku.length_mm && <span className="text-slate-400">-</span>}
+                              </td>
                               <td className="px-3 py-2">
                                 <select
                                   value={skuEdit.status}
@@ -797,7 +911,7 @@ export default function StoreProductDetailPage({
                         })}
                         {variantSkus.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="px-3 py-4 text-center text-slate-500">
+                            <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
                               No SKUs for this variant yet.
                             </td>
                           </tr>
@@ -1005,6 +1119,13 @@ export default function StoreProductDetailPage({
         loading={working}
         onConfirm={confirmArchive}
         onCancel={() => setShowArchiveModal(false)}
+      />
+
+      <VariantOptionsModal
+        isOpen={showVariantOptionsModal}
+        onClose={() => setShowVariantOptionsModal(false)}
+        onSubmit={handleCreateVariantWithOptions}
+        loading={working}
       />
     </div>
   );

@@ -19,6 +19,8 @@ vi.mock('next/navigation', () => ({
 const { mockClient } = vi.hoisted(() => {
   const mockClient = {
     listStoreOrders: vi.fn(),
+    listStoreShipments: vi.fn(),
+    createStoreShipment: vi.fn(),
     getStoreOrderDetail: vi.fn(),
     getStores: vi.fn(),
     getStoreOperationalState: vi.fn(),
@@ -40,31 +42,35 @@ describe('SDS-3, SDS-4 & SDS-5 Completion Tests', () => {
   });
 
   describe('SDS-3 Operations & Fulfillment', () => {
-    it('renders ShipmentsOverviewScreen with orders queue and status filter', async () => {
-      vi.mocked(sellerClient.listStoreOrders).mockResolvedValue({
-        orders: [
+    it('renders ShipmentsOverviewScreen with shipments queue and status filter', async () => {
+      vi.mocked(sellerClient.listStoreShipments).mockResolvedValue({
+        items: [
           {
-            id: 'ord_1',
-            order_number: 'ORD-1001',
-            status: 'ready_for_shipping',
+            id: 'shp_1',
+            order_id: 'ord_1',
+            fulfillment_location_id: 'loc_1',
+            status: 'PENDING',
+            carrier_name: 'SMSA Express',
+            tracking_number: 'TRK-ORD-1001-abc',
+            shipping_cost_minor: 2500,
+            cod_amount_minor: 0,
             currency: 'SAR',
-            total: 25000,
-            item_count: 2,
-            recipient_name: 'Khalid Al-Mansoor',
-            created_at: '2026-10-02T10:00:00Z'
+            items: [],
+            created_at: '2026-10-02T10:00:00Z',
+            updated_at: '2026-10-02T10:00:00Z'
           }
         ],
-        total: 1,
-        limit: 25,
-        offset: 0
+        total_count: 1,
+        page: 1,
+        page_size: 25
       });
 
       render(<ShipmentsOverviewScreen storeId="str_1" />);
 
       await waitFor(() => {
-        expect(screen.getByText('Store Shipments Overview')).toBeInTheDocument();
-        expect(screen.getByText(/ORD-1001/i)).toBeInTheDocument();
-        expect(screen.getByText(/Khalid Al-Mansoor/i)).toBeInTheDocument();
+        expect(screen.getByText('Store Shipments Queue')).toBeInTheDocument();
+        expect(screen.getByText(/TRK-ORD-1001-abc/i)).toBeInTheDocument();
+        expect(screen.getByText(/SMSA Express/i)).toBeInTheDocument();
       });
     });
 

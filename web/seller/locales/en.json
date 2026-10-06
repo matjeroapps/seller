@@ -1,0 +1,88 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "create": "Create",
+    "refresh": "Refresh",
+    "search": "Search",
+    "filter": "Filter",
+    "loading": "Loading...",
+    "actions": "Actions",
+    "status": "Status",
+    "currency": "Currency",
+    "total": "Total",
+    "back": "Back",
+    "view": "View",
+    "all": "All",
+    "active": "Active",
+    "draft": "Draft",
+    "archived": "Archived"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "catalog": "Catalog",
+    "products": "Products",
+    "listings": "Listings",
+    "supplierOffers": "Supplier Offers",
+    "media": "Media Library",
+    "inventory": "Inventory",
+    "orders": "Orders",
+    "shipments": "Shipments",
+    "storefront": "Storefront",
+    "theme": "Theme Draft",
+    "settings": "Settings",
+    "integrations": "Integrations",
+    "team": "Team",
+    "account": "Account",
+    "switchWorkspace": "Switch Workspace",
+    "signOut": "Sign Out"
+  },
+  "header": {
+    "searchCatalog": "Search catalog",
+    "switchToArabic": "العربية",
+    "switchToEnglish": "English",
+    "toggleTheme": "Toggle color mode",
+    "helpAndSettings": "Help and settings"
+  },
+  "inventory": {
+    "title": "Store Inventory Management",
+    "subtitle": "Monitor stock levels, set low-stock guardrails, and record auditable stock adjustments",
+    "onHand": "On Hand",
+    "reserved": "Reserved",
+    "available": "Available",
+    "adjustStock": "Adjust Stock",
+    "reason": "Reason Code",
+    "delta": "Quantity Adjustment",
+    "idempotencyKey": "Idempotency Key",
+    "auditNote": "Audit Note"
+  },
+  "catalog": {
+    "productsTitle": "Products",
+    "listingsTitle": "Store Listings",
+    "supplierOffersTitle": "Supplier Offers Catalog",
+    "variantsTitle": "Variants & SKUs",
+    "wholesaleCost": "Wholesale Price",
+    "retailPrice": "Retail Price",
+    "markupPercent": "Markup %",
+    "unsafeMarginWarning": "Unsafe Margin Warning",
+    "ownerOverride": "Store Owner Margin Override",
+    "auditReason": "Audit Reason"
+  },
+  "shipping": {
+    "title": "Store Shipments Queue",
+    "subtitle": "Monitor and dispatch package shipments across all store orders",
+    "createShipment": "Create Shipment",
+    "trackingCode": "Tracking Code",
+    "carrier": "Carrier",
+    "orderId": "Order ID",
+    "autoTrackingNotice": "Leave blank to auto-generate an internal tracking code (TRK-...)"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "retry": "Try again",
+    "notFound": "Page or resource not found.",
+    "unauthorized": "Unauthorized access. Please sign in again."
+  }
+}

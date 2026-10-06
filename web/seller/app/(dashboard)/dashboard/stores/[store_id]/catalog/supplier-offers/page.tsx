@@ -67,41 +67,23 @@ export default function StoreSupplierOffersPage({
     setImportingOfferId(offerId);
     setNotification(null);
     try {
-      const listing = await sellerApi.importSupplierOffer(store_id, offerId);
-
-      // Persist the markup as the listing retail price (minor units).
-      // Shipping policy is NOT persisted: no API stores it, so it is preview-only.
-      const wholesaleMinor = minorAmount(selectedOffer.price) ?? 0;
-      const cur = selectedOffer.price?.currency || 'SAR';
       const pct = parseFloat(markupPercent) || 0;
-      let priceError: string | null = null;
-      if (wholesaleMinor > 0 && pct > 0) {
-        const retailMinor = Math.round(wholesaleMinor * (1 + pct / 100));
-        try {
-          await sellerApi.updateListingPrice(store_id, listing.id, { currency: cur, amount_minor: retailMinor });
-        } catch (priceErr: any) {
-          priceError = priceErr?.message || 'unknown error';
-        }
-      }
+      const wholesaleMinor = minorAmount(selectedOffer.price) ?? 0;
+      const retailMinor = wholesaleMinor > 0 && pct > 0 ? Math.round(wholesaleMinor * (1 + pct / 100)) : undefined;
+
+      const listing = await sellerApi.importSupplierOffer(store_id, offerId, {
+        markup_percentage: pct > 0 ? pct : undefined,
+        retail_price_minor_units: retailMinor,
+        shipping_subsidy_policy: shippingSubsidy,
+      });
 
       setImportedOffers((prev) => ({ ...prev, [offerId]: listing.id }));
       setSelectedOffer(null);
-      setNotification(
-        priceError
-          ? {
-              type: 'error',
-              message: `Offer imported, but the retail price was NOT saved (${priceError}). Set it on the listing page before publishing.`,
-              listingId: listing.id,
-            }
-          : {
-              type: 'success',
-              message:
-                wholesaleMinor > 0 && pct > 0
-                  ? `Offer imported and retail price saved (${pct}% markup). The shipping policy is a preview only and was not saved.`
-                  : 'Offer imported. No retail price was set; set it on the listing page before publishing.',
-              listingId: listing.id,
-            }
-      );
+      setNotification({
+        type: 'success',
+        message: `Offer imported atomically with ${pct}% markup and initial retail price saved.`,
+        listingId: listing.id,
+      });
     } catch (err: any) {
       setNotification({
         type: 'error',
@@ -326,7 +308,7 @@ export default function StoreSupplierOffersPage({
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">
-                  Shipping Subsidy Policy <span className="font-normal text-slate-500">(preview only — not saved)</span>
+                  Shipping Subsidy Policy
                 </label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer">
