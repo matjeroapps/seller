@@ -76,6 +76,39 @@ func jsonHandler(status int, body string) func(http.ResponseWriter, *http.Reques
 	}
 }
 
+func TestListStoreMediaNormalizesCoreItemsEnvelope(t *testing.T) {
+	stub := newStubCore(t, jsonHandler(http.StatusOK, `{
+		"items": [
+			{
+				"id": "asset-1",
+				"store_id": "store-1",
+				"checksum_sha256": "abc",
+				"content_type": "image/png",
+				"byte_size": 68,
+				"original_filename": "matjerhub-upload-test.png",
+				"status": "ready",
+				"url": "http://localhost:9000/matjero-staging-media/object.png",
+				"created_at": "2026-10-06T00:00:00Z",
+				"updated_at": "2026-10-06T00:00:00Z"
+			}
+		],
+		"total": 1,
+		"limit": 25,
+		"offset": 0
+	}`))
+
+	res, err := stub.client(t).ListStoreMedia(context.Background(), "subject-1", "store-1", "", "", 25, 0)
+	if err != nil {
+		t.Fatalf("ListStoreMedia: %v", err)
+	}
+	if got := len(res.Items); got != 1 {
+		t.Fatalf("len(Items) = %d, want 1", got)
+	}
+	if res.Items[0].OriginalFilename != "matjerhub-upload-test.png" {
+		t.Fatalf("OriginalFilename = %q", res.Items[0].OriginalFilename)
+	}
+}
+
 // --- construction ---
 
 func TestNewRejectsUnusableConfig(t *testing.T) {

@@ -453,7 +453,10 @@ export const sellerApi = {
 
   // Media Library
   async listStoreMedia(storeId: string): Promise<{ items: StoreMediaAsset[] }> {
-    return request<{ items: StoreMediaAsset[] }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/media`);
+    const res = await request<{ items?: StoreMediaAsset[]; assets?: StoreMediaAsset[] }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/media`
+    );
+    return { items: res.items || res.assets || [] };
   },
 
   async createMediaUpload(

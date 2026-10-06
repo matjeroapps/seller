@@ -113,4 +113,34 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
     await expect(sellerClient.listStoreInventory('store-1')).resolves.toEqual({ items: [] });
     await expect(sellerClient.listStoreListings('store-1')).resolves.toEqual({ items: [] });
   });
+
+  it('normalizes store media assets envelope returned by the seller BFF', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        assets: [
+          {
+            id: 'asset-1',
+            store_id: 'store-1',
+            checksum_sha256: 'abc',
+            content_type: 'image/png',
+            byte_size: 68,
+            original_filename: 'matjerhub-upload-test.png',
+            status: 'ready',
+            url: 'http://localhost:9000/matjero-staging-media/object.png',
+            created_at: '2026-10-06T00:00:00Z',
+            updated_at: '2026-10-06T00:00:00Z'
+          }
+        ],
+        total: 1,
+        limit: 25,
+        offset: 0
+      })
+    });
+
+    await expect(sellerClient.listStoreMedia('store-1')).resolves.toEqual({
+      items: [expect.objectContaining({ id: 'asset-1', original_filename: 'matjerhub-upload-test.png' })]
+    });
+  });
 });
