@@ -16,6 +16,7 @@ vi.mock('next/navigation', () => ({
 const { mockApi } = vi.hoisted(() => {
   const mockApi = {
     getStoreProductDetail: vi.fn(),
+    listStoreCategories: vi.fn(),
     listStoreMedia: vi.fn(),
     listProductMediaReferences: vi.fn(),
     updateProductTranslations: vi.fn(),
@@ -213,8 +214,9 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
       media: [],
     };
 
-    beforeEach(() => {
-      vi.clearAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi.listStoreCategories.mockResolvedValue([]);
       mockApi.getStoreProductDetail.mockResolvedValue(sampleDetail);
       mockApi.listStoreMedia.mockResolvedValue({ assets: [] });
       mockApi.listProductMediaReferences.mockResolvedValue([]);

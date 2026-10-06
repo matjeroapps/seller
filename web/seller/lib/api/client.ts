@@ -20,6 +20,7 @@ import type {
   ProductVariant,
   OrderTransitionPayload,
   SellerListing,
+  SellerCategory,
   SellerProductDetail,
   SellerOrder,
   SellerOrderDetail,
@@ -284,6 +285,13 @@ export const sellerApi = {
         updated_at: row.product?.updated_at || ''
       }))
     };
+  },
+
+  async listStoreCategories(storeId: string): Promise<SellerCategory[]> {
+    const payload = await request<SellerCategory[] | { items?: SellerCategory[] }>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/categories?limit=100`
+    );
+    return normalizeItems(payload);
   },
 
   async createStoreProduct(storeId: string, data: { name: string; slug: string; category_id?: string }): Promise<Product> {
