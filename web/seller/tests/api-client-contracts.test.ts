@@ -115,32 +115,55 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
   });
 
   it('normalizes store media assets envelope returned by the seller BFF', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        assets: [
-          {
-            id: 'asset-1',
-            store_id: 'store-1',
-            checksum_sha256: 'abc',
-            content_type: 'image/png',
-            byte_size: 68,
-            original_filename: 'matjerhub-upload-test.png',
-            status: 'ready',
-            url: 'http://localhost:9000/matjero-staging-media/object.png',
-            created_at: '2026-10-06T00:00:00Z',
-            updated_at: '2026-10-06T00:00:00Z'
-          }
-        ],
-        total: 1,
-        limit: 25,
-        offset: 0
-      })
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      expect(url).toContain('/v1/seller/stores/store-1/media?filename=matjerhub&content_type=image%2Fpng&limit=25&offset=50');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assets: [
+            {
+              id: 'asset-1',
+              store_id: 'store-1',
+              checksum_sha256: 'abc',
+              content_type: 'image/png',
+              byte_size: 68,
+              original_filename: 'matjerhub-upload-test.png',
+              status: 'ready',
+              url: 'http://localhost:9000/matjero-staging-media/object.png',
+              created_at: '2026-10-06T00:00:00Z',
+              updated_at: '2026-10-06T00:00:00Z'
+            }
+          ],
+          total: 1,
+          limit: 25,
+          offset: 50
+        })
+      };
     });
 
-    await expect(sellerClient.listStoreMedia('store-1')).resolves.toEqual({
-      items: [expect.objectContaining({ id: 'asset-1', original_filename: 'matjerhub-upload-test.png' })]
+    await expect(sellerClient.listStoreMedia('store-1', {
+      filename: 'matjerhub',
+      contentType: 'image/png',
+      limit: 25,
+      offset: 50
+    })).resolves.toEqual({
+      items: [expect.objectContaining({ id: 'asset-1', original_filename: 'matjerhub-upload-test.png' })],
+      total: 1,
+      limit: 25,
+      offset: 50
     });
+  });
+
+  it('accepts successful empty-body responses for void media mutations', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 200,
+      })
+    );
+
+    await expect(
+      sellerClient.detachProductMedia('store-1', 'product-1', 'reference-1')
+    ).resolves.toBeDefined();
   });
 });

@@ -143,7 +143,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return {} as T;
   }
 
-  return response.json();
+  if (typeof response.text !== 'function') {
+    return response.json();
+  }
+
+  const responseText = await response.text();
+  if (!responseText.trim()) {
+    return {} as T;
+  }
+
+  return JSON.parse(responseText) as T;
 }
 
 export const sellerApi = {
@@ -564,11 +573,29 @@ export const sellerApi = {
   },
 
   // Media Library
-  async listStoreMedia(storeId: string): Promise<{ items: StoreMediaAsset[] }> {
-    const res = await request<{ items?: StoreMediaAsset[]; assets?: StoreMediaAsset[] }>(
-      `/v1/seller/stores/${encodeURIComponent(storeId)}/media`
-    );
-    return { items: res.items || res.assets || [] };
+  async listStoreMedia(
+    storeId: string,
+    options: { filename?: string; contentType?: string; limit?: number; offset?: number } = {}
+  ): Promise<{ items: StoreMediaAsset[]; total: number; limit: number; offset: number }> {
+    const params = new URLSearchParams();
+    if (options.filename?.trim()) params.set('filename', options.filename.trim());
+    if (options.contentType?.trim()) params.set('content_type', options.contentType.trim());
+    if (options.limit) params.set('limit', String(options.limit));
+    if (options.offset) params.set('offset', String(options.offset));
+    const query = params.toString();
+    const res = await request<{
+      items?: StoreMediaAsset[];
+      assets?: StoreMediaAsset[];
+      total?: number;
+      limit?: number;
+      offset?: number;
+    }>(`/v1/seller/stores/${encodeURIComponent(storeId)}/media${query ? `?${query}` : ''}`);
+    return {
+      items: res.items || res.assets || [],
+      total: res.total ?? res.items?.length ?? res.assets?.length ?? 0,
+      limit: res.limit ?? options.limit ?? 50,
+      offset: res.offset ?? options.offset ?? 0
+    };
   },
 
   async createMediaUpload(
