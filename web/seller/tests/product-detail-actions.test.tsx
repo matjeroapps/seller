@@ -95,15 +95,43 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
     readiness: {
       is_ready: true,
       missing_requirements: []
-    }
+    },
+    store_category_ids: ['cat-electronics'],
+    store_categories: [
+      { id: 'cat-electronics', slug: 'electronics', status: 'active', name: 'Electronics' }
+    ]
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockApi.getStoreProductDetail.mockResolvedValue(sampleDetail);
     mockApi.listStoreCategories.mockResolvedValue([
-      { id: 'cat-electronics', slug: 'electronics', status: 'active' },
-      { id: 'cat-accessories', slug: 'accessories', status: 'active' }
+      {
+        id: 'cat-electronics',
+        store_id: 'store_123',
+        parent_category_id: null,
+        slug: 'electronics',
+        status: 'active',
+        sort_order: 0,
+        translations: { en: { name: 'Electronics', description: '' } },
+        product_count: 0,
+        child_count: 0,
+        created_at: '2026-10-01T00:00:00Z',
+        updated_at: '2026-10-01T00:00:00Z'
+      },
+      {
+        id: 'cat-accessories',
+        store_id: 'store_123',
+        parent_category_id: null,
+        slug: 'accessories',
+        status: 'active',
+        sort_order: 1,
+        translations: { en: { name: 'Accessories', description: '' } },
+        product_count: 0,
+        child_count: 0,
+        created_at: '2026-10-01T00:00:00Z',
+        updated_at: '2026-10-01T00:00:00Z'
+      }
     ]);
     mockApi.listStoreMedia.mockResolvedValue({
       items: [
@@ -159,6 +187,10 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
       variants: null,
       skus: null,
       category_ids: null,
+      store_category_ids: ['cat-electronics'],
+      store_categories: [
+        { id: 'cat-electronics', slug: 'electronics', status: 'active', name: 'Electronics' }
+      ],
       inventory_summary: {
         total_on_hand: 0,
         total_reserved: 0,
@@ -233,7 +265,7 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
     });
   });
 
-  it('renders category options and persists the selected category IDs', async () => {
+  it('renders the category picker with readable names and persists store category selection', async () => {
     mockApi.updateStoreProduct.mockResolvedValue(sampleDetail);
 
     await renderPage(
@@ -243,22 +275,24 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('listbox', { name: 'Category IDs' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'electronics' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Categories' })).toBeInTheDocument();
+      // Readable localized names, not raw ids.
+      expect(screen.getByLabelText('Electronics')).toBeInTheDocument();
+      expect(screen.getByLabelText('Accessories')).toBeInTheDocument();
     });
 
-    const categorySelect = screen.getByRole('listbox', { name: 'Category IDs' }) as HTMLSelectElement;
-    Array.from(categorySelect.options).forEach((option) => {
-      option.selected = option.value.startsWith('cat-');
-    });
-    fireEvent.change(categorySelect);
+    // Pre-selected from the product's existing assignments.
+    expect((screen.getByLabelText('Electronics') as HTMLInputElement).checked).toBe(true);
+
+    // Add a second category and save; store_category_ids carries the selection.
+    fireEvent.click(screen.getByLabelText('Accessories'));
     fireEvent.click(screen.getByRole('button', { name: /save product details/i }));
 
     await waitFor(() => {
       expect(mockApi.updateStoreProduct).toHaveBeenCalledWith(
         'store_123',
         'prod_456',
-        expect.objectContaining({ category_ids: ['cat-electronics', 'cat-accessories'] })
+        expect.objectContaining({ store_category_ids: ['cat-electronics', 'cat-accessories'] })
       );
     });
   });

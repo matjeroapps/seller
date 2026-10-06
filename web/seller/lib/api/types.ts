@@ -52,6 +52,58 @@ export interface SellerCategory {
   status: string;
 }
 
+// Store-scoped category (seller-managed). A flat tree node: the hierarchy is
+// assembled client-side from parent_category_id. The English name is always
+// present; Arabic falls back to English where missing.
+export type CategoryStatus = 'active' | 'inactive' | 'archived';
+
+export interface StoreCategoryTranslation {
+  name: string;
+  description: string;
+}
+
+export interface StoreCategory {
+  id: string;
+  store_id: string;
+  parent_category_id: string | null;
+  slug: string;
+  status: CategoryStatus;
+  sort_order: number;
+  translations: Record<string, StoreCategoryTranslation>;
+  product_count: number;
+  child_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreCategoryRef {
+  id: string;
+  slug: string;
+  status: string;
+  name: string;
+  name_ar?: string;
+}
+
+export interface StoreCategoryInput {
+  slug: string;
+  parent_category_id?: string | null;
+  sort_order?: number;
+  translations: Record<string, StoreCategoryTranslation>;
+}
+
+export interface StoreCategoryUpdateInput {
+  slug?: string;
+  parent_category_id?: string | null;
+  clear_parent?: boolean;
+  sort_order?: number;
+  translations?: Record<string, StoreCategoryTranslation>;
+}
+
+export interface StoreCategoryReorderEntry {
+  id: string;
+  sort_order: number;
+}
+
 export interface ProductTranslation {
   locale: string;
   name: string;
@@ -155,6 +207,8 @@ export interface SellerProductDetail {
   source: Product['source'];
   translations: ProductTranslation[];
   category_ids: string[];
+  store_category_ids: string[];
+  store_categories: StoreCategoryRef[];
   variants: ProductVariant[];
   skus: ProductSku[];
   media: Array<{

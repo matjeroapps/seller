@@ -19,23 +19,25 @@ import (
 )
 
 type storeData struct {
-	code             string
-	name             string
-	domain           string
-	market           string
-	currencyCode     string
-	currencySymbol   string
-	currencyMinor    int
-	timezone         string
-	defaultLocale    string
-	supportedLocales []string
-	settings         map[string]any
-	theme            map[string]any
-	draftTheme       map[string]any
-	previewToken     string
-	revision         int64
-	categories       []map[string]any
-	products         []map[string]any
+	code              string
+	name              string
+	domain            string
+	market            string
+	currencyCode      string
+	currencySymbol    string
+	currencyMinor     int
+	timezone          string
+	defaultLocale     string
+	supportedLocales  []string
+	settings          map[string]any
+	theme             map[string]any
+	draftTheme        map[string]any
+	previewToken      string
+	revision          int64
+	categories        []map[string]any
+	storeCategories   []map[string]any
+	storeCategoryRefs []map[string]any
+	products          []map[string]any
 }
 
 type fakeCoreServer struct {
@@ -53,12 +55,14 @@ type fakeCoreServer struct {
 	sellerSubject string
 
 	// P5.8 in-memory seller catalog state. Guarded by mu.
-	sellerProducts   []*sellerProduct
-	sellerLocations  []*sellerLocation
-	sellerInventory  []*sellerInventorySnapshot
-	mediaIntents     map[string]*mediaIntent
-	sellerCategories []map[string]any
-	idSeq            atomic.Uint64
+	sellerProducts    []*sellerProduct
+	sellerLocations   []*sellerLocation
+	sellerInventory   []*sellerInventorySnapshot
+	mediaIntents      map[string]*mediaIntent
+	sellerCategories  []map[string]any
+	storeCategories   []map[string]any
+	storeCategoryRefs []map[string]any
+	idSeq             atomic.Uint64
 	// revisionWatermark guarantees each reset hands out a strictly higher
 	// revision than any earlier test run, so stale storefront cache entries
 	// (keyed by revision) can never be served after a reset.
@@ -127,6 +131,43 @@ func (s *fakeCoreServer) resetDefaultState() {
 	s.sellerCategories = []map[string]any{
 		{"id": "cat-beverages", "parent_category_id": nil, "slug": "beverages", "status": "active", "created_at": seedNow, "updated_at": seedNow},
 		{"id": "cat-snacks", "parent_category_id": nil, "slug": "snacks", "status": "active", "created_at": seedNow, "updated_at": seedNow},
+	}
+	s.storeCategories = []map[string]any{
+		{
+			"id": "scat-beverages", "store_id": fakeStoreID, "parent_category_id": nil,
+			"slug": "beverages", "status": "active", "sort_order": 0,
+			"translations": map[string]any{
+				"en": map[string]any{"name": "Beverages", "description": "Drinks of all kinds"},
+				"ar": map[string]any{"name": "مشروبات", "description": "جميع أنواع المشروبات"},
+			},
+			"product_count": 0, "child_count": 0,
+			"created_at": seedNow, "updated_at": seedNow,
+		},
+		{
+			"id": "scat-hot-drinks", "store_id": fakeStoreID, "parent_category_id": "scat-beverages",
+			"slug": "hot-drinks", "status": "active", "sort_order": 0,
+			"translations": map[string]any{
+				"en": map[string]any{"name": "Hot Drinks", "description": ""},
+				"ar": map[string]any{"name": "مشروبات ساخنة", "description": ""},
+			},
+			"product_count": 0, "child_count": 0,
+			"created_at": seedNow, "updated_at": seedNow,
+		},
+		{
+			"id": "scat-snacks", "store_id": fakeStoreID, "parent_category_id": nil,
+			"slug": "snacks", "status": "active", "sort_order": 1,
+			"translations": map[string]any{
+				"en": map[string]any{"name": "Snacks", "description": ""},
+			},
+			"product_count": 0, "child_count": 0,
+			"created_at": seedNow, "updated_at": seedNow,
+		},
+	}
+
+	s.storeCategoryRefs = []map[string]any{
+		{"id": "scat-beverages", "slug": "beverages", "status": "active", "name": "Beverages", "name_ar": "مشروبات"},
+		{"id": "scat-hot-drinks", "slug": "hot-drinks", "status": "active", "name": "Hot Drinks", "name_ar": "مشروبات ساخنة"},
+		{"id": "scat-snacks", "slug": "snacks", "status": "active", "name": "Snacks"},
 	}
 
 	s.stores = map[string]*storeData{

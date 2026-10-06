@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { CategoryPicker } from '@/components/seller/CategoryPicker';
 import { sellerApi } from '@/lib/api/client';
+import type { StoreCategory } from '@/lib/api/types';
 
 export default function NewStoreProductPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
@@ -15,6 +17,22 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<StoreCategory[]>([]);
+  const [categoryLoadError, setCategoryLoadError] = useState<string | null>(null);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+
+  const loadCategories = () => {
+    setCategoryLoadError(null);
+    sellerApi
+      .listStoreCategories(store_id)
+      .then((items) => setCategories(items))
+      .catch((err: Error) => setCategoryLoadError(err.message || 'Failed to load categories'));
+  };
+
+  useEffect(() => {
+    loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store_id]);
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -36,7 +54,8 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
     try {
       const product = await sellerApi.createStoreProduct(store_id, {
         name,
-        slug
+        slug,
+        store_category_ids: selectedCategoryIds
       });
       router.push(`/dashboard/stores/${store_id}/catalog/products/${product.id}`);
     } catch (err: any) {
@@ -91,6 +110,18 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
             className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <p className="text-[11px] text-slate-500 mt-1">Unique URL identifier for the product catalog</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="block text-xs font-semibold text-slate-700">Categories</span>
+          <CategoryPicker
+            storeId={store_id}
+            categories={categories}
+            selectedIds={selectedCategoryIds}
+            onChange={setSelectedCategoryIds}
+            loadError={categoryLoadError}
+            onRetry={loadCategories}
+          />
         </div>
 
         <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-100">

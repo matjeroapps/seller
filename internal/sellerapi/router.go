@@ -56,7 +56,7 @@ type CoreCapabilities interface {
 	ListStoreProducts(ctx context.Context, subject, storeID, status, source, query string, limit, offset int) (*coreclient.SellerProductListResponse, error)
 	CreateSellerProduct(ctx context.Context, subject, storeID string, draft coreclient.SellerProductDraft) (*coreclient.SellerProductDetail, error)
 	GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error)
-	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error)
+	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*coreclient.SellerProductDetail, error)
 	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
 	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)
@@ -89,7 +89,13 @@ type CoreCapabilities interface {
 	ListStoreOrders(ctx context.Context, subject, storeID, status string, limit, offset int) (*coreclient.SellerOrderListResponse, error)
 	GetStoreOrderDetail(ctx context.Context, subject, storeID, orderID string) (*coreclient.SellerOrderDetail, error)
 	TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error)
-	ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error)
+	ListStoreCategories(ctx context.Context, subject, storeID, status string, limit, offset int) ([]coreclient.StoreCategory, error)
+	CreateStoreCategory(ctx context.Context, subject, storeID string, input coreclient.StoreCategoryInput) (*coreclient.StoreCategory, error)
+	GetStoreCategory(ctx context.Context, subject, storeID, categoryID string) (*coreclient.StoreCategory, error)
+	UpdateStoreCategory(ctx context.Context, subject, storeID, categoryID string, input coreclient.StoreCategoryUpdateInput) (*coreclient.StoreCategory, error)
+	UpdateStoreCategoryStatus(ctx context.Context, subject, storeID, categoryID, status string) (*coreclient.StoreCategory, error)
+	DeleteStoreCategory(ctx context.Context, subject, storeID, categoryID string) error
+	ReorderStoreCategories(ctx context.Context, subject, storeID string, order []coreclient.StoreCategoryReorderEntry) error
 
 	CreateOrderShipment(ctx context.Context, subject, orderID string, req coreclient.CreateShipmentRequest) (*coreclient.ShipmentResponse, error)
 	GetShipment(ctx context.Context, subject, shipmentID string) (*coreclient.ShipmentResponse, error)
@@ -301,7 +307,15 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Post("/public/webhooks/subscriptions", deps.handlePublicCreateWebhookSubscription)
 			r.Delete("/public/webhooks/subscriptions/{id}", deps.handlePublicDeleteWebhookSubscription)
 
+			// Store-Scoped Category Routes (seller-managed per-store categories;
+			// membership and isolation enforced by Core).
 			r.Get("/seller/stores/{store_id}/categories", deps.handleListStoreCategories)
+			r.Post("/seller/stores/{store_id}/categories", deps.handleCreateStoreCategory)
+			r.Get("/seller/stores/{store_id}/categories/{category_id}", deps.handleGetStoreCategory)
+			r.Put("/seller/stores/{store_id}/categories/{category_id}", deps.handleUpdateStoreCategory)
+			r.Post("/seller/stores/{store_id}/categories/{category_id}/status", deps.handleTransitionStoreCategoryStatus)
+			r.Delete("/seller/stores/{store_id}/categories/{category_id}", deps.handleDeleteStoreCategory)
+			r.Post("/seller/stores/{store_id}/categories/reorder", deps.handleReorderStoreCategories)
 		})
 	}
 }

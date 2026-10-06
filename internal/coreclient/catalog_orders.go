@@ -19,9 +19,10 @@ type SellerProductTranslation struct {
 }
 
 type SellerProductDraft struct {
-	Slug         string                     `json:"slug"`
-	Translations []SellerProductTranslation `json:"translations"`
-	CategoryIDs  []string                   `json:"category_ids,omitempty"`
+	Slug             string                     `json:"slug"`
+	Translations     []SellerProductTranslation `json:"translations"`
+	CategoryIDs      []string                   `json:"category_ids,omitempty"`
+	StoreCategoryIDs []string                   `json:"store_category_ids,omitempty"`
 }
 
 type SellerProduct struct {
@@ -177,6 +178,8 @@ type SellerProductDetail struct {
 	Source           string                     `json:"source"`
 	Translations     []SellerProductTranslation `json:"translations"`
 	CategoryIDs      []string                   `json:"category_ids"`
+	StoreCategoryIDs []string                   `json:"store_category_ids"`
+	StoreCategories  []StoreCategoryRef         `json:"store_categories"`
 	Variants         []Variant                  `json:"variants"`
 	SKUs             []SKU                      `json:"skus"`
 	Media            []MediaMetadata            `json:"media"`
@@ -426,12 +429,13 @@ func (c *Client) GetSellerProductDetail(ctx context.Context, subject, storeID, p
 	return &res, nil
 }
 
-func (c *Client) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []SellerProductTranslation, categoryIDs []string) (*SellerProductDetail, error) {
+func (c *Client) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*SellerProductDetail, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s", url.PathEscape(storeID), url.PathEscape(productID))
 	body := map[string]any{
-		"slug":         slug,
-		"translations": translations,
-		"category_ids": categoryIDs,
+		"slug":               slug,
+		"translations":       translations,
+		"category_ids":       categoryIDs,
+		"store_category_ids": storeCategoryIDs,
 	}
 	var res SellerProductDetail
 	if err := c.put(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {

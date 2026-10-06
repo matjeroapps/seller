@@ -33,6 +33,11 @@ type stubCore struct {
 	// page records the forwarded pagination window.
 	page coreclient.Page
 
+	storeCategories []coreclient.StoreCategory
+	categoryInput   coreclient.StoreCategoryInput
+	categoryID      string
+	reorderOrder    []coreclient.StoreCategoryReorderEntry
+
 	err error
 
 	seller    coreclient.Seller
@@ -245,7 +250,7 @@ func (s *stubCore) CreateSellerProduct(ctx context.Context, subject, storeID str
 func (s *stubCore) GetSellerProductDetail(ctx context.Context, subject, storeID, productID string) (*coreclient.SellerProductDetail, error) {
 	return &coreclient.SellerProductDetail{}, s.err
 }
-func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string) (*coreclient.SellerProductDetail, error) {
+func (s *stubCore) UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*coreclient.SellerProductDetail, error) {
 	return &coreclient.SellerProductDetail{}, s.err
 }
 func (s *stubCore) TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error) {
@@ -344,8 +349,48 @@ func (s *stubCore) GetStoreOrderDetail(ctx context.Context, subject, storeID, or
 func (s *stubCore) TransitionStoreOrder(ctx context.Context, subject, storeID, orderID string, req coreclient.OrderTransitionRequest) (*coreclient.SellerOrderDetail, error) {
 	return &coreclient.SellerOrderDetail{}, s.err
 }
-func (s *stubCore) ListCategories(ctx context.Context, subject string, limit, offset int) ([]coreclient.SellerCategory, error) {
-	return nil, s.err
+func (s *stubCore) ListStoreCategories(ctx context.Context, subject, storeID, status string, limit, offset int) ([]coreclient.StoreCategory, error) {
+	s.subject, s.storeID = subject, storeID
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.storeCategories, nil
+}
+func (s *stubCore) CreateStoreCategory(ctx context.Context, subject, storeID string, input coreclient.StoreCategoryInput) (*coreclient.StoreCategory, error) {
+	s.subject, s.storeID, s.categoryInput = subject, storeID, input
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &coreclient.StoreCategory{ID: "cat_new_1", StoreID: storeID, Slug: input.Slug, Status: "active", Translations: input.Translations}, nil
+}
+func (s *stubCore) GetStoreCategory(ctx context.Context, subject, storeID, categoryID string) (*coreclient.StoreCategory, error) {
+	s.subject, s.storeID, s.categoryID = subject, storeID, categoryID
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &coreclient.StoreCategory{ID: categoryID, StoreID: storeID, Slug: "winter", Status: "active"}, nil
+}
+func (s *stubCore) UpdateStoreCategory(ctx context.Context, subject, storeID, categoryID string, input coreclient.StoreCategoryUpdateInput) (*coreclient.StoreCategory, error) {
+	s.subject, s.storeID, s.categoryID = subject, storeID, categoryID
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &coreclient.StoreCategory{ID: categoryID, StoreID: storeID, Slug: "winter", Status: "active"}, nil
+}
+func (s *stubCore) UpdateStoreCategoryStatus(ctx context.Context, subject, storeID, categoryID, status string) (*coreclient.StoreCategory, error) {
+	s.subject, s.storeID, s.categoryID, s.status = subject, storeID, categoryID, status
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &coreclient.StoreCategory{ID: categoryID, StoreID: storeID, Slug: "winter", Status: status}, nil
+}
+func (s *stubCore) DeleteStoreCategory(ctx context.Context, subject, storeID, categoryID string) error {
+	s.subject, s.storeID, s.categoryID = subject, storeID, categoryID
+	return s.err
+}
+func (s *stubCore) ReorderStoreCategories(ctx context.Context, subject, storeID string, order []coreclient.StoreCategoryReorderEntry) error {
+	s.subject, s.storeID, s.reorderOrder = subject, storeID, order
+	return s.err
 }
 func (s *stubCore) CreateOrderShipment(ctx context.Context, subject, orderID string, req coreclient.CreateShipmentRequest) (*coreclient.ShipmentResponse, error) {
 	s.subject = subject

@@ -23,21 +23,22 @@ const (
 )
 
 type sellerProduct struct {
-	id            string
-	slug          string
-	status        string
-	createdAt     time.Time
-	updatedAt     time.Time
-	translations  []map[string]any // {product_id, locale, name, description}
-	categoryIDs   []string
-	listingID     string
-	listingStatus string
-	priceAmount   int64
-	priceCurrency string
-	hasPrice      bool
-	variants      []*sellerVariant
-	media         []*sellerMediaRecord
-	presentation  *sellerPresentation
+	id               string
+	slug             string
+	status           string
+	createdAt        time.Time
+	updatedAt        time.Time
+	translations     []map[string]any // {product_id, locale, name, description}
+	categoryIDs      []string
+	storeCategoryIDs []string
+	listingID        string
+	listingStatus    string
+	priceAmount      int64
+	priceCurrency    string
+	hasPrice         bool
+	variants         []*sellerVariant
+	media            []*sellerMediaRecord
+	presentation     *sellerPresentation
 }
 
 type sellerVariant struct {
@@ -248,6 +249,27 @@ func (s *fakeCoreServer) handleStoreRoutes(w http.ResponseWriter, r *http.Reques
 	case len(sub) == 1 && sub[0] == "storefront-host" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"host": fakeStoreHost})
 
+	// Store-scoped categories (spec 030).
+	case len(sub) == 1 && sub[0] == "categories" && r.Method == http.MethodGet:
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		writeJSON(w, http.StatusOK, map[string]any{"items": s.storeCategories, "total": len(s.storeCategories), "limit": 100, "offset": 0})
+	case len(sub) == 2 && sub[0] == "categories" && sub[1] == "reorder" && r.Method == http.MethodPost:
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	case len(sub) == 3 && sub[0] == "categories" && sub[2] == "status" && r.Method == http.MethodPost:
+		writeJSON(w, http.StatusOK, s.storeCategoryNode(sub[1], "active"))
+	case len(sub) == 2 && sub[0] == "categories" && r.Method == http.MethodGet:
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		node := s.storeCategoryNode(sub[1], "")
+		if node == nil {
+			writeCoreError(w, http.StatusNotFound, "not_found", "resource not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, node)
+	case len(sub) == 2 && sub[0] == "categories" && r.Method == http.MethodDelete:
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+
 	case len(sub) == 1 && sub[0] == "domains" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"items": s.seedDomains()})
 
@@ -389,6 +411,37 @@ func (s *fakeCoreServer) seedDomains() []any {
 
 func (s *fakeCoreServer) handleListCategories(w http.ResponseWriter) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": s.sellerCategories})
+}
+
+// --- store categories ---
+
+func (s *fakeCoreServer) storeCategoryRefsLocked(p *sellerProduct) []any {
+	refs := []any{}
+	for _, ref := range s.storeCategoryRefs {
+		for _, id := range p.storeCategoryIDs {
+			if id == ref["id"] {
+				refs = append(refs, ref)
+			}
+		}
+	}
+	return refs
+}
+
+func (s *fakeCoreServer) storeCategoryNode(id, statusOverride string) map[string]any {
+	for _, node := range s.storeCategories {
+		if node["id"] == id {
+			if statusOverride != "" {
+				clone := map[string]any{}
+				for k, v := range node {
+					clone[k] = v
+				}
+				clone["status"] = statusOverride
+				return clone
+			}
+			return node
+		}
+	}
+	return nil
 }
 
 // --- product shapes ---
@@ -551,9 +604,10 @@ func (s *fakeCoreServer) handleListProducts(w http.ResponseWriter, r *http.Reque
 
 func (s *fakeCoreServer) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Slug         string           `json:"slug"`
-		Translations []map[string]any `json:"translations"`
-		CategoryIDs  []string         `json:"category_ids"`
+		Slug             string           `json:"slug"`
+		Translations     []map[string]any `json:"translations"`
+		CategoryIDs      []string         `json:"category_ids"`
+		StoreCategoryIDs []string         `json:"store_category_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeCoreError(w, http.StatusBadRequest, "invalid_argument", "invalid JSON body")
@@ -606,6 +660,7 @@ func (s *fakeCoreServer) handleCreateProduct(w http.ResponseWriter, r *http.Requ
 	if body.CategoryIDs != nil {
 		p.categoryIDs = body.CategoryIDs
 	}
+	p.storeCategoryIDs = body.StoreCategoryIDs
 	s.sellerProducts = append(s.sellerProducts, p)
 	resp := s.productDetailLocked(p)
 	s.mu.Unlock()
@@ -626,9 +681,10 @@ func (s *fakeCoreServer) handleGetProduct(w http.ResponseWriter, _ *http.Request
 
 func (s *fakeCoreServer) handleUpdateProduct(w http.ResponseWriter, r *http.Request, productID string) {
 	var body struct {
-		Slug         string           `json:"slug"`
-		Translations []map[string]any `json:"translations"`
-		CategoryIDs  []string         `json:"category_ids"`
+		Slug             string           `json:"slug"`
+		Translations     []map[string]any `json:"translations"`
+		CategoryIDs      []string         `json:"category_ids"`
+		StoreCategoryIDs []string         `json:"store_category_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeCoreError(w, http.StatusBadRequest, "invalid_argument", "invalid JSON body")
@@ -667,6 +723,9 @@ func (s *fakeCoreServer) handleUpdateProduct(w http.ResponseWriter, r *http.Requ
 	if body.CategoryIDs != nil {
 		p.categoryIDs = body.CategoryIDs
 	}
+	if body.StoreCategoryIDs != nil {
+		p.storeCategoryIDs = body.StoreCategoryIDs
+	}
 	p.updatedAt = time.Now().UTC()
 	resp := s.productDetailLocked(p)
 	s.mu.Unlock()
@@ -694,19 +753,21 @@ func (s *fakeCoreServer) productDetailLocked(p *sellerProduct) map[string]any {
 	presentation := s.presentationShape(p)
 
 	return map[string]any{
-		"product":           s.productShape(p),
-		"source":            "seller_owned",
-		"translations":      translations,
-		"category_ids":      p.categoryIDs,
-		"variants":          variants,
-		"skus":              skus,
-		"media":             media,
-		"listing":           s.listingFor(p),
-		"current_price":     s.priceShape(p),
-		"inventory_summary": s.inventorySummaryFor(p),
-		"presentation":      presentation,
-		"purchase_behavior": presentation["purchase_behavior"],
-		"publish_readiness": s.publishReadiness(p),
+		"product":            s.productShape(p),
+		"source":             "seller_owned",
+		"translations":       translations,
+		"category_ids":       p.categoryIDs,
+		"store_category_ids": p.storeCategoryIDs,
+		"store_categories":   s.storeCategoryRefsLocked(p),
+		"variants":           variants,
+		"skus":               skus,
+		"media":              media,
+		"listing":            s.listingFor(p),
+		"current_price":      s.priceShape(p),
+		"inventory_summary":  s.inventorySummaryFor(p),
+		"presentation":       presentation,
+		"purchase_behavior":  presentation["purchase_behavior"],
+		"publish_readiness":  s.publishReadiness(p),
 	}
 }
 

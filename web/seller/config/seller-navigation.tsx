@@ -7,6 +7,7 @@ import {
   ChartNoAxesColumn,
   ClipboardPlus,
   CreditCard,
+  FolderTree,
   Layers,
   LayoutDashboard,
   PackageSearch,
@@ -72,6 +73,12 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
           label: 'Listings',
           icon: <Boxes aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/catalog/listings`
+        },
+        {
+          id: 'categories',
+          label: 'Categories',
+          icon: <FolderTree aria-hidden="true" className={iconClassName} />,
+          path: `${storePrefix}/catalog/categories`
         },
         {
           id: 'inventory',
@@ -245,6 +252,13 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
             label: 'Listings',
             icon: <Boxes aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/catalog/listings`,
+            capability: 'retail'
+          },
+          {
+            id: 'categories',
+            label: 'Categories',
+            icon: <FolderTree aria-hidden="true" className={iconClassName} />,
+            path: `${storePrefix}/catalog/categories`,
             capability: 'retail'
           },
           {

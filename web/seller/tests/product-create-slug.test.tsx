@@ -16,7 +16,8 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../lib/api/client', () => ({
   sellerApi: {
-    createStoreProduct: mockCreateStoreProduct
+    createStoreProduct: mockCreateStoreProduct,
+    listStoreCategories: vi.fn().mockResolvedValue([])
   }
 }));
 
