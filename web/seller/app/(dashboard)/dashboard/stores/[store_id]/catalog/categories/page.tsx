@@ -243,7 +243,7 @@ export default function StoreCategoriesPage({
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-2 sm:p-4">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 sm:p-4">
           <CategoryTree
             categories={categories}
             locale={locale}

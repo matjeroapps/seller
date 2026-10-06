@@ -153,7 +153,7 @@ function TreeRow({
           </span>
         )}
 
-        <span className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+        <span className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <button
             type="button"
             onClick={() => onMove(category, 'up')}
