@@ -97,13 +97,13 @@ func (deps Dependencies) handleListOrderShipments(w http.ResponseWriter, r *http
 }
 
 type CreateStoreShipmentRequest struct {
-	OrderID               string                            `json:"order_id"`
-	FulfillmentLocationID string                            `json:"fulfillment_location_id"`
-	CarrierName           string                            `json:"carrier_name,omitempty"`
-	TrackingNumber        string                            `json:"tracking_number,omitempty"`
-	ShippingCostMinor     int64                             `json:"shipping_cost_minor"`
-	CodAmountMinor        int64                             `json:"cod_amount_minor"`
-	Currency              string                            `json:"currency"`
+	OrderID               string                                 `json:"order_id"`
+	FulfillmentLocationID string                                 `json:"fulfillment_location_id"`
+	CarrierName           string                                 `json:"carrier_name,omitempty"`
+	TrackingNumber        string                                 `json:"tracking_number,omitempty"`
+	ShippingCostMinor     int64                                  `json:"shipping_cost_minor"`
+	CodAmountMinor        int64                                  `json:"cod_amount_minor"`
+	Currency              string                                 `json:"currency"`
 	Items                 []coreclient.CreateShipmentItemRequest `json:"items"`
 }
 

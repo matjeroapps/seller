@@ -41,7 +41,7 @@ test.describe('Seller Shipping Operations E2E', () => {
 
   test('Seller can view store shipments overview page with status filters', async ({ page }) => {
     await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/shipments`);
-    await expect(page.getByRole('heading', { name: 'Store Shipments Overview' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Store Shipments Queue' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'ALL' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'PENDING' })).toBeVisible();
   });

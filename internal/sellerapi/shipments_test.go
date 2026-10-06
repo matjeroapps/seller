@@ -12,13 +12,13 @@ import (
 
 type shipmentsStubCore struct {
 	stubCore
-	listStoreShipmentsCalled bool
-	lastStoreID              string
-	lastStatus               string
-	lastPage                 int
-	lastPageSize             int
+	listStoreShipmentsCalled  bool
+	lastStoreID               string
+	lastStatus                string
+	lastPage                  int
+	lastPageSize              int
 	createOrderShipmentCalled bool
-	lastOrderID              string
+	lastOrderID               string
 }
 
 func (s *shipmentsStubCore) ListStoreShipments(ctx context.Context, subject, storeID string, status string, page, pageSize int) (*coreclient.StoreShipmentsResponse, error) {
