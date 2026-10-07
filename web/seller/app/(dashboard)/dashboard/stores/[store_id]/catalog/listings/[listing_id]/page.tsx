@@ -7,6 +7,7 @@ import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { sellerApi } from '@/lib/api/client';
 import type { SellerListing, SellerListingLifecycle, StructuredPublishReadiness } from '@/lib/api/types';
 import { majorToMinor, minorAmount, minorToMajor } from '@/lib/money';
+import { getCurrencyForMarketCode } from '@/lib/dashboard-model';
 
 export default function StoreListingDetailPage({
   params
@@ -29,6 +30,7 @@ export default function StoreListingDetailPage({
 
   const [priceAmount, setPriceAmount] = useState<string>('');
   const [priceCurrency, setPriceCurrency] = useState<string>('SAR');
+  const [storeCurrency, setStoreCurrency] = useState<string>('SAR');
   const [markupPercent, setMarkupPercent] = useState<string>('20');
   const [shippingSubsidy, setShippingSubsidy] = useState<'buyer_paid' | 'seller_free'>('buyer_paid');
   const [estimatedShipping, setEstimatedShipping] = useState<string>('15');
@@ -42,17 +44,24 @@ export default function StoreListingDetailPage({
     Promise.all([
       sellerApi.getStoreListing(store_id, listing_id),
       sellerApi.getStoreListingLifecycle(store_id, listing_id).catch(() => null),
-      sellerApi.getListingReadiness(store_id, listing_id).catch(() => null)
+      sellerApi.getListingReadiness(store_id, listing_id).catch(() => null),
+      Promise.resolve(sellerApi.getStores()).catch(() => ({ items: [] }))
     ])
-      .then(([listingRes, lifecycleRes, readinessRes]) => {
+      .then(([listingRes, lifecycleRes, readinessRes, storesRes]) => {
         setListing(listingRes);
         setLifecycle(lifecycleRes);
         setReadiness(readinessRes);
 
+        const store = (storesRes?.items || []).find((item) => item.id === store_id);
+        const configuredCurrency = getCurrencyForMarketCode(store?.market_code || listingRes.market_code);
+        setStoreCurrency(configuredCurrency);
+
         // Pre-fill retail price if available (API amounts are minor units)
         const retailMinor = minorAmount(lifecycleRes?.current_retail_price);
         const wholesaleMinor = minorAmount(lifecycleRes?.upstream_wholesale_price);
-        const cur = lifecycleRes?.current_retail_price?.currency || lifecycleRes?.upstream_wholesale_price?.currency || 'SAR';
+        // Store market currency is authoritative. Listing and supplier price
+        // records must never make a different currency selectable in Seller.
+        const cur = configuredCurrency;
         if (retailMinor !== null && retailMinor > 0) {
           setPriceAmount(minorToMajor(retailMinor, cur).toFixed(2));
         }
@@ -365,12 +374,13 @@ export default function StoreListingDetailPage({
                   <select
                     value={priceCurrency}
                     onChange={(e) => setPriceCurrency(e.target.value)}
+                    disabled
+                    aria-label="Store currency"
                     className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="SAR">SAR</option>
-                    <option value="USD">USD</option>
-                    <option value="AED">AED</option>
+                    <option value={storeCurrency}>{storeCurrency}</option>
                   </select>
+                  <p className="mt-1 text-[10px] text-slate-500">Set by the store market ({storeCurrency}).</p>
                 </div>
 
                 <div>

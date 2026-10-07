@@ -62,8 +62,8 @@ export function formatCompactNumber(value: number) {
   return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
-export function getStoreCurrency(store?: Store) {
-  switch (store?.market_code) {
+export function getCurrencyForMarketCode(marketCode?: string) {
+  switch ((marketCode || '').trim().toUpperCase()) {
     case 'EG':
       return 'EGP';
     case 'AE':
@@ -74,6 +74,10 @@ export function getStoreCurrency(store?: Store) {
     default:
       return 'SAR';
   }
+}
+
+export function getStoreCurrency(store?: Store) {
+  return getCurrencyForMarketCode(store?.market_code);
 }
 
 export function getLowStockItems(inventory: InventorySnapshot[]) {

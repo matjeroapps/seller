@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({
 const { mockApi } = vi.hoisted(() => {
   const mockApi = {
     getStoreListing: vi.fn(),
+    getStores: vi.fn(),
     getStoreListingLifecycle: vi.fn(),
     getListingReadiness: vi.fn(),
     updateListingPrice: vi.fn(),
@@ -38,9 +39,59 @@ describe('Margin Guardrails & Atomic Imports (T035-T038)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockApi.getStores.mockResolvedValue({ items: [] });
   });
 
   describe('Listing Detail Page Margin Guardrail & Owner Override', () => {
+    it('uses the store market currency and only offers that currency for pricing', async () => {
+      mockApi.getStoreListing.mockResolvedValue({
+        id: listingId,
+        store_id: storeId,
+        product_id: 'prod_123',
+        status: 'draft',
+        market_code: 'EG',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      mockApi.getStores.mockResolvedValue({
+        items: [{
+          id: storeId,
+          seller_id: 'seller_123',
+          market_code: 'EG',
+          code: 'eg-store',
+          name: 'Egypt Store',
+          status: 'draft',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }],
+        active_store_limit: 5,
+        active_store_count: 0,
+      });
+      mockApi.getStoreListingLifecycle.mockResolvedValue({
+        listing_id: listingId,
+        store_id: storeId,
+        status: 'draft',
+        effective_availability: 'available',
+        is_upstream_available: true,
+        has_margin_warning: false,
+        last_synced_at: new Date().toISOString(),
+      });
+      mockApi.getListingReadiness.mockResolvedValue({ is_ready: true, reasons: [] });
+
+      await act(async () => {
+        render(<StoreListingDetailPage params={{ store_id: storeId, listing_id: listingId }} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
+      });
+
+      const currencySelect = screen.getByRole('combobox') as HTMLSelectElement;
+      expect(currencySelect.value).toBe('EGP');
+      expect(screen.getByRole('option', { name: 'EGP' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'SAR' })).toBeNull();
+    });
+
     it('does not display sub-wholesale override panel when retail price >= wholesale cost', async () => {
       mockApi.getStoreListing.mockResolvedValue({
         id: listingId,

@@ -67,6 +67,11 @@ type SellerProductListPayload = {
     };
     source?: string;
     name?: string;
+    listing_status?: string;
+    listing_id?: string;
+    current_price?: Product['current_price'];
+    inventory_summary?: Product['inventory_summary'];
+    publish_readiness?: Product['publish_readiness'];
   }>;
   items?: Product[];
 };
@@ -295,7 +300,12 @@ export const sellerApi = {
         name: row.name || row.product?.slug || 'Unnamed product',
         status: (row.product?.status || 'draft') as Product['status'],
         created_at: row.product?.created_at || '',
-        updated_at: row.product?.updated_at || ''
+        updated_at: row.product?.updated_at || '',
+        listing_id: row.listing_id,
+        listing_status: row.listing_status,
+        current_price: row.current_price,
+        inventory_summary: row.inventory_summary,
+        publish_readiness: row.publish_readiness
       }))
     };
   },
