@@ -38,6 +38,34 @@ function readinessLabel(product: Product) {
   return 'Readiness not checked';
 }
 
+function ProductImagePreview({
+  src,
+  alt,
+  className,
+  iconClassName
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  iconClassName: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) {
+    return (
+      <div className={`${className} bg-slate-100`} role="img" aria-label="No product image">
+        <ImageIcon className={iconClassName} aria-hidden="true" />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+}
+
 export default function StoreProductsPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
   const searchParams = useSearchParams();
@@ -209,11 +237,12 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
               return (
                 <article key={product.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                   <div className="relative flex h-44 items-center justify-center bg-slate-100">
-                    {image ? (
-                      <img src={image} alt={product.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <ImageIcon className="h-12 w-12 text-slate-300" aria-label="No product image" />
-                    )}
+                    <ProductImagePreview
+                      src={image}
+                      alt={product.name}
+                      className="flex h-full w-full items-center justify-center object-cover"
+                      iconClassName="h-12 w-12 text-slate-300"
+                    />
                     <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold uppercase text-slate-700 shadow-sm">
                       {product.status}
                     </span>
@@ -279,9 +308,12 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                   return (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-2">
-                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                        {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-5 w-5 text-slate-300" aria-label="No product image" />}
-                      </div>
+                      <ProductImagePreview
+                        src={image}
+                        alt=""
+                        className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg object-cover"
+                        iconClassName="h-5 w-5 text-slate-300"
+                      />
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-900">
                       <Link href={`/dashboard/stores/${store_id}/catalog/products/${p.id}`} className="hover:underline">
