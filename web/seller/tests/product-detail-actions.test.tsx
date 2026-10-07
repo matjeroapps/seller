@@ -259,6 +259,8 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
     });
 
     fireEvent.click(screen.getByTitle('Detach reference'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Detach image' }));
 
     await waitFor(() => {
       expect(mockApi.detachProductMedia).toHaveBeenCalledWith('store_123', 'prod_456', 'ref_1');

@@ -331,6 +331,7 @@ export interface StoreMediaAsset {
   status: 'ready' | 'deleting' | 'deleted';
   url: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ProductMediaReference {

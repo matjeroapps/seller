@@ -8,15 +8,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   ExternalLink,
-  Image as ImageIcon,
   Layers,
   Package,
   Plus,
-  Save,
-  Trash2
+  Save
 } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { CategoryPicker } from '@/components/seller/CategoryPicker';
+import { ProductMediaWorkspace } from '@/components/seller/ProductMediaWorkspace';
 import { VariantOptionsModal } from '@/components/seller/VariantOptionsModal';
 import { sellerApi } from '@/lib/api/client';
 import { formatMoney } from '@/lib/money';
@@ -153,8 +152,6 @@ export default function StoreProductDetailPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [working, setWorking] = useState(false);
-  const [selectedAssetId, setSelectedAssetId] = useState('');
-  const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -435,39 +432,6 @@ export default function StoreProductDetailPage({
       setError(err.message || 'Failed to update SKU');
     } finally {
       setWorking(false);
-    }
-  };
-
-  const handleAttachMedia = async () => {
-    if (!selectedAssetId || !canManageProduct) return;
-    setAttaching(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const ref = await sellerApi.attachProductMedia(store_id, product_id, {
-        asset_id: selectedAssetId,
-        is_primary: references.length === 0
-      });
-      setReferences((prev) => [...prev, ref]);
-      setSelectedAssetId('');
-      setNotice('Media attached.');
-    } catch (err: any) {
-      setError(err.message || 'Failed to attach media reference');
-    } finally {
-      setAttaching(false);
-    }
-  };
-
-  const handleDetachMedia = async (refId: string) => {
-    if (!canManageProduct) return;
-    setError(null);
-    setNotice(null);
-    try {
-      await sellerApi.detachProductMedia(store_id, product_id, refId);
-      setReferences((prev) => prev.filter((ref) => ref.id !== refId));
-      setNotice('Media detached.');
-    } catch (err: any) {
-      setError(err.message || 'Failed to detach media reference');
     }
   };
 
@@ -1056,78 +1020,14 @@ export default function StoreProductDetailPage({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-950">Product media references</h2>
-            <p className="mt-1 text-xs text-slate-500">Attach existing store media assets to this product.</p>
-          </div>
-          <Link href={`/dashboard/stores/${store_id}/media`} className="text-xs font-semibold text-indigo-600 hover:underline">
-            Upload to Media Library
-          </Link>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <select
-            value={selectedAssetId}
-            onChange={(event) => setSelectedAssetId(event.target.value)}
-            disabled={!canManageProduct}
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs disabled:bg-slate-50"
-          >
-            <option value="">Select an asset from store media library...</option>
-            {mediaAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.original_filename || 'Media asset'}
-                {asset.checksum_sha256 ? ` (${asset.checksum_sha256.substring(0, 8)}...)` : ''}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={!canManageProduct || !selectedAssetId || attaching}
-            onClick={handleAttachMedia}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Attach Media
-          </button>
-        </div>
-
-        {references.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">
-            No media attached to this product yet. Select an asset above or upload to the store media library.
-          </div>
-        ) : (
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {references.map((ref) => (
-              <div key={ref.id} className="relative space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                <div className="flex h-28 items-center justify-center overflow-hidden rounded-lg bg-slate-200">
-                  {ref.url ? (
-                    <img src={ref.url} alt={ref.alt_text || product.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <ImageIcon className="h-6 w-6 text-slate-400" />
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  {ref.is_primary ? (
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">Primary</span>
-                  ) : (
-                    <span className="text-slate-500">Secondary</span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!canManageProduct}
-                    onClick={() => handleDetachMedia(ref.id)}
-                    className="p-1 text-red-600 hover:text-red-800 disabled:opacity-40"
-                    title="Detach reference"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <ProductMediaWorkspace
+        storeId={store_id}
+        productId={product_id}
+        productName={product.name}
+        canManage={canManageProduct}
+        initialAssets={mediaAssets}
+        initialReferences={references}
+      />
 
       <ConfirmModal
         isOpen={showArchiveModal}
