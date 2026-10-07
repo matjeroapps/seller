@@ -63,6 +63,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const { locale, toggleLocale, direction } = useTranslation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState('');
   const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'legacy' });
 
   // Legacy store paths remain compatibility entrypoints; canonical merchant
@@ -141,6 +142,13 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
     setMobileNavOpen(false);
     setProfileOpen(false);
     router.push(path);
+  };
+
+  const submitCatalogSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = catalogQuery.trim();
+    const destination = query ? `${catalogSearchPath}?query=${encodeURIComponent(query)}` : catalogSearchPath;
+    navigate(destination);
   };
 
   const currentStoreId = inMerchantContext ? merchantStoreId : legacyStoreId;
@@ -246,10 +254,25 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
             </nav>
           </div>
 
-          <button type="button" className="seller-search-command" onClick={() => navigate(catalogSearchPath)}>
+          <form className="seller-search-command" role="search" onSubmit={submitCatalogSearch}>
             <Search aria-hidden="true" />
-            <span>Search catalog</span>
-          </button>
+            <label className="sr-only" htmlFor="seller-catalog-search">
+              Search catalog
+            </label>
+            <input
+              id="seller-catalog-search"
+              type="search"
+              name="query"
+              value={catalogQuery}
+              onChange={(event) => setCatalogQuery(event.target.value)}
+              placeholder="Search catalog"
+              aria-label="Search catalog"
+              autoComplete="off"
+            />
+            <button type="submit" className="sr-only" aria-label="Submit catalog search">
+              Search
+            </button>
+          </form>
 
           <div className="seller-topbar__actions">
             <button

@@ -44,6 +44,13 @@ export interface Product {
   supplier_name?: string;
   created_at: string;
   updated_at: string;
+  listing_id?: string;
+  listing_status?: string;
+  current_price?: Money | null;
+  inventory_summary?: InventorySummary;
+  publish_readiness?: PublishReadiness;
+  primary_media_uri?: string;
+  media_count?: number;
 }
 
 export interface SellerCategory {
@@ -230,6 +237,8 @@ export interface SellerProductDetail {
   presentation: SellerListingPresentation;
   purchase_behavior: string;
   publish_readiness: PublishReadiness;
+  primary_media_id?: string;
+  primary_media_uri?: string;
 }
 
 export interface SellerListing {

@@ -325,9 +325,26 @@ a {
   border-radius: 8px;
   background: var(--color-card);
   color: var(--color-muted-foreground);
-  cursor: pointer;
   padding: 10px 14px;
   text-align: start;
+}
+
+.seller-search-command input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-foreground);
+  font: inherit;
+}
+
+.seller-search-command input::placeholder {
+  color: var(--color-muted-foreground);
+}
+
+.seller-search-command input::-webkit-search-cancel-button {
+  cursor: pointer;
 }
 
 .seller-search-command span {

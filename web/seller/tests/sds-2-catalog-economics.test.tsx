@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../lib/api/client', () => ({
   sellerApi: {
+    getStores: vi.fn(),
     getStoreListing: vi.fn(),
     getStoreListingLifecycle: vi.fn(),
     getListingReadiness: vi.fn(),
@@ -30,6 +31,11 @@ vi.mock('../lib/api/client', () => ({
 describe('SDS-2 — Seller Catalog Economics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(sellerApi.getStores).mockResolvedValue({
+      items: [],
+      active_store_limit: 0,
+      active_store_count: 0
+    });
   });
 
   describe('Listing Detail Economics', () => {
