@@ -45,6 +45,7 @@ import type {
   Theme,
   ThemeInstallationResponse,
   UpdatePaymentStatusPayload,
+  UpdateProductVariantPayload,
   UpdateSellerProfilePayload,
   UpdateShipmentStatusPayload,
   WebhookSubscription
@@ -442,12 +443,14 @@ export const sellerApi = {
   async createProductVariant(
     storeId: string,
     productId: string,
-    data: CreateProductVariantPayload | { code: string; status: string }
+    data: CreateProductVariantPayload | { code: string; status: string },
+    idempotencyKey?: string
   ): Promise<ProductVariant> {
     return request<ProductVariant>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants`,
       {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(data)
       }
     );
@@ -457,7 +460,7 @@ export const sellerApi = {
     storeId: string,
     productId: string,
     variantId: string,
-    data: { code: string; status: string }
+    data: UpdateProductVariantPayload
   ): Promise<ProductVariant> {
     return request<ProductVariant>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
@@ -465,6 +468,20 @@ export const sellerApi = {
         method: 'PUT',
         body: JSON.stringify(data)
       }
+    );
+  },
+
+  async deleteProductVariant(storeId: string, productId: string, variantId: string): Promise<void> {
+    await request<void>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  async archiveProductVariant(storeId: string, productId: string, variantId: string): Promise<ProductVariant> {
+    return request<ProductVariant>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/archive`,
+      { method: 'POST' }
     );
   },
 

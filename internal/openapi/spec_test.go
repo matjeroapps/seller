@@ -190,6 +190,88 @@ func TestStorefrontSpecOmitsPrivateVocabulary(t *testing.T) {
 	}
 }
 
+// The seller document must declare the variant lifecycle routes that the
+// seller API registers: DELETE of an unreferenced variant and the POST
+// .../archive lifecycle transition.
+func TestProductVariantLifecycleRoutesAreDeclared(t *testing.T) {
+	spec, err := BuildSellerSpec()
+	if err != nil {
+		t.Fatalf("build seller spec: %v", err)
+	}
+
+	variantPath := "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}"
+	item := spec.Paths.Value(variantPath)
+	if item == nil || item.Delete == nil {
+		t.Fatalf("seller spec missing DELETE %s", variantPath)
+	}
+	if item.Delete.OperationID != "deleteProductVariant" {
+		t.Fatalf("DELETE variant operation id = %q, want deleteProductVariant", item.Delete.OperationID)
+	}
+	if !containsTag(item.Delete.Tags, "Variants") {
+		t.Fatalf("DELETE variant route missing Variants tag")
+	}
+	if item.Delete.Security == nil || len(*item.Delete.Security) == 0 {
+		t.Fatalf("DELETE variant route must require auth")
+	}
+	deleteResponses := item.Delete.Responses.Map()
+	for _, status := range []string{"204", "404", "409"} {
+		if deleteResponses[status] == nil || deleteResponses[status].Value == nil {
+			t.Fatalf("DELETE variant missing %s response (responses %v)", status, deleteResponses)
+		}
+	}
+
+	archivePath := "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive"
+	archive := spec.Paths.Value(archivePath)
+	if archive == nil || archive.Post == nil {
+		t.Fatalf("seller spec missing POST %s", archivePath)
+	}
+	if archive.Post.OperationID != "archiveProductVariant" {
+		t.Fatalf("archive variant operation id = %q, want archiveProductVariant", archive.Post.OperationID)
+	}
+	if !containsTag(archive.Post.Tags, "Variants") {
+		t.Fatalf("archive variant route missing Variants tag")
+	}
+	if archive.Post.Security == nil || len(*archive.Post.Security) == 0 {
+		t.Fatalf("archive variant route must require auth")
+	}
+	okResponse := archive.Post.Responses.Value("200")
+	if okResponse == nil || okResponse.Value == nil || okResponse.Value.Description == nil {
+		t.Fatalf("archive variant route should return 200 with an archived-variant description")
+	}
+	description := strings.ToLower(*okResponse.Value.Description)
+	if !strings.Contains(description, "archived") || !strings.Contains(description, "variant") {
+		t.Fatalf("archive variant route should return 200 with an archived-variant description")
+	}
+
+	// The declared paths must line up with the routes the seller router
+	// registers, so the document cannot drift from the server surface.
+	registered := map[string]map[string]string{
+		variantPath: {"DELETE": "deleteProductVariant"},
+		archivePath: {"POST": "archiveProductVariant"},
+		"/v1/seller/stores/{store_id}/products/{product_id}/variants":                            {"POST": "createProductVariant"},
+		"/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}":               {"PUT": "updateProductVariant"},
+		"/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus":          {"POST": "createProductSKU"},
+		"/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}": {"PUT": "updateProductSKU"},
+	}
+	// The lifecycle table above keys off the same surface the router registers;
+	// a missing entry here means the document no longer covers a variant route.
+	for path, methods := range registered {
+		entry := spec.Paths.Value(path)
+		if entry == nil {
+			t.Fatalf("seller spec missing variant path %s", path)
+		}
+		for method, operationID := range methods {
+			operation := entry.Operations()[method]
+			if operation == nil {
+				t.Fatalf("seller spec path %s missing declared method %s", path, method)
+			}
+			if operation.OperationID != operationID {
+				t.Fatalf("seller spec path %s method %s operation id = %q, want %q", path, method, operation.OperationID, operationID)
+			}
+		}
+	}
+}
+
 func containsTag(tags []string, want string) bool {
 	for _, tag := range tags {
 		if tag == want {

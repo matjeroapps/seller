@@ -25,6 +25,8 @@ const { mockApi } = vi.hoisted(() => {
     archiveProduct: vi.fn(),
     createProductVariant: vi.fn(),
     updateProductVariant: vi.fn(),
+    archiveProductVariant: vi.fn(),
+    deleteProductVariant: vi.fn(),
     createProductSku: vi.fn(),
     updateProductSku: vi.fn(),
     attachProductMedia: vi.fn(),
@@ -296,6 +298,129 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
         'prod_456',
         expect.objectContaining({ store_category_ids: ['cat-electronics', 'cat-accessories'] })
       );
+    });
+  });
+
+  describe('Variant lifecycle confirmation flow (034)', () => {
+    const skulessDetail = { ...sampleDetail, skus: [] };
+    const archivedDetail = {
+      ...skulessDetail,
+      product: { ...sampleDetail.product, updated_at: '2026-10-07T00:00:00Z' },
+      variants: [{ ...sampleDetail.variants[0], status: 'archived' }],
+      skus: [{ ...sampleDetail.skus[0], status: 'inactive' }]
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockApi.getStoreProductDetail.mockReset();
+      mockApi.getStoreProductDetail.mockResolvedValue(skulessDetail);
+      mockApi.listStoreCategories.mockResolvedValue([]);
+      mockApi.listStoreMedia.mockResolvedValue({ items: [] });
+      mockApi.listProductMediaReferences.mockResolvedValue({ items: [] });
+    });
+
+    async function openPage() {
+      await renderPage(
+        <StoreProductDetailPage
+          params={Promise.resolve({ store_id: 'store_123', product_id: 'prod_456' })}
+        />
+      );
+    }
+
+    it('requires confirmation before variant archive and remove (no immediate calls)', async () => {
+      await openPage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeInTheDocument();
+      });
+
+      // window.confirm must never be used for variant lifecycle actions
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      fireEvent.click(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' }));
+
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
+      expect(mockApi.archiveProductVariant).not.toHaveBeenCalled();
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Remove Variant' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
+    });
+
+    it('archives the variant only after confirmation and reloads with historical SKU shown', async () => {
+      mockApi.archiveProductVariant.mockResolvedValue({});
+      await openPage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' }));
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Archive Variant' })).toBeInTheDocument();
+
+      // Queue the post-archive reload before confirming so loadDetail picks it up.
+      mockApi.getStoreProductDetail.mockResolvedValueOnce(archivedDetail);
+      fireEvent.click(screen.getByRole('button', { name: 'Archive Variant' }));
+
+      await waitFor(() => {
+        expect(mockApi.archiveProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
+      });
+
+      // Reload with archived variant detail: status reflects history, SKU code still displayed.
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('archived')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('SKU-WAL-BRN-01')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('removes the variant only after confirmation and reports the refreshed state', async () => {
+      mockApi.deleteProductVariant.mockResolvedValue(undefined);
+
+      await openPage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })).toBeInTheDocument();
+      });
+
+      // Queue the post-removal reload before confirming.
+      mockApi.getStoreProductDetail.mockResolvedValueOnce({ ...skulessDetail, variants: [] });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Remove Variant' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Variant' }));
+
+      await waitFor(() => {
+        expect(mockApi.deleteProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
+      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByText('Variant removed.')).toBeInTheDocument();
+    });
+
+    it('shows actionable archive guidance and disables removal for SKU-referenced variants', async () => {
+      mockApi.getStoreProductDetail.mockResolvedValueOnce(sampleDetail); // var_1 backed by sku_1
+      await openPage();
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })
+        ).toBeDisabled();
+        expect(
+          screen.getByText(/referenced by 1 SKU; permanent removal is blocked/i)
+        ).toBeInTheDocument();
+      });
+
+      // The archive path remains available for referenced variants.
+      expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeEnabled();
     });
   });
 });

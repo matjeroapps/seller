@@ -692,6 +692,7 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     sellerApiMock.listThemes.mockResolvedValue({ items: [] });
     sellerApiMock.getThemeInstallation.mockResolvedValue(null);
     sellerApiMock.getStoreOperationalState.mockResolvedValue({ checkout_accepting: true, maintenance_message: '' });
+    sellerApiMock.getStorefrontHost.mockResolvedValue({ host: 'ST-1.localhost:3000' });
 
     let utils!: ReturnType<typeof render>;
     await act(async () => {

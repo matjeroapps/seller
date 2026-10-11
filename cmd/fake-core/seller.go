@@ -249,6 +249,17 @@ func (s *fakeCoreServer) handleStoreRoutes(w http.ResponseWriter, r *http.Reques
 	case len(sub) == 1 && sub[0] == "storefront-host" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"host": fakeStoreHost})
 
+	// Canonical fake store is always accepting checkout (launch gate).
+	case len(sub) == 1 && sub[0] == "operational-state" && r.Method == http.MethodGet:
+		now := time.Now().UTC()
+		writeJSON(w, http.StatusOK, map[string]any{
+			"store_id":            fakeStoreID,
+			"checkout_status":     "accepting",
+			"maintenance_message": "",
+			"checkout_accepting":  true,
+			"updated_at":          now,
+		})
+
 	// Store-scoped categories (spec 030).
 	case len(sub) == 1 && sub[0] == "categories" && r.Method == http.MethodGet:
 		s.mu.RLock()

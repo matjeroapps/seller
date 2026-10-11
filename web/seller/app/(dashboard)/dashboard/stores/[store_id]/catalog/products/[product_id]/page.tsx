@@ -11,15 +11,17 @@ import {
   Layers,
   Package,
   Plus,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
 import { CategoryPicker } from '@/components/seller/CategoryPicker';
 import { ProductMediaWorkspace } from '@/components/seller/ProductMediaWorkspace';
-import { VariantOptionsModal } from '@/components/seller/VariantOptionsModal';
+import { VariantOptionsModal, type VariantBatchConfig } from '@/components/seller/VariantOptionsModal';
 import { sellerApi } from '@/lib/api/client';
 import { useTranslation } from '@/lib/i18n/locale-context';
 import { formatMoney } from '@/lib/money';
+import { deriveVariantAttributes } from '@/lib/variants/preview';
 import type {
   CreateProductVariantPayload,
   Product,
@@ -29,7 +31,8 @@ import type {
   ProductVariant,
   SellerProductDetail,
   StoreCategory,
-  StoreMediaAsset
+  StoreMediaAsset,
+  UpdateProductVariantPayload
 } from '@/lib/api/types';
 
 type TranslationForm = {
@@ -46,9 +49,20 @@ type TranslationForm = {
   storeCategoryIds: string[];
 };
 
+type VariantAttributeEdit = {
+  attribute_id: string;
+  attribute_value_id: string;
+};
+
 type VariantEdit = {
   code: string;
   status: string;
+  /**
+   * Editable attribute combination for saved unreferenced variants. Seeded
+   * from the variant's saved `attribute_values`; only sent for unreferenced
+   * variants because referenced variants keep their combination immutable.
+   */
+  attribute_values?: VariantAttributeEdit[];
 };
 
 type SkuEdit = {
@@ -58,7 +72,7 @@ type SkuEdit = {
 };
 
 const productStatusOptions = ['draft', 'active', 'archived'];
-const catalogItemStatusOptions = ['draft', 'active', 'inactive', 'archived'];
+const catalogItemStatusOptions = ['active', 'inactive', 'archived'];
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -157,6 +171,10 @@ export default function StoreProductDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [variantConfirm, setVariantConfirm] = useState<{
+    variant: ProductVariant;
+    action: 'archive' | 'remove';
+  } | null>(null);
   const [showVariantOptionsModal, setShowVariantOptionsModal] = useState(false);
   const [form, setForm] = useState<TranslationForm>({
     enName: '',
@@ -178,11 +196,39 @@ export default function StoreProductDetailPage({
 
   const product = useMemo(() => (detail ? productFromDetail(detail, store_id) : null), [detail, store_id]);
 
+  const canManageProduct =
+    (product?.source === 'seller_owned' || detail?.source === 'seller_owned') &&
+    product?.status !== 'archived';
+
+  const variantOptions = useMemo(
+    () => (detail ? deriveVariantAttributes(detail.variants || []) : []),
+    [detail]
+  );
+
+  const variantBatchConfig: VariantBatchConfig | null = useMemo(() => {
+    if (!canManageProduct || !variantOptions.length) return null;
+    return {
+      storeId: store_id,
+      productId: product_id,
+      productCode: detail?.product.slug || product_id,
+      attributes: variantOptions,
+      existingVariantRecords: detail?.variants || [],
+      onComplete: () => refreshAfterMutation(`${t('products.noticeVariantSpecsCreated')} (batch)`)
+    };
+  }, [canManageProduct, variantOptions, store_id, product_id, detail, t]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resetEditableState = useCallback((nextDetail: SellerProductDetail) => {
     setForm(buildTranslationForm(nextDetail));
     setVariantEdits(
       productVariants(nextDetail).reduce<Record<string, VariantEdit>>((acc, variant) => {
-        acc[variant.id] = { code: variant.code, status: variant.status };
+        acc[variant.id] = {
+          code: variant.code,
+          status: variant.status,
+          attribute_values: asArray(variant.attribute_values).map((av) => ({
+            attribute_id: av.attribute_id,
+            attribute_value_id: av.value_id
+          }))
+        };
         return acc;
       }, {})
     );
@@ -238,9 +284,6 @@ export default function StoreProductDetailPage({
     }, {});
   }, [detail]);
 
-  const canManageProduct =
-    (product?.source === 'seller_owned' || detail?.source === 'seller_owned') &&
-    product?.status !== 'archived';
   const listing = detail?.listing;
 
   const refreshAfterMutation = async (message: string) => {
@@ -366,7 +409,7 @@ export default function StoreProductDetailPage({
     }
   };
 
-  const handleSaveVariant = async (variant: ProductVariant) => {
+  const handleSaveVariant = async (variant: ProductVariant, variantHasSkus: boolean) => {
     if (!canManageProduct) return;
     const edit = variantEdits[variant.id];
     if (!edit?.code.trim()) {
@@ -377,13 +420,59 @@ export default function StoreProductDetailPage({
     setError(null);
     setNotice(null);
     try {
-      await sellerApi.updateProductVariant(store_id, product_id, variant.id, {
+      const payload: UpdateProductVariantPayload = {
         code: edit.code.trim(),
         status: edit.status
-      });
+      };
+      // Unreferenced saved variants can atomically replace their attribute
+      // combination through the existing update route; referenced variants
+      // answer with an actionable 409 from Core, so their combination stays
+      // immutable and pending edits are preserved on conflict.
+      if (!variantHasSkus && edit.attribute_values && edit.attribute_values.length > 0) {
+        payload.attribute_values = edit.attribute_values
+          .map((av) => ({
+            attribute_id: av.attribute_id.trim(),
+            attribute_value_id: av.attribute_value_id.trim()
+          }))
+          .filter((av) => av.attribute_id !== '' && av.attribute_value_id !== '');
+      }
+      await sellerApi.updateProductVariant(store_id, product_id, variant.id, payload);
       await refreshAfterMutation(t('products.noticeVariantUpdated'));
     } catch (err: any) {
       setError(err.message || t('products.errorUpdateVariant'));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const openVariantConfirmation = (variant: ProductVariant, action: 'archive' | 'remove') => {
+    if (!canManageProduct) return;
+    setVariantConfirm({ variant, action });
+  };
+
+  const confirmVariantLifecycle = async () => {
+    if (!canManageProduct || !variantConfirm) return;
+    const { variant, action } = variantConfirm;
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (action === 'archive') {
+        await sellerApi.archiveProductVariant(store_id, product_id, variant.id);
+        await refreshAfterMutation('Variant archived and its active SKU was deactivated.');
+      } else {
+        await sellerApi.deleteProductVariant(store_id, product_id, variant.id);
+        await refreshAfterMutation('Variant removed.');
+      }
+      setVariantConfirm(null);
+    } catch (err: any) {
+      setVariantConfirm(null);
+      setError(
+        err.message ||
+          (action === 'remove'
+            ? 'Unable to remove variant. This variant is still referenced (SKUs or inventory history); archive it instead.'
+            : 'Unable to archive variant.')
+      );
     } finally {
       setWorking(false);
     }
@@ -754,10 +843,11 @@ export default function StoreProductDetailPage({
               const edit = variantEdits[variant.id] || { code: variant.code, status: variant.status };
               const skuDraft = newSkuByVariant[variant.id] || { code: '', barcode: '', status: 'active' };
               const variantSkus = skusByVariant[variant.id] || [];
+              const variantHasSkus = variantSkus.length > 0;
 
               return (
                 <div key={variant.id} className="rounded-xl border border-slate-200 p-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto]">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto_auto_auto]">
                     <input
                       value={edit.code}
                       onChange={(event) =>
@@ -788,13 +878,133 @@ export default function StoreProductDetailPage({
                     </select>
                     <button
                       type="button"
-                      onClick={() => handleSaveVariant(variant)}
+                      onClick={() => handleSaveVariant(variant, variantHasSkus)}
                       disabled={!canManageProduct || working}
                       className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
                       {t('products.saveVariant')}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => openVariantConfirmation(variant, 'archive')}
+                      disabled={!canManageProduct || working || variant.status === 'archived'}
+                      aria-label={`Deactivate variant ${variant.code}`}
+                      className="rounded-lg border border-amber-200 px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openVariantConfirmation(variant, 'remove')}
+                      disabled={!canManageProduct || working || variantHasSkus}
+                      aria-label={`Delete variant ${variant.code}`}
+                      title={variantHasSkus ? 'Variant is referenced by SKUs — archive it instead of removing it.' : undefined}
+                      className="rounded-lg border border-red-200 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Remove
+                    </button>
                   </div>
+
+                  {variantHasSkus && canManageProduct && (
+                    <p className="mt-2 text-xs text-amber-700" role="note" data-testid="variant-reference-guidance">
+                      This variant is referenced by {variantSkus.length} SKU{variantSkus.length > 1 ? 's' : ''}; permanent
+                      removal is blocked. Archive it instead to keep historical SKU records. Its attribute combination is
+                      locked while referenced — you can still edit the variant code and SKU details below.
+                    </p>
+                  )}
+
+                  {!variantHasSkus && canManageProduct && (
+                    <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/60 p-3" data-testid="variant-attribute-editor">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            Attribute Combination
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Editable while this variant is not referenced by SKUs or inventory history.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVariantEdits((prev) => ({
+                              ...prev,
+                              [variant.id]: { ...edit, attribute_values: [...(edit.attribute_values || []), { attribute_id: '', attribute_value_id: '' }] }
+                            }))
+                          }
+                          disabled={working}
+                          aria-label={`Add attribute to variant ${variant.code}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Attribute
+                        </button>
+                      </div>
+                      {(edit.attribute_values && edit.attribute_values.length > 0) ? (
+                        <div className="mt-2 space-y-2">
+                          {edit.attribute_values.map((attr, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Attribute ID (e.g. color)"
+                                value={attr.attribute_id}
+                                aria-label={`Attribute for variant ${variant.code}`}
+                                onChange={(event) =>
+                                  setVariantEdits((prev) => ({
+                                    ...prev,
+                                    [variant.id]: {
+                                      ...edit,
+                                      attribute_values: (edit.attribute_values || []).map((a, i) =>
+                                        i === idx ? { ...a, attribute_id: event.target.value } : a
+                                      )
+                                    }
+                                  }))
+                                }
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Attribute Value ID (e.g. red)"
+                                value={attr.attribute_value_id}
+                                aria-label={`Attribute value for variant ${variant.code}`}
+                                onChange={(event) =>
+                                  setVariantEdits((prev) => ({
+                                    ...prev,
+                                    [variant.id]: {
+                                      ...edit,
+                                      attribute_values: (edit.attribute_values || []).map((a, i) =>
+                                        i === idx ? { ...a, attribute_value_id: event.target.value } : a
+                                      )
+                                    }
+                                  }))
+                                }
+                                className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setVariantEdits((prev) => ({
+                                    ...prev,
+                                    [variant.id]: {
+                                      ...edit,
+                                      attribute_values: (edit.attribute_values || []).filter((_, i) => i !== idx)
+                                    }
+                                  }))
+                                }
+                                aria-label={`Remove attribute from variant ${variant.code}`}
+                                className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs italic text-slate-400">
+                          No attribute values on this variant. Click &quot;Add Attribute&quot; to link an option like Color or Size.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {variant.attribute_values && variant.attribute_values.length > 0 && (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -1044,11 +1254,30 @@ export default function StoreProductDetailPage({
         onCancel={() => setShowArchiveModal(false)}
       />
 
+      <ConfirmModal
+        isOpen={variantConfirm !== null}
+        title={
+          variantConfirm?.action === 'remove' ? 'Remove Variant' : 'Archive Variant'
+        }
+        description={
+          variantConfirm?.action === 'remove'
+            ? `Permanently remove variant ${variantConfirm.variant.code}? This cannot be undone and fails if the variant is still referenced by SKUs or inventory history. Archive it if you need to keep records.`
+            : `Archive variant ${variantConfirm?.variant.code}? Its active SKUs will be deactivated and historical records are kept. Reload shows the variant with archived status.`
+        }
+        confirmLabel={variantConfirm?.action === 'remove' ? 'Remove Variant' : 'Archive Variant'}
+        cancelLabel="Cancel"
+        variant={variantConfirm?.action === 'remove' ? 'danger' : 'warning'}
+        loading={working}
+        onConfirm={confirmVariantLifecycle}
+        onCancel={() => setVariantConfirm(null)}
+      />
+
       <VariantOptionsModal
         isOpen={showVariantOptionsModal}
         onClose={() => setShowVariantOptionsModal(false)}
         onSubmit={handleCreateVariantWithOptions}
         loading={working}
+        batch={variantBatchConfig}
       />
     </div>
   );
