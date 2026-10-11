@@ -3,6 +3,7 @@
 import { useState, useEffect, useId, useRef, FormEvent } from 'react';
 import { X, Plus, Trash2, Truck, Loader2, Package } from 'lucide-react';
 import type { CreateStoreShipmentPayload } from '@/lib/api/types';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export interface CreateShipmentModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function CreateShipmentModal({
 }: CreateShipmentModalProps) {
   const titleId = useId();
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const [orderId, setOrderId] = useState(defaultOrderId);
   const [fulfillmentLocationId, setFulfillmentLocationId] = useState(defaultLocationId || 'loc_main');
@@ -80,19 +82,19 @@ export function CreateShipmentModal({
 
     const cleanOrderId = orderId.trim();
     if (!cleanOrderId) {
-      setValidationError('Order ID is required to create a shipment.');
+      setValidationError(t('shipments.modal.orderIdRequired', 'Order ID is required to create a shipment.'));
       return;
     }
 
     const cleanLocationId = fulfillmentLocationId.trim();
     if (!cleanLocationId) {
-      setValidationError('Fulfillment location ID is required.');
+      setValidationError(t('shipments.modal.locationRequired', 'Fulfillment location ID is required.'));
       return;
     }
 
     const validItems = items.filter((item) => item.orderItemId.trim() && item.quantity > 0);
     if (validItems.length === 0) {
-      setValidationError('At least one shipment item with a valid order item ID and quantity is required.');
+      setValidationError(t('shipments.modal.itemsRequired', 'At least one shipment item with a valid order item ID and quantity is required.'));
       return;
     }
 
@@ -116,7 +118,7 @@ export function CreateShipmentModal({
     try {
       await onSubmit(payload);
     } catch (err: unknown) {
-      setValidationError(err instanceof Error ? err.message : 'Failed to create shipment.');
+      setValidationError(err instanceof Error ? err.message : t('shipments.modal.createFailed', 'Failed to create shipment.'));
     }
   };
 
@@ -139,10 +141,10 @@ export function CreateShipmentModal({
             </div>
             <div>
               <h2 id={titleId} className="text-base font-semibold text-slate-900">
-                Create Store Shipment
+                {t('shipments.modal.title', 'Create Store Shipment')}
               </h2>
               <p className="text-xs text-slate-500">
-                Dispatch an order shipment with optional courier tracking or auto-generated code
+                {t('shipments.modal.subtitle', 'Dispatch an order shipment with optional courier tracking or auto-generated code')}
               </p>
             </div>
           </div>
@@ -150,7 +152,7 @@ export function CreateShipmentModal({
             type="button"
             onClick={onClose}
             disabled={loading}
-            aria-label="Close dialog"
+            aria-label={t('shipments.modal.closeDialog', 'Close dialog')}
             className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
@@ -169,7 +171,7 @@ export function CreateShipmentModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="shipment-order-id" className="block text-xs font-semibold text-slate-700 mb-1">
-                Order ID <span className="text-rose-500">*</span>
+                {t('shipments.modal.orderIdLabel', 'Order ID')} <span className="text-rose-500">*</span>
               </label>
               <input
                 id="shipment-order-id"
@@ -177,7 +179,7 @@ export function CreateShipmentModal({
                 type="text"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                placeholder="e.g. ord_01j7..."
+                placeholder={t('shipments.modal.orderIdPlaceholder', 'e.g. ord_01j7...')}
                 required
                 disabled={loading}
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
@@ -186,14 +188,14 @@ export function CreateShipmentModal({
 
             <div>
               <label htmlFor="shipment-location-id" className="block text-xs font-semibold text-slate-700 mb-1">
-                Fulfillment Location <span className="text-rose-500">*</span>
+                {t('shipments.modal.locationLabel', 'Fulfillment Location')} <span className="text-rose-500">*</span>
               </label>
               <input
                 id="shipment-location-id"
                 type="text"
                 value={fulfillmentLocationId}
                 onChange={(e) => setFulfillmentLocationId(e.target.value)}
-                placeholder="e.g. loc_main"
+                placeholder={t('shipments.modal.locationPlaceholder', 'e.g. loc_main')}
                 required
                 disabled={loading}
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
@@ -205,14 +207,14 @@ export function CreateShipmentModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="shipment-carrier" className="block text-xs font-semibold text-slate-700 mb-1">
-                Carrier Name <span className="text-slate-400 font-normal">(Optional)</span>
+                {t('shipments.modal.carrierLabel', 'Carrier Name')} <span className="text-slate-400 font-normal">{t('shipments.modal.optional', '(Optional)')}</span>
               </label>
               <input
                 id="shipment-carrier"
                 type="text"
                 value={carrierName}
                 onChange={(e) => setCarrierName(e.target.value)}
-                placeholder="e.g. SMSA Express, Aramex"
+                placeholder={t('shipments.modal.carrierPlaceholder', 'e.g. SMSA Express, Aramex')}
                 disabled={loading}
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               />
@@ -220,19 +222,19 @@ export function CreateShipmentModal({
 
             <div>
               <label htmlFor="shipment-tracking" className="block text-xs font-semibold text-slate-700 mb-1">
-                Tracking Number <span className="text-slate-400 font-normal">(Optional)</span>
+                {t('shipments.modal.trackingLabel', 'Tracking Number')} <span className="text-slate-400 font-normal">{t('shipments.modal.optional', '(Optional)')}</span>
               </label>
               <input
                 id="shipment-tracking"
                 type="text"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
-                placeholder="Leave blank for auto TRK-..."
+                placeholder={t('shipments.modal.trackingPlaceholder', 'Leave blank for auto TRK-...')}
                 disabled={loading}
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
-                Leave blank to auto-generate an internal tracking code (<code className="text-indigo-600 font-mono">TRK-...</code>).
+                {t('shipments.modal.trackingHint', 'Leave blank to auto-generate an internal tracking code ({code}).').replace('{code}', 'TRK-...')}
               </span>
             </div>
           </div>
@@ -241,7 +243,7 @@ export function CreateShipmentModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label htmlFor="shipment-cost" className="block text-xs font-semibold text-slate-700 mb-1">
-                Shipping Fee ({currency})
+                {t('shipments.modal.shippingFeeLabel', 'Shipping Fee')} ({currency})
               </label>
               <input
                 id="shipment-cost"
@@ -257,7 +259,7 @@ export function CreateShipmentModal({
 
             <div>
               <label htmlFor="shipment-cod" className="block text-xs font-semibold text-slate-700 mb-1">
-                COD Amount ({currency})
+                {t('shipments.modal.codLabel', 'COD Amount')} ({currency})
               </label>
               <input
                 id="shipment-cod"
@@ -273,7 +275,7 @@ export function CreateShipmentModal({
 
             <div>
               <label htmlFor="shipment-currency" className="block text-xs font-semibold text-slate-700 mb-1">
-                Currency
+                {t('shipments.modal.currencyLabel', 'Currency')}
               </label>
               <select
                 id="shipment-currency"
@@ -295,7 +297,7 @@ export function CreateShipmentModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <Package className="w-3.5 h-3.5 text-slate-400" />
-                Shipment Line Items <span className="text-rose-500">*</span>
+                {t('shipments.modal.lineItemsLabel', 'Shipment Line Items')} <span className="text-rose-500">*</span>
               </label>
               <button
                 type="button"
@@ -303,7 +305,7 @@ export function CreateShipmentModal({
                 disabled={loading}
                 className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
               >
-                <Plus className="w-3 h-3" /> Add Item
+                <Plus className="w-3 h-3" /> {t('shipments.modal.addItem', 'Add Item')}
               </button>
             </div>
 
@@ -314,10 +316,10 @@ export function CreateShipmentModal({
                     type="text"
                     value={item.orderItemId}
                     onChange={(e) => handleItemChange(idx, 'orderItemId', e.target.value)}
-                    placeholder="Order Item ID (e.g. itm_01j...)"
+                    placeholder={t('shipments.modal.orderItemPlaceholder', 'Order Item ID (e.g. itm_01j...)')}
                     required
                     disabled={loading}
-                    aria-label={`Order Item ID ${idx + 1}`}
+                    aria-label={t('shipments.modal.orderItemAriaLabel', 'Order Item ID {index}').replace('{index}', String(idx + 1))}
                     className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <input
@@ -325,10 +327,10 @@ export function CreateShipmentModal({
                     min="1"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
-                    placeholder="Qty"
+                    placeholder={t('shipments.modal.qtyPlaceholder', 'Qty')}
                     required
                     disabled={loading}
-                    aria-label={`Quantity ${idx + 1}`}
+                    aria-label={t('shipments.modal.quantityAriaLabel', 'Quantity {index}').replace('{index}', String(idx + 1))}
                     className="w-16 px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center"
                   />
                   {items.length > 1 && (
@@ -336,7 +338,7 @@ export function CreateShipmentModal({
                       type="button"
                       onClick={() => handleRemoveItem(idx)}
                       disabled={loading}
-                      aria-label={`Remove Item ${idx + 1}`}
+                      aria-label={t('shipments.modal.removeItemAriaLabel', 'Remove Item {index}').replace('{index}', String(idx + 1))}
                       className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-50 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -355,7 +357,7 @@ export function CreateShipmentModal({
               disabled={loading}
               className="px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
             >
-              Cancel
+              {t('shipments.modal.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
@@ -363,7 +365,7 @@ export function CreateShipmentModal({
               className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {loading ? 'Creating...' : 'Create Shipment'}
+              {loading ? t('shipments.modal.creating', 'Creating...') : t('shipments.modal.submit', 'Create Shipment')}
             </button>
           </div>
         </form>

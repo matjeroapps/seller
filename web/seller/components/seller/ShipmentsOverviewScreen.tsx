@@ -15,6 +15,7 @@ import {
 
 import { sellerApi } from '@/lib/api/client';
 import type { Shipment, CreateStoreShipmentPayload } from '@/lib/api/types';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { CreateShipmentModal } from './CreateShipmentModal';
 
 type ShipmentsOverviewScreenProps = {
@@ -71,6 +72,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { t } = useTranslation();
 
   const loadShipments = useCallback(async (statusFilter: string) => {
     setLoading(true);
@@ -84,16 +86,19 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
       setShipments(response.items || []);
       setTotalCount(response.total_count ?? (response.items?.length || 0));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load store shipments.';
+      const message = err instanceof Error ? err.message : t('shipments.loadFailed', 'Failed to load store shipments.');
       setError(
         message === 'Actor authentication required'
-          ? 'Your session could not be used to load shipment operations. Refresh the dashboard or sign in again.'
+          ? t(
+              'shipments.authSessionMessage',
+              'Your session could not be used to load shipment operations. Refresh the dashboard or sign in again.'
+            )
           : message
       );
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     loadShipments(activeStatus);
@@ -106,7 +111,13 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
       setIsModalOpen(false);
       setNotification({
         type: 'success',
-        message: `Shipment created successfully with tracking code ${created.tracking_number || created.id}.`,
+        message: t(
+          'shipments.createSuccess',
+          'Shipment created successfully with tracking code {tracking}.'
+        ).replace(
+          '{tracking}',
+          created.tracking_number || created.id
+        ),
       });
       loadShipments(activeStatus);
     } catch (err: unknown) {
@@ -123,16 +134,16 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-medium text-indigo-600">
             <Truck className="w-4 h-4" />
-            <span>Store Fulfillment Queue</span>
+            <span>{t('shipments.eyebrow', 'Store Fulfillment Queue')}</span>
           </div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-slate-900">Store Shipments Queue</h1>
+            <h1 className="text-xl font-bold text-slate-900">{t('shipments.title', 'Store Shipments Queue')}</h1>
             <span className="px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-full border border-slate-200">
-              {totalCount} shipments
+              {totalCount} {t('shipments.shipmentsUnit', 'shipments')}
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Monitor and dispatch package shipments across all store orders
+            {t('shipments.subtitle', 'Monitor and dispatch package shipments across all store orders')}
           </p>
         </div>
 
@@ -144,7 +155,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('common.refresh', 'Refresh')}
           </button>
           <button
             type="button"
@@ -152,7 +163,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            Create Shipment
+            {t('shipments.createShipment', 'Create Shipment')}
           </button>
         </div>
       </div>
@@ -195,7 +206,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Filter Bar */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4 flex-wrap bg-slate-50/50">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full" aria-label="Shipment status filters">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full" aria-label={t('shipments.filtersAriaLabel', 'Shipment status filters')}>
             {shipmentStatuses.map((status) => (
               <button
                 key={status}
@@ -212,7 +223,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
             ))}
           </div>
           <div className="text-xs text-slate-500 font-medium">
-            Showing {shipments.length} of {totalCount} shipments
+            {t('shipments.showing', 'Showing')} {shipments.length} {t('shipments.of', 'of')} {totalCount} {t('shipments.shipmentsUnit', 'shipments')}
           </div>
         </div>
 
@@ -220,16 +231,16 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
-            <span>Loading store shipments...</span>
+            <span>{t('shipments.loading', 'Loading store shipments...')}</span>
           </div>
         ) : shipments.length === 0 ? (
           <div className="py-16 text-center space-y-3">
             <div className="inline-flex p-3 bg-slate-100 text-slate-400 rounded-full">
               <Truck className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-semibold text-slate-800">No shipments found in this status</h3>
+            <h3 className="text-sm font-semibold text-slate-800">{t('shipments.emptyTitle', 'No shipments found in this status')}</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              There are no shipments matching your filter. Create a shipment to begin order fulfillment.
+              {t('shipments.emptyBody', 'There are no shipments matching your filter. Create a shipment to begin order fulfillment.')}
             </p>
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
@@ -237,13 +248,13 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
                 onClick={() => setIsModalOpen(true)}
                 className="px-3.5 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
               >
-                Create Shipment
+                {t('shipments.createShipment', 'Create Shipment')}
               </button>
               <Link
                 href={`/dashboard/stores/${storeId}/orders`}
                 className="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
               >
-                View Store Orders
+                {t('shipments.viewStoreOrders', 'View Store Orders')}
               </Link>
             </div>
           </div>
@@ -252,14 +263,14 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-4">Tracking Code</th>
-                  <th className="py-3 px-4">Carrier</th>
-                  <th className="py-3 px-4">Order ID</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Items</th>
-                  <th className="py-3 px-4">Shipping Cost</th>
-                  <th className="py-3 px-4">Created At</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th className="py-3 px-4">{t('shipments.colTracking', 'Tracking Code')}</th>
+                  <th className="py-3 px-4">{t('shipments.colCarrier', 'Carrier')}</th>
+                  <th className="py-3 px-4">{t('shipments.colOrderId', 'Order ID')}</th>
+                  <th className="py-3 px-4">{t('shipments.colStatus', 'Status')}</th>
+                  <th className="py-3 px-4">{t('shipments.colItems', 'Items')}</th>
+                  <th className="py-3 px-4">{t('shipments.colShippingCost', 'Shipping Cost')}</th>
+                  <th className="py-3 px-4">{t('shipments.colCreatedAt', 'Created At')}</th>
+                  <th className="py-3 px-4 text-right">{t('shipments.colAction', 'Action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -272,7 +283,7 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-700">
-                      {sh.carrier_name || <span className="text-slate-400 italic">Merchant / Internal</span>}
+                      {sh.carrier_name || <span className="text-slate-400 italic">{t('shipments.merchantInternal', 'Merchant / Internal')}</span>}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-600">
                       <Link
@@ -293,20 +304,20 @@ export function ShipmentsOverviewScreen({ storeId }: ShipmentsOverviewScreenProp
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
-                      {sh.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || sh.items?.length || 1} units
+                      {sh.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || sh.items?.length || 1} {t('shipments.units', 'units')}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-800">
                       {formatCost(sh.shipping_cost_minor, sh.currency)}
                     </td>
                     <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                      {sh.created_at ? new Date(sh.created_at).toLocaleDateString() : 'N/A'}
+                      {sh.created_at ? new Date(sh.created_at).toLocaleDateString() : t('shipments.notAvailable', 'N/A')}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <Link
                         href={`/dashboard/stores/${storeId}/orders/${sh.order_id}`}
                         className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                       >
-                        View Order
+                        {t('shipments.viewOrder', 'View Order')}
                       </Link>
                     </td>
                   </tr>

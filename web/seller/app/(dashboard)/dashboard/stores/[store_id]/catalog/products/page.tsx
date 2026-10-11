@@ -18,36 +18,39 @@ import {
 } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { Product } from '@/lib/api/types';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { formatMoney } from '@/lib/money';
 
 type ProductView = 'list' | 'grid';
 
-function formatDate(value?: string) {
-  if (!value) return 'Not available';
+function formatDate(value: string | undefined, fallbackText: string) {
+  if (!value) return fallbackText;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? fallbackText : date.toLocaleDateString();
 }
 
 function productImage(product: Product, mediaByProductId: Record<string, string>) {
   return product.primary_media_uri || mediaByProductId[product.id] || '';
 }
 
-function readinessLabel(product: Product) {
-  if (product.publish_readiness?.is_ready) return 'Ready to publish';
+function readinessLabel(product: Product, readyText: string, notCheckedText: string) {
+  if (product.publish_readiness?.is_ready) return readyText;
   if (product.publish_readiness?.reasons?.[0]) return product.publish_readiness.reasons[0];
-  return 'Readiness not checked';
+  return notCheckedText;
 }
 
 function ProductImagePreview({
   src,
   alt,
   className,
-  iconClassName
+  iconClassName,
+  noImageLabel
 }: {
   src: string;
   alt: string;
   className: string;
   iconClassName: string;
+  noImageLabel: string;
 }) {
   const [failed, setFailed] = useState(false);
 
@@ -57,7 +60,7 @@ function ProductImagePreview({
 
   if (!src || failed) {
     return (
-      <div className={`${className} bg-slate-100`} role="img" aria-label="No product image">
+      <div className={`${className} bg-slate-100`} role="img" aria-label={noImageLabel}>
         <ImageIcon className={iconClassName} aria-hidden="true" />
       </div>
     );
@@ -69,6 +72,7 @@ function ProductImagePreview({
 export default function StoreProductsPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [mediaByProductId, setMediaByProductId] = useState<Record<string, string>>({});
@@ -134,21 +138,21 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Store Products Catalog</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Unified catalog containing seller-owned products and supplier-backed items</p>
+          <h1 className="text-xl font-bold text-slate-900">{t('products.catalogTitle')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('products.catalogSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/dashboard/stores/${store_id}/catalog/supplier-offers`}
             className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50"
           >
-            Import Supplier Offer
+            {t('products.importSupplierOffer')}
           </Link>
           <Link
             href={`/dashboard/stores/${store_id}/catalog/products/new`}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
           >
-            <Plus className="w-3.5 h-3.5" /> Create Product
+            <Plus className="w-3.5 h-3.5" /> {t('products.createProduct')}
           </Link>
         </div>
       </div>
@@ -157,65 +161,66 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
       <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            Search:
+            {t('products.searchLabel')}
             <input
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Name, slug, supplier..."
-              aria-label="Filter products"
+              placeholder={t('products.searchPlaceholder')}
+              aria-label={t('products.searchAria')}
               className="w-48 px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 font-normal focus:outline-none"
             />
           </label>
           <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            <Filter className="w-3.5 h-3.5" /> Source:
+            <Filter className="w-3.5 h-3.5" /> {t('products.sourceLabel')}
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value as any)}
               className="px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 font-normal focus:outline-none"
             >
-              <option value="all">All Sources</option>
-              <option value="seller_owned">Seller Owned</option>
-              <option value="supplier_backed">Supplier Backed</option>
+              <option value="all">{t('products.allSources')}</option>
+              <option value="seller_owned">{t('products.sellerOwned')}</option>
+              <option value="supplier_backed">{t('products.supplierBacked')}</option>
             </select>
           </div>
 
           <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            Status:
+            {t('products.statusLabel')}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 font-normal focus:outline-none"
             >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
+              <option value="all">{t('products.allStatuses')}</option>
+              <option value="draft">{t('statuses.draft')}</option>
+              <option value="active">{t('statuses.active')}</option>
+              <option value="archived">{t('statuses.archived')}</option>
             </select>
           </div>
         </div>
 
         <div className="text-xs text-slate-500">
-          Showing <span className="font-semibold text-slate-800">{filteredProducts.length}</span> of {products.length} products
+          {t('products.showingPrefix')} <span className="font-semibold text-slate-800">{filteredProducts.length}</span>{' '}
+          {t('products.showingSuffix').replace('{total}', String(products.length))}
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Product view">
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label={t('products.viewGroupAria')}>
           <button
             type="button"
-            aria-label="List view"
+            aria-label={t('products.listAria')}
             aria-pressed={view === 'list'}
             onClick={() => setView('list')}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${view === 'list' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            <List className="h-3.5 w-3.5" /> List
+            <List className="h-3.5 w-3.5" /> {t('products.listLabel')}
           </button>
           <button
             type="button"
-            aria-label="Grid view"
+            aria-label={t('products.gridAria')}
             aria-pressed={view === 'grid'}
             onClick={() => setView('grid')}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${view === 'grid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            <Grid2X2 className="h-3.5 w-3.5" /> Grid
+            <Grid2X2 className="h-3.5 w-3.5" /> {t('products.gridLabel')}
           </button>
         </div>
       </div>
@@ -223,11 +228,11 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
       {/* Products */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-slate-500 text-xs animate-pulse">Loading products catalog...</div>
+          <div className="p-8 text-center text-slate-500 text-xs animate-pulse">{t('products.loading')}</div>
         ) : filteredProducts.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-xs">
             <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            No products found matching filters.
+            {t('products.emptyFilters')}
           </div>
         ) : view === 'grid' ? (
           <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -240,6 +245,7 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                     <ProductImagePreview
                       src={image}
                       alt={product.name}
+                      noImageLabel={t('products.noImageAria')}
                       className="flex h-full w-full items-center justify-center object-cover"
                       iconClassName="h-12 w-12 text-slate-300"
                     />
@@ -257,28 +263,28 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                     <div className="flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
                         <Tag className="h-3 w-3" />
-                        {product.source === 'seller_owned' ? 'Seller Owned' : 'Supplier Backed'}
+                        {product.source === 'seller_owned' ? t('products.sellerOwned') : t('products.supplierBacked')}
                       </span>
                       {product.supplier_name && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{product.supplier_name}</span>}
                     </div>
                     <dl className="grid grid-cols-2 gap-3 text-[11px]">
                       <div>
-                        <dt className="text-slate-400">Retail price</dt>
-                        <dd className="font-semibold text-slate-800">{formatMoney(product.current_price, 'Not set')}</dd>
+                        <dt className="text-slate-400">{t('products.retailPrice')}</dt>
+                        <dd className="font-semibold text-slate-800">{formatMoney(product.current_price, t('products.moneyNotSet'))}</dd>
                       </div>
                       <div>
-                        <dt className="text-slate-400">Available</dt>
-                        <dd className="font-semibold text-slate-800">{available ?? '—'} units</dd>
+                        <dt className="text-slate-400">{t('products.available')}</dt>
+                        <dd className="font-semibold text-slate-800">{available ?? '—'} {t('products.unitsSuffix')}</dd>
                       </div>
                     </dl>
                     <div className={`flex items-start gap-1.5 text-[11px] ${product.publish_readiness?.is_ready ? 'text-emerald-700' : 'text-amber-700'}`}>
                       {product.publish_readiness?.is_ready ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-                      <span className="line-clamp-2">{readinessLabel(product)}</span>
+                      <span className="line-clamp-2">{readinessLabel(product, t('products.readyToPublish'), t('products.readinessNotChecked'))}</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className="text-[10px] text-slate-400">Updated {formatDate(product.updated_at)}</span>
+                      <span className="text-[10px] text-slate-400">{t('products.updatedPrefix')} {formatDate(product.updated_at, t('products.dateUnavailable'))}</span>
                       <Link href={`/dashboard/stores/${store_id}/catalog/products/${product.id}`} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-                        Edit Details
+                        {t('products.editDetails')}
                       </Link>
                     </div>
                   </div>
@@ -291,15 +297,15 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Preview</th>
-                  <th className="px-4 py-3">Product Name</th>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Slug</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Inventory</th>
-                  <th className="px-4 py-3">Readiness</th>
-                  <th className="px-4 py-3">Updated</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('products.colPreview')}</th>
+                  <th className="px-4 py-3">{t('products.colProductName')}</th>
+                  <th className="px-4 py-3">{t('products.colSource')}</th>
+                  <th className="px-4 py-3">{t('products.colSlug')}</th>
+                  <th className="px-4 py-3">{t('products.colStatus')}</th>
+                  <th className="px-4 py-3">{t('products.colInventory')}</th>
+                  <th className="px-4 py-3">{t('products.colReadiness')}</th>
+                  <th className="px-4 py-3">{t('products.colUpdated')}</th>
+                  <th className="px-4 py-3 text-right">{t('products.colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -311,6 +317,7 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                       <ProductImagePreview
                         src={image}
                         alt=""
+                        noImageLabel={t('products.noImageAria')}
                         className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg object-cover"
                         iconClassName="h-5 w-5 text-slate-300"
                       />
@@ -320,9 +327,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                         {p.name}
                       </Link>
                       {p.supplier_name && (
-                        <div className="text-[10px] text-slate-400">Supplier: {p.supplier_name}</div>
+                        <div className="text-[10px] text-slate-400">{t('products.supplierPrefix')}{p.supplier_name}</div>
                       )}
-                      <div className="mt-1 text-[10px] text-slate-400">ID: {p.id.slice(0, 8)}…</div>
+                      <div className="mt-1 text-[10px] text-slate-400">{t('products.idPrefix')}{p.id.slice(0, 8)}…</div>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -333,7 +340,7 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                         }`}
                       >
                         <Tag className="w-3 h-3" />
-                        {p.source === 'seller_owned' ? 'Seller Owned' : 'Supplier Backed'}
+                        {p.source === 'seller_owned' ? t('products.sellerOwned') : t('products.supplierBacked')}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-slate-500">{p.slug}</td>
@@ -354,24 +361,24 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">{p.inventory_summary?.total_available ?? '—'} available</div>
-                      <div className="text-[10px] text-slate-400">{formatMoney(p.current_price, 'Price not set')}</div>
+                      <div className="font-semibold text-slate-800">{p.inventory_summary?.total_available ?? '—'} {t('products.availableCount')}</div>
+                      <div className="text-[10px] text-slate-400">{formatMoney(p.current_price, t('products.priceNotSet'))}</div>
                     </td>
                     <td className="max-w-48 px-4 py-3">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${p.publish_readiness?.is_ready ? 'text-emerald-700' : 'text-amber-700'}`}>
                         {p.publish_readiness?.is_ready ? <CheckCircle2 className="h-3 w-3" /> : <CircleAlert className="h-3 w-3" />}
-                        <span className="truncate">{readinessLabel(p)}</span>
+                        <span className="truncate">{readinessLabel(p, t('products.readyToPublish'), t('products.readinessNotChecked'))}</span>
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-[10px] text-slate-500">
-                      <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatDate(p.updated_at)}</span>
+                      <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatDate(p.updated_at, t('products.dateUnavailable'))}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/dashboard/stores/${store_id}/catalog/products/${p.id}`}
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                       >
-                        Edit Details
+                        {t('products.editDetails')}
                       </Link>
                     </td>
                   </tr>

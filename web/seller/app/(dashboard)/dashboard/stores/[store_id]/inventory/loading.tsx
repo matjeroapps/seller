@@ -1,6 +1,11 @@
+'use client';
+
+import { useTranslation } from '@/lib/i18n/locale-context';
+
 export default function InventoryLoading() {
+  const { t } = useTranslation();
   return (
-    <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Loading store inventory">
+    <div className="space-y-6 animate-pulse" aria-busy="true" aria-label={t('inventory.loading', 'Loading store inventory')}>
       {/* Header Skeleton */}
       <div className="p-6 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-2">

@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import Link from 'next/link';
-import { Image as ImageIcon, Upload, Trash2, CheckCircle2, RefreshCw, Copy, ExternalLink, AlertCircle } from 'lucide-react';
+import { Image as ImageIcon, Upload, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi } from '@/lib/api/client';
 import type { StoreMediaAsset } from '@/lib/api/types';
 
@@ -17,6 +17,7 @@ export default function StoreMediaLibraryPage({
       ? use(params as Promise<{ store_id: string }>)
       : (params as unknown as { store_id: string }) || {};
   const { store_id } = unwrappedParams;
+  const { t } = useTranslation();
 
   const [assets, setAssets] = useState<StoreMediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,13 +58,13 @@ export default function StoreMediaLibraryPage({
     if (!file) return;
 
     setUploading(true);
-    setUploadStatus('Calculating checksum...');
+    setUploadStatus(t('media.statusChecksum'));
 
     try {
       const checksum = await computeSha256(file);
       const clientUploadId = crypto.randomUUID();
 
-      setUploadStatus('Presigning upload intent...');
+      setUploadStatus(t('media.statusPresigning'));
       const presign = await sellerApi.createMediaUpload(store_id, {
         client_upload_id: clientUploadId,
         filename: file.name,
@@ -73,13 +74,13 @@ export default function StoreMediaLibraryPage({
       });
 
       if (presign.mode === 'reuse' && presign.asset) {
-        setUploadStatus('Asset reused from deduplication cache!');
+        setUploadStatus(t('media.statusReused'));
         loadMedia();
         return;
       }
 
       if (presign.mode === 'upload' && presign.upload_url && presign.intent_id && presign.upload_token) {
-        setUploadStatus('Uploading object directly to storage...');
+        setUploadStatus(t('media.statusUploading'));
         const headers: Record<string, string> = {
           ...presign.required_headers
         };
@@ -91,16 +92,16 @@ export default function StoreMediaLibraryPage({
         });
 
         if (!uploadRes.ok) {
-          throw new Error(`Storage upload failed with HTTP ${uploadRes.status}`);
+          throw new Error(t('media.storageUploadFailed').replace('{status}', String(uploadRes.status)));
         }
 
-        setUploadStatus('Verifying object completion...');
+        setUploadStatus(t('media.statusVerifying'));
         await sellerApi.completeMediaUpload(store_id, presign.intent_id, presign.upload_token);
-        setUploadStatus('Upload complete!');
+        setUploadStatus(t('media.statusComplete'));
         loadMedia();
       }
     } catch (err: any) {
-      setActionError(err.message || 'Media upload failed');
+      setActionError(err.message || t('media.uploadFailed'));
     } finally {
       setUploading(false);
       setUploadStatus('');
@@ -128,14 +129,11 @@ export default function StoreMediaLibraryPage({
         err?.message?.toLowerCase().includes('in use') ||
         err?.message?.toLowerCase().includes('referenced');
       if (isConflict) {
-        setConflictMessage(
-          err.message ||
-            'This media asset cannot be deleted because it is currently referenced by one or more products or variants. Please detach or replace the media reference before deleting.'
-        );
+        setConflictMessage(err.message || t('media.conflictFallback'));
         setDeletingAssetId(null);
         setConflictModalOpen(true);
       } else {
-        setActionError(err.message || 'Failed to delete media asset');
+        setActionError(err.message || t('media.deleteFailed'));
       }
     } finally {
       setIsDeleting(false);
@@ -153,14 +151,12 @@ export default function StoreMediaLibraryPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Store Media Library</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Immutable store media library with per-store SHA-256 deduplication and presigned S3 uploads
-          </p>
+          <h1 className="text-xl font-bold text-slate-900">{t('media.title')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('media.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-sky-600 rounded-md hover:bg-sky-700 cursor-pointer">
-            <Upload className="w-3.5 h-3.5" /> Upload Media
+            <Upload className="w-3.5 h-3.5" /> {t('media.uploadMedia')}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
@@ -180,11 +176,11 @@ export default function StoreMediaLibraryPage({
 
       {/* Assets Grid */}
       {loading ? (
-        <div className="p-6 text-sm text-slate-500 animate-pulse">Loading store media assets...</div>
+        <div className="p-6 text-sm text-slate-500 animate-pulse">{t('media.loading')}</div>
       ) : assets.length === 0 ? (
         <div className="p-8 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-500">
           <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          No media assets in store library yet. Click "Upload Media" above to upload an image.
+          {t('media.emptyBody')}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -202,9 +198,9 @@ export default function StoreMediaLibraryPage({
                 <div className="text-xs font-medium text-slate-900 truncate" title={asset.original_filename}>
                   {asset.original_filename}
                 </div>
-                <div className="text-[10px] font-mono text-slate-400 truncate">SHA: {asset.checksum_sha256}</div>
+                <div className="text-[10px] font-mono text-slate-400 truncate">{t('media.shaLabel')} {asset.checksum_sha256}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">
-                  {(asset.byte_size / 1024).toFixed(1)} KB · {asset.content_type}
+                  {(asset.byte_size / 1024).toFixed(1)} {t('media.kbUnit')} · {asset.content_type}
                 </div>
               </div>
 
@@ -216,7 +212,7 @@ export default function StoreMediaLibraryPage({
                   type="button"
                   onClick={() => handleDelete(asset.id)}
                   className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-50"
-                  title="Safe Delete Asset"
+                  title={t('media.safeDelete')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -228,10 +224,10 @@ export default function StoreMediaLibraryPage({
 
       <ConfirmModal
         isOpen={Boolean(deletingAssetId)}
-        title="Delete Media Asset"
-        description="Permanently delete this media asset? Safe delete will reject if product references exist."
-        confirmLabel="Delete Asset"
-        cancelLabel="Keep Asset"
+        title={t('media.deleteModalTitle')}
+        description={t('media.deleteModalDescription')}
+        confirmLabel={t('media.deleteConfirm')}
+        cancelLabel={t('media.keepAsset')}
         variant="danger"
         loading={isDeleting}
         onConfirm={confirmDelete}
@@ -240,13 +236,10 @@ export default function StoreMediaLibraryPage({
 
       <ConfirmModal
         isOpen={conflictModalOpen}
-        title="Asset In Use"
-        description={
-          conflictMessage ||
-          'This media asset cannot be deleted because it is currently referenced by one or more products or variants. Please detach or replace the media reference before deleting.'
-        }
-        confirmLabel="Understood"
-        cancelLabel="Close"
+        title={t('media.conflictModalTitle')}
+        description={conflictMessage || t('media.conflictFallback')}
+        confirmLabel={t('media.conflictConfirm')}
+        cancelLabel={t('media.close')}
         variant="warning"
         onConfirm={() => setConflictModalOpen(false)}
         onCancel={() => setConflictModalOpen(false)}

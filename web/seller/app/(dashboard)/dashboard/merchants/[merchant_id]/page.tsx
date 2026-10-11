@@ -11,9 +11,11 @@ import {
   type MerchantWorkspace
 } from '@/lib/api/merchant-console';
 import { MerchantAccessDenied } from '@/components/shell/MerchantAccessDenied';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function MerchantWorkspacePage({ params }: { params: Promise<{ merchant_id: string }> }) {
   const { merchant_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'ready'; workspace: MerchantWorkspace }
   >({ status: 'loading' });
@@ -42,18 +44,14 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
   }
   if (state.status === 'denied') {
     return (
-      <MerchantAccessDenied
-        backPath="/dashboard"
-        title="Merchant workspace unavailable"
-        message="This merchant workspace is not accessible for your account, or your membership is not active."
-      />
+      <MerchantAccessDenied backPath="/dashboard" />
     );
   }
   if (state.status === 'error') {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950" role="alert" data-testid="workspace-error">
-        <h1 className="text-base font-semibold text-red-900 dark:text-red-200">Console unavailable</h1>
-        <p className="text-sm text-red-700 dark:text-red-300 mt-1">The merchant workspace context could not be loaded.</p>
+        <h1 className="text-base font-semibold text-red-900 dark:text-red-200">{t('merchantOverview.errorTitle')}</h1>
+        <p className="text-sm text-red-700 dark:text-red-300 mt-1">{t('merchantOverview.errorMessage')}</p>
       </div>
     );
   }
@@ -71,11 +69,11 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{ws.legal_name}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Merchant workspace · {ws.merchant_code} · {ws.merchant_status}
+            {t('merchantOverview.workspaceLabel')} · <span className="mh-ltr-token" dir="ltr">{ws.merchant_code}</span> · <span dir="ltr">{ws.merchant_status}</span>
           </p>
         </div>
         <div className="text-xs text-slate-500">
-          Membership <span className="font-semibold text-slate-700 dark:text-slate-300">{ws.membership.status}</span>
+          {t('merchantOverview.membership')} <span className="font-semibold text-slate-700 dark:text-slate-300">{ws.membership.status}</span>
         </div>
       </div>
 
@@ -87,13 +85,13 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
             ) : (
               <CircleSlash aria-hidden="true" className="h-5 w-5 text-slate-400" />
             )}
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Retail capability</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('merchantOverview.retailCapability')}</h2>
             <span className={`ml-auto text-xs font-semibold uppercase rounded px-1.5 py-0.5 ${retailActive ? 'bg-emerald-100 text-emerald-800' : retailStatus === 'suspended' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
               {retailStatus}
             </span>
           </div>
           {retailActive && stores.length > 0 && (
-            <p className="text-xs text-slate-500 mt-2">{stores.length} authorized store{stores.length === 1 ? '' : 's'}</p>
+            <p className="text-xs text-slate-500 mt-2">{stores.length} {stores.length === 1 ? t('merchantOverview.authorizedStoreSingular') : t('merchantOverview.authorizedStorePlural')}</p>
           )}
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -103,14 +101,14 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
             ) : (
               <CircleSlash aria-hidden="true" className="h-5 w-5 text-slate-400" />
             )}
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Supply capability</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('merchantOverview.supplyCapability')}</h2>
             <span className={`ml-auto text-xs font-semibold uppercase rounded px-1.5 py-0.5 ${supplyActive ? 'bg-emerald-100 text-emerald-800' : supplyStatus === 'suspended' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'}`}>
               {supplyStatus}
             </span>
           </div>
           {supplyActive && (
             <Link href={`/dashboard/merchants/${ws.merchant_id}/supply/connections`} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
-              Open Supply module <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              {t('merchantOverview.openSupplyModule')} <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </Link>
           )}
         </div>
@@ -120,21 +118,21 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900" data-testid="pending-review-cases">
           <div className="flex items-center gap-2">
             <AlertTriangle aria-hidden="true" className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-medium text-slate-500">Open review cases</span>
+            <span className="text-xs font-medium text-slate-500">{t('merchantOverview.openReviewCases')}</span>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{ws.pending_actions ? ws.pending_actions.open_review_cases : 0}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900" data-testid="unhealthy-connections">
           <div className="flex items-center gap-2">
             <Truck aria-hidden="true" className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-medium text-slate-500">Unhealthy connections</span>
+            <span className="text-xs font-medium text-slate-500">{t('merchantOverview.unhealthyConnections')}</span>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">{ws.pending_actions ? ws.pending_actions.unhealthy_connections : 0}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900" data-testid="plan-summary">
           <div className="flex items-center gap-2">
             <Package aria-hidden="true" className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500">Plan</span>
+            <span className="text-xs font-medium text-slate-500">{t('merchantOverview.plan')}</span>
           </div>
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-2">
             {ws.plan_summary ? ws.plan_summary.state : 'UNAVAILABLE'}
@@ -145,11 +143,11 @@ export default function MerchantWorkspacePage({ params }: { params: Promise<{ me
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Store aria-hidden="true" className="h-4 w-4 text-slate-500" />
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Authorized stores</h2>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('merchantOverview.authorizedStores')}</h2>
         </div>
         {stores.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-900" data-testid="stores-empty">
-            <p className="text-sm text-slate-500">No stores are authorized for this workspace yet.</p>
+            <p className="text-sm text-slate-500">{t('merchantOverview.storesEmpty')}</p>
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

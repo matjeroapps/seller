@@ -57,6 +57,7 @@ type stubCore struct {
 	published coreclient.ThemePublish
 	preview   coreclient.ThemePreview
 	host      string
+	balance   *coreclient.StoreBalanceResponse
 }
 
 func (s *stubCore) GetStorefrontHost(ctx context.Context, storeID, subject string) (string, error) {
@@ -441,7 +442,10 @@ func (s *stubCore) UpdatePaymentStatus(ctx context.Context, subject, paymentID s
 }
 
 func (s *stubCore) GetStoreBalance(ctx context.Context, subject, storeID string) (*coreclient.StoreBalanceResponse, error) {
-	s.subject = subject
+	s.subject, s.storeID = subject, storeID
+	if s.balance != nil {
+		return s.balance, s.err
+	}
 	return &coreclient.StoreBalanceResponse{AvailableMinor: 150000, PendingMinor: 25000, Currency: "SAR"}, s.err
 }
 
@@ -751,6 +755,62 @@ func TestRetailWorkspaceEnsureForwardsAuthenticatedSubject(t *testing.T) {
 	}
 }
 
+// Core rejects an additional-store creation from a merchant that already holds
+// one or more store records. The Seller API must surface that rejection as a
+// 409 store_entitlement_exceeded response on both direct-create routes, never
+// as a 500, and never leak Core's message detail.
+func TestAdditionalStoreCreateRejectsEntitlement(t *testing.T) {
+	for _, path := range []string{"/v1/merchants/merchant-1/stores", "/v1/seller/stores"} {
+		t.Run(path, func(t *testing.T) {
+			core := &stubCore{err: &coreclient.Error{
+				Status:  http.StatusConflict,
+				Code:    coreclient.CodeStoreEntitlementExceeded,
+				Message: "merchant already holds a store record",
+			}}
+			handler := newHandler(core, core)
+
+			rec := doRequest(t, handler, http.MethodPost, path, `{"name":"Another Store","code":"store-b","market_code":"SA"}`)
+
+			if rec.Code != http.StatusConflict {
+				t.Fatalf("status = %d, want 409 (body %q)", rec.Code, rec.Body.String())
+			}
+			if got := decodeError(t, rec); got != "store_entitlement_exceeded" {
+				t.Errorf("error code = %q, want store_entitlement_exceeded", got)
+			}
+			if strings.Contains(rec.Body.String(), "already holds a store record") {
+				t.Errorf("response must use the public mapping, not leak Core message detail: %s", rec.Body.String())
+			}
+		})
+	}
+}
+
+// A stale onboarding entry (the onboarding flow resolving its retail workspace
+// again after stores already exist) stays idempotent: the route keeps
+// resolving to the same merchant workspace with 200 and implies no store
+// creation of its own.
+func TestStaleOnboardingEntryResolveStaysIdempotent(t *testing.T) {
+	core := &stubCore{store: coreclient.Store{ID: "store-1", Code: "store-a"}}
+	handler := newHandler(core, core)
+
+	for _, code := range []string{"merchant-store-a", "merchant-store-b"} {
+		rec := doRequest(t, handler, http.MethodPost, "/v1/merchants/self/retail-workspace", `{"code":"`+code+`","legal_name":"Store A"}`)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("stale-entry ensure status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+		}
+		var workspace coreclient.RetailWorkspace
+		if err := json.NewDecoder(rec.Body).Decode(&workspace); err != nil {
+			t.Fatalf("decode workspace: %v", err)
+		}
+		if workspace.ID != "merchant-1" {
+			t.Errorf("workspace id = %q, want the existing merchant workspace", workspace.ID)
+		}
+	}
+
+	if core.merchantID != "" {
+		t.Errorf("store create addressed merchant %q: a stale-entry resolve must not create a store", core.merchantID)
+	}
+}
+
 func TestSellerStoreOperationalStateRoutes(t *testing.T) {
 	core := &stubCore{state: coreclient.StoreOperationalState{
 		StoreID:            "store-1",
@@ -876,6 +936,45 @@ func TestSellerReturns503WhenCoreUnavailable(t *testing.T) {
 		if strings.Contains(body, leak) {
 			t.Errorf("response leaked transport detail %q: %s", leak, body)
 		}
+	}
+}
+
+func TestSellerFinanceBalancePropagatesCoreErrors(t *testing.T) {
+	core := &stubCore{err: &coreclient.Error{Status: http.StatusServiceUnavailable, Code: coreclient.CodeUnavailable}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-eg/finance/balance", "")
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+	}
+	if got := decodeError(t, rec); got != "service_unavailable" {
+		t.Errorf("error code = %q, want service_unavailable", got)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "available_minor") || strings.Contains(body, "SAR") {
+		t.Fatalf("balance error must not masquerade as a zero/SAR success: %s", body)
+	}
+}
+
+func TestSellerFinanceBalancePreservesSuccessfulSourceCurrency(t *testing.T) {
+	core := &stubCore{balance: &coreclient.StoreBalanceResponse{AvailableMinor: 0, PendingMinor: 0, Currency: "EGP"}}
+	handler := newHandler(core, core)
+
+	rec := doRequest(t, handler, http.MethodGet, "/v1/seller/stores/store-eg/finance/balance", "")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	var payload coreclient.StoreBalanceResponse
+	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode balance: %v", err)
+	}
+	if payload.AvailableMinor != 0 || payload.PendingMinor != 0 || payload.Currency != "EGP" {
+		t.Fatalf("balance = %+v, want real zero in EGP", payload)
+	}
+	if core.storeID != "store-eg" || core.subject != testSubject {
+		t.Fatalf("Core called with store=%q subject=%q", core.storeID, core.subject)
 	}
 }
 

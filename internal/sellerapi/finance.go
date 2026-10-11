@@ -20,11 +20,7 @@ func (deps Dependencies) handleGetStoreBalance(w http.ResponseWriter, r *http.Re
 
 	balance, err := deps.Core.GetStoreBalance(r.Context(), subject, storeID)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"available_minor": 0,
-			"pending_minor":   0,
-			"currency":        "SAR",
-		})
+		actorhttp.WriteCoreError(w, err)
 		return
 	}
 

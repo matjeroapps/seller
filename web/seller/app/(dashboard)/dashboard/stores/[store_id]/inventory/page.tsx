@@ -4,6 +4,11 @@ import { useEffect, useState, use, useMemo } from 'react';
 import Link from 'next/link';
 import { ChartNoAxesColumn, RefreshCw, AlertCircle, CheckCircle, ArrowDownUp, Calculator } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
+import { useTranslation } from '@/lib/i18n/locale-context';
+
+function formatTemplate(template: string, values: Record<string, string | number>) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(values[key] ?? ''));
+}
 import type { InventorySnapshot, StoreLocation, Product, InventoryAdjustmentPayload } from '@/lib/api/types';
 
 export default function StoreInventoryPage({
@@ -16,6 +21,7 @@ export default function StoreInventoryPage({
       ? use(params as Promise<{ store_id: string }>)
       : (params as unknown as { store_id: string }) || {};
   const { store_id } = unwrappedParams;
+  const { t } = useTranslation();
 
   const [snapshots, setSnapshots] = useState<InventorySnapshot[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
@@ -77,13 +83,16 @@ export default function StoreInventoryPage({
     const map = new Map<string, string>();
     for (const snap of snapshots) {
       if (snap.sku_id) {
-        map.set(snap.sku_id, snap.sku_code ? `${snap.sku_code} (${snap.sku_id.slice(0, 8)})` : `SKU: ${snap.sku_id.slice(0, 8)}...`);
+        map.set(
+          snap.sku_id,
+          snap.sku_code ? `${snap.sku_code} (${snap.sku_id.slice(0, 8)})` : `${t('inventory.skuFallback', 'SKU')}: ${snap.sku_id.slice(0, 8)}...`
+        );
       }
     }
     for (const prod of products) {
       if (prod.id) {
         // Fallback product-level representation
-        map.set(prod.id, `${prod.name || 'Product'} (${prod.id.slice(0, 8)})`);
+        map.set(prod.id, `${prod.name || t('inventory.productFallback', 'Product')} (${prod.id.slice(0, 8)})`);
       }
     }
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
@@ -97,7 +106,12 @@ export default function StoreInventoryPage({
     }
     for (const snap of snapshots) {
       if (snap.fulfillment_location_id && !map.has(snap.fulfillment_location_id)) {
-        map.set(snap.fulfillment_location_id, snap.location_name ? `${snap.location_name}` : `Location: ${snap.fulfillment_location_id.slice(0, 8)}...`);
+        map.set(
+          snap.fulfillment_location_id,
+          snap.location_name
+            ? `${snap.location_name}`
+            : `${t('inventory.locationFallback', 'Location')}: ${snap.fulfillment_location_id.slice(0, 8)}...`
+        );
       }
     }
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
@@ -109,7 +123,7 @@ export default function StoreInventoryPage({
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSkuId || !activeLocationId) {
-      setActionError('Please select or enter both a SKU and a Fulfillment Location.');
+      setActionError(t('inventory.selectSkuAndLocation', 'Please select or enter both a SKU and a Fulfillment Location.'));
       return;
     }
 
@@ -136,11 +150,15 @@ export default function StoreInventoryPage({
     try {
       const res = await sellerApi.adjustInventory(store_id, payload);
       setActionSuccess(
-        `Stock successfully updated! New on-hand: ${res.on_hand_qty ?? 'updated'}, available: ${res.available_qty ?? 'updated'} (delta: ${res.quantity_delta > 0 ? `+${res.quantity_delta}` : res.quantity_delta})`
+        formatTemplate(t('inventory.adjustSuccess', 'Stock successfully updated! New on-hand: {{on_hand}}, available: {{available}} (delta: {{delta}})'), {
+          on_hand: res.on_hand_qty ?? 'updated',
+          available: res.available_qty ?? 'updated',
+          delta: res.quantity_delta > 0 ? `+${res.quantity_delta}` : `${res.quantity_delta}`
+        })
       );
       loadInventory();
     } catch (err: any) {
-      setActionError(err.message || 'Failed to adjust inventory');
+      setActionError(err.message || t('inventory.adjustFailed', 'Failed to adjust inventory'));
     } finally {
       setAdjusting(false);
     }
@@ -173,17 +191,15 @@ export default function StoreInventoryPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Store Inventory Snapshots</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage on-hand inventory snapshots and reconcile physical stock across fulfillment locations
-          </p>
+          <h1 className="text-xl font-bold text-slate-900">{t('inventory.title', 'Store Inventory Snapshots')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('inventory.subtitle', 'Manage on-hand inventory snapshots and reconcile physical stock across fulfillment locations')}</p>
         </div>
         <button
           type="button"
           onClick={loadInventory}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 self-start"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh Inventory
+          <RefreshCw className="w-3.5 h-3.5" /> {t('inventory.refresh', 'Refresh Inventory')}
         </button>
       </div>
 
@@ -191,8 +207,8 @@ export default function StoreInventoryPage({
       <div className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Adjust Inventory Stock</h2>
-            <p className="text-[11px] text-slate-500">Record stock movement or reconcile physical cycle counts</p>
+            <h2 className="text-sm font-semibold text-slate-900">{t('inventory.adjustStockTitle', 'Adjust Inventory Stock')}</h2>
+            <p className="text-[11px] text-slate-500">{t('inventory.adjustStockSubtitle', 'Record stock movement or reconcile physical cycle counts')}</p>
           </div>
 
           {/* Mode Switcher */}
@@ -207,7 +223,7 @@ export default function StoreInventoryPage({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <ArrowDownUp className="w-3.5 h-3.5" /> Relative Delta (+/-)
+              <ArrowDownUp className="w-3.5 h-3.5" /> {t('inventory.modeDelta', 'Relative Delta (+/-)')}
             </button>
             <button
               type="button"
@@ -219,7 +235,7 @@ export default function StoreInventoryPage({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Calculator className="w-3.5 h-3.5" /> Cycle Count Target
+              <Calculator className="w-3.5 h-3.5" /> {t('inventory.modeCycleCount', 'Cycle Count Target')}
             </button>
           </div>
         </div>
@@ -229,7 +245,7 @@ export default function StoreInventoryPage({
             {/* SKU Selector */}
             <div>
               <label htmlFor="sku-select" className="block text-slate-700 font-medium mb-1">
-                Select SKU *
+                {t('inventory.selectSku', 'Select SKU *')}
               </label>
               <select
                 id="sku-select"
@@ -238,20 +254,20 @@ export default function StoreInventoryPage({
                 onChange={(e) => setSelectedSkuId(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                <option value="">-- Choose SKU --</option>
+                <option value="">{t('inventory.chooseSku', '-- Choose SKU --')}</option>
                 {availableSkus.map((sku) => (
                   <option key={sku.id} value={sku.id}>
                     {sku.label}
                   </option>
                 ))}
-                <option value="__custom__">+ Enter Custom SKU ID...</option>
+                <option value="__custom__">{t('inventory.customSku', '+ Enter Custom SKU ID...')}</option>
               </select>
 
               {selectedSkuId === '__custom__' && (
                 <input
                   type="text"
                   required
-                  placeholder="Paste SKU UUID..."
+                  placeholder={t('inventory.pasteSku', 'Paste SKU UUID...')}
                   value={customSkuId}
                   onChange={(e) => setCustomSkuId(e.target.value)}
                   className="mt-1.5 w-full px-2.5 py-1 border border-slate-300 rounded font-mono text-[11px] focus:outline-none"
@@ -262,7 +278,7 @@ export default function StoreInventoryPage({
             {/* Location Selector */}
             <div>
               <label htmlFor="location-select" className="block text-slate-700 font-medium mb-1">
-                Fulfillment Location *
+                {t('inventory.fulfillmentLocation', 'Fulfillment Location *')}
               </label>
               <select
                 id="location-select"
@@ -271,20 +287,20 @@ export default function StoreInventoryPage({
                 onChange={(e) => setLocationId(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                <option value="">-- Choose Location --</option>
+                <option value="">{t('inventory.chooseLocation', '-- Choose Location --')}</option>
                 {availableLocations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.label}
                   </option>
                 ))}
-                <option value="__custom__">+ Enter Custom Location ID...</option>
+                <option value="__custom__">{t('inventory.customLocation', '+ Enter Custom Location ID...')}</option>
               </select>
 
               {locationId === '__custom__' && (
                 <input
                   type="text"
                   required
-                  placeholder="Paste Location UUID..."
+                  placeholder={t('inventory.pasteLocation', 'Paste Location UUID...')}
                   value={customLocationId}
                   onChange={(e) => setCustomLocationId(e.target.value)}
                   className="mt-1.5 w-full px-2.5 py-1 border border-slate-300 rounded font-mono text-[11px] focus:outline-none"
@@ -296,7 +312,7 @@ export default function StoreInventoryPage({
             {mode === 'delta' ? (
               <div>
                 <label htmlFor="qty-delta-input" className="block text-slate-700 font-medium mb-1">
-                  Quantity Delta (+/-) *
+                  {t('inventory.qtyDelta', 'Quantity Delta (+/-) *')}
                 </label>
                 <input
                   id="qty-delta-input"
@@ -308,12 +324,12 @@ export default function StoreInventoryPage({
                   onChange={(e) => setDelta(parseInt(e.target.value, 10) || 0)}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
-                <p className="text-[10px] text-slate-400 mt-0.5">e.g. +10 for received, -3 for damaged</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{t('inventory.qtyDeltaHint', 'e.g. +10 for received, -3 for damaged')}</p>
               </div>
             ) : (
               <div>
                 <label htmlFor="target-qty-input" className="block text-slate-700 font-medium mb-1">
-                  Target Physical Count *
+                  {t('inventory.targetQty', 'Target Physical Count *')}
                 </label>
                 <input
                   id="target-qty-input"
@@ -326,14 +342,14 @@ export default function StoreInventoryPage({
                   onChange={(e) => setTargetQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
-                <p className="text-[10px] text-slate-400 mt-0.5">Server reconciles delta to match physical count</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{t('inventory.targetQtyHint', 'Server reconciles delta to match physical count')}</p>
               </div>
             )}
 
             {/* Reason Code */}
             <div>
               <label htmlFor="reason-code-select" className="block text-slate-700 font-medium mb-1">
-                Reason Code *
+                {t('inventory.reasonLabel', 'Reason Code *')}
               </label>
               <select
                 id="reason-code-select"
@@ -342,12 +358,12 @@ export default function StoreInventoryPage({
                 onChange={(e) => setReasonCode(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                <option value="received_stock">Stock Received (استلام مخزون)</option>
-                <option value="damaged">Damaged Goods (تلف)</option>
-                <option value="cycle_count_reconciliation">Cycle Count Reconciliation (جرد فعلي)</option>
-                <option value="theft_loss">Theft / Shrinkage Loss (فقد / سرقة)</option>
-                <option value="customer_return_manual">Customer Return (مرتجع عميل)</option>
-                <option value="correction">Audit Correction (تصحيح مخزون)</option>
+                <option value="received_stock">{t('inventory.reasonReceivedStock', 'Stock Received')}</option>
+                <option value="damaged">{t('inventory.reasonDamaged', 'Damaged Goods')}</option>
+                <option value="cycle_count_reconciliation">{t('inventory.reasonCycleCount', 'Cycle Count Reconciliation')}</option>
+                <option value="theft_loss">{t('inventory.reasonTheftLoss', 'Theft / Shrinkage Loss')}</option>
+                <option value="customer_return_manual">{t('inventory.reasonCustomerReturn', 'Customer Return')}</option>
+                <option value="correction">{t('inventory.reasonCorrection', 'Audit Correction')}</option>
               </select>
             </div>
           </div>
@@ -355,13 +371,13 @@ export default function StoreInventoryPage({
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
             <div className="sm:col-span-3">
               <label htmlFor="note-input" className="block text-slate-700 font-medium mb-1">
-                Audit Note (Optional)
+                {t('inventory.auditNoteOptional', 'Audit Note (Optional)')}
               </label>
               <input
                 id="note-input"
                 data-testid="note-input"
                 type="text"
-                placeholder="Reference purchase order, count sheet, or incident..."
+                placeholder={t('inventory.auditNotePlaceholder', 'Reference purchase order, count sheet, or incident...')}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -374,7 +390,11 @@ export default function StoreInventoryPage({
                 disabled={adjusting || !activeSkuId || !activeLocationId}
                 className="w-full px-4 py-2 font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
               >
-                {adjusting ? 'Adjusting...' : mode === 'cycle_count' ? 'Reconcile Count' : 'Apply Adjustment'}
+                {adjusting
+                  ? t('inventory.adjusting', 'Adjusting...')
+                  : mode === 'cycle_count'
+                    ? t('inventory.reconcileCount', 'Reconcile Count')
+                    : t('inventory.applyAdjustment', 'Apply Adjustment')}
               </button>
             </div>
           </div>
@@ -384,35 +404,35 @@ export default function StoreInventoryPage({
       {/* Inventory Snapshots Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-6 text-sm text-slate-500 animate-pulse">Loading inventory snapshots...</div>
+          <div className="p-6 text-sm text-slate-500 animate-pulse">{t('inventory.loadingSnapshots', 'Loading inventory snapshots...')}</div>
         ) : snapshots.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
             <ChartNoAxesColumn className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            No store inventory snapshots found.
+            {t('inventory.empty', 'No store inventory snapshots found.')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Location</th>
-                  <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3">On Hand Qty</th>
-                  <th className="px-4 py-3">Reserved Qty</th>
-                  <th className="px-4 py-3">Available Qty</th>
-                  <th className="px-4 py-3">Version</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('inventory.headerLocation', 'Location')}</th>
+                  <th className="px-4 py-3">{t('inventory.headerSku', 'SKU')}</th>
+                  <th className="px-4 py-3">{t('inventory.headerOnHand', 'On Hand Qty')}</th>
+                  <th className="px-4 py-3">{t('inventory.headerReserved', 'Reserved Qty')}</th>
+                  <th className="px-4 py-3">{t('inventory.headerAvailable', 'Available Qty')}</th>
+                  <th className="px-4 py-3">{t('inventory.headerVersion', 'Version')}</th>
+                  <th className="px-4 py-3 text-right">{t('inventory.headerActions', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {snapshots.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{s.location_name || 'Location'}</div>
+                      <div className="font-medium text-slate-900">{s.location_name || t('inventory.locationFallback', 'Location')}</div>
                       <div className="font-mono text-[10px] text-slate-400">{s.fulfillment_location_id}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{s.sku_code || 'SKU'}</div>
+                      <div className="font-medium text-slate-900">{s.sku_code || t('inventory.skuFallback', 'SKU')}</div>
                       <div className="font-mono text-[10px] text-slate-400">{s.sku_id}</div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{s.on_hand_qty}</td>
@@ -425,7 +445,7 @@ export default function StoreInventoryPage({
                         onClick={() => prefillAdjustment(s)}
                         className="text-indigo-600 hover:text-indigo-800 font-medium text-[11px]"
                       >
-                        Select for Adjust
+                        {t('inventory.selectForAdjust', 'Select for Adjust')}
                       </button>
                     </td>
                   </tr>

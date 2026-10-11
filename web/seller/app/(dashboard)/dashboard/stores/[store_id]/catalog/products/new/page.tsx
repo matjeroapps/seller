@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { CategoryPicker } from '@/components/seller/CategoryPicker';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi } from '@/lib/api/client';
 import type { StoreCategory } from '@/lib/api/types';
 
 export default function NewStoreProductPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -26,7 +28,7 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
     sellerApi
       .listStoreCategories(store_id)
       .then((items) => setCategories(items))
-      .catch((err: Error) => setCategoryLoadError(err.message || 'Failed to load categories'));
+      .catch((err: Error) => setCategoryLoadError(err.message || t('products.errorLoadCategories')));
   };
 
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
       });
       router.push(`/dashboard/stores/${store_id}/catalog/products/${product.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create product');
+      setError(err.message || t('products.errorCreateProduct'));
       setSaving(false);
     }
   };
@@ -74,8 +76,8 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Create Seller Product</h1>
-          <p className="text-xs text-slate-500">Add a new seller-owned draft product and initial store listing</p>
+          <h1 className="text-xl font-bold text-slate-900">{t('products.newTitle')}</h1>
+          <p className="text-xs text-slate-500">{t('products.newSubtitle')}</p>
         </div>
       </div>
 
@@ -85,19 +87,19 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
 
       <form onSubmit={handleSubmit} className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Product Name *</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">{t('products.nameRequiredLabel')}</label>
           <input
             type="text"
             required
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="e.g. Premium Cotton T-Shirt"
+            placeholder={t('products.namePlaceholder')}
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Product Slug *</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">{t('products.slugRequiredLabel')}</label>
           <input
             type="text"
             required
@@ -106,14 +108,14 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
               setSlugManuallyEdited(true);
               setSlug(e.target.value);
             }}
-            placeholder="e.g. premium-cotton-t-shirt"
+            placeholder={t('products.slugPlaceholder')}
             className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
-          <p className="text-[11px] text-slate-500 mt-1">Unique URL identifier for the product catalog</p>
+          <p className="text-[11px] text-slate-500 mt-1">{t('products.slugHelp')}</p>
         </div>
 
         <div className="space-y-1.5">
-          <span className="block text-xs font-semibold text-slate-700">Categories</span>
+          <span className="block text-xs font-semibold text-slate-700">{t('products.categoriesLabel')}</span>
           <CategoryPicker
             storeId={store_id}
             categories={categories}
@@ -129,14 +131,14 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
             href={`/dashboard/stores/${store_id}/catalog/products`}
             className="px-3 py-1.5 text-xs text-slate-600 hover:underline"
           >
-            Cancel
+            {t('common.cancel')}
           </Link>
           <button
             type="submit"
             disabled={saving}
             className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
           >
-            {saving ? 'Creating...' : 'Create Draft Product'}
+            {saving ? t('products.creating') : t('products.createDraft')}
           </button>
         </div>
       </form>

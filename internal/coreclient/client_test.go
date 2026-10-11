@@ -76,6 +76,40 @@ func jsonHandler(status int, body string) func(http.ResponseWriter, *http.Reques
 	}
 }
 
+func TestGetStoreBalancePropagatesCoreError(t *testing.T) {
+	stub := newStubCore(t, jsonHandler(http.StatusServiceUnavailable, `{"error":{"code":"`+CodeUnavailable+`","message":"balance unavailable"}}`))
+
+	balance, err := stub.client(t).GetStoreBalance(context.Background(), "subject-1", "store-eg")
+	if err == nil {
+		t.Fatalf("expected Core error, got balance %+v", balance)
+	}
+	var coreErr *Error
+	if !asError(err, &coreErr) {
+		t.Fatalf("error is not a *coreclient.Error: %T %v", err, err)
+	}
+	if coreErr.Code != CodeUnavailable || coreErr.Status != http.StatusServiceUnavailable {
+		t.Fatalf("Core error = %+v, want unavailable 503", coreErr)
+	}
+}
+
+func TestGetStoreBalancePreservesSuccessfulSourceCurrency(t *testing.T) {
+	stub := newStubCore(t, jsonHandler(http.StatusOK, `{"available_minor":0,"pending_minor":0,"currency":"EGP","updated_at":"2026-10-01T10:00:00Z"}`))
+
+	balance, err := stub.client(t).GetStoreBalance(context.Background(), "subject-1", "store-eg")
+	if err != nil {
+		t.Fatalf("GetStoreBalance: %v", err)
+	}
+	if balance.AvailableMinor != 0 || balance.PendingMinor != 0 || balance.Currency != "EGP" {
+		t.Fatalf("balance = %+v, want real zero in EGP", balance)
+	}
+	if got := stub.last.URL.Path; got != "/internal/v1/stores/store-eg/finance/balance" {
+		t.Fatalf("path = %q, want store balance path", got)
+	}
+	if got := stub.last.Header.Get(HeaderSubject); got != "subject-1" {
+		t.Fatalf("%s = %q, want subject-1", HeaderSubject, got)
+	}
+}
+
 func TestListStoreMediaNormalizesCoreItemsEnvelope(t *testing.T) {
 	stub := newStubCore(t, jsonHandler(http.StatusOK, `{
 		"items": [

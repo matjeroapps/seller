@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { LocaleProvider } from '../lib/i18n/locale-context';
 import { UnsupportedCapabilityScreen } from '../components/seller/UnsupportedCapabilityScreen';
 
 const unsupportedRouteFiles = [
@@ -20,18 +21,17 @@ const unsupportedRouteFiles = [
 describe('Unsupported Seller Dashboard routes', () => {
   it('renders an explicit unavailable state with a useful next action', () => {
     render(
-      <UnsupportedCapabilityScreen
-        eyebrow="Orders"
-        title="Manual order creation is not available yet"
-        description="Draft/manual order creation is not currently supported by Core."
-        storeId="str_1"
-        primaryHref="/dashboard/stores/str_1/orders"
-        primaryLabel="View store orders"
-      />
+      <LocaleProvider initialLocale="en">
+        <UnsupportedCapabilityScreen
+          copyKey="unsupported.ordersNew"
+          storeId="str_1"
+          primaryHref="/dashboard/stores/str_1/orders"
+        />
+      </LocaleProvider>
     );
 
     expect(screen.getByRole('heading', { level: 1, name: 'Manual order creation is not available yet' })).toBeInTheDocument();
-    expect(screen.getByText('Draft/manual order creation is not currently supported by Core.')).toBeInTheDocument();
+    expect(screen.getByText('Draft/manual order creation is not currently supported by Core. The Seller Dashboard only shows orders that came through the authenticated storefront checkout flow.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View store orders' })).toHaveAttribute(
       'href',
       '/dashboard/stores/str_1/orders'

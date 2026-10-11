@@ -48,14 +48,23 @@ export interface DashboardAttentionItem {
   href?: string;
 }
 
-export function formatMinorMoney(valueMinor?: number, currency = 'SAR') {
-  const value = Number.isFinite(valueMinor) ? Number(valueMinor) / 100 : 0;
+export function formatMinorMoney(valueMinor?: number, currency?: string) {
+  const normalizedCurrency = currency?.trim().toUpperCase();
+  if (!Number.isFinite(valueMinor) || !normalizedCurrency) {
+    return 'Unavailable';
+  }
 
-  return new Intl.NumberFormat('en', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2
-  }).format(value);
+  const value = Number(valueMinor) / 100;
+
+  try {
+    return new Intl.NumberFormat('en', {
+      style: 'currency',
+      currency: normalizedCurrency,
+      maximumFractionDigits: value % 1 === 0 ? 0 : 2
+    }).format(value);
+  } catch {
+    return 'Unavailable';
+  }
 }
 
 export function formatCompactNumber(value: number) {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { merchantSupplyApi, type SupplyReviewCase } from '@/lib/api/merchant-console';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function SupplyReviewCaseDetailPage({
   params
@@ -12,6 +13,7 @@ export default function SupplyReviewCaseDetailPage({
   params: Promise<{ merchant_id: string; case_id: string }>;
 }) {
   const { merchant_id, case_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'ready'; data: SupplyReviewCase }
   >({ status: 'loading' });
@@ -36,7 +38,7 @@ export default function SupplyReviewCaseDetailPage({
         href={`/dashboard/merchants/${merchant_id}/supply/review-cases`}
         className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
       >
-        ← Review cases
+        ← {t('nav.reviewCases')}
       </Link>
 
       {state.status === 'loading' && <SupplyLoading />}
@@ -45,11 +47,12 @@ export default function SupplyReviewCaseDetailPage({
         <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">{state.data.case_type}</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Status <span className="font-semibold">{state.data.status}</span> · reason {state.data.reason_code}
+            {t('supply.state.statusLabel')} <span className="font-semibold">{state.data.status}</span> · {t('supply.state.reasonLabel')} {state.data.reason_code}
           </p>
           {state.data.status !== 'OPEN' && (
             <p className="text-xs text-slate-500 mt-2">
-              Resolution: {state.data.resolution || '—'} {state.data.resolved_by ? `by ${state.data.resolved_by}` : ''}
+              {t('supply.state.resolutionLabel')}: {state.data.resolution || '—'}
+              {state.data.resolved_by ? ` ${t('supply.state.byLabel')} ${state.data.resolved_by}` : ''}
             </p>
           )}
           <pre className="mt-4 overflow-x-auto rounded bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">

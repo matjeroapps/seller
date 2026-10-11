@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { Boxes, Filter, CheckCircle2, AlertCircle, Archive, ArrowUpRight } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { SellerListing } from '@/lib/api/types';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function StoreListingsPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
+  const { t } = useTranslation();
 
   const [listings, setListings] = useState<SellerListing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,60 +43,61 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Store Listings</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Manage store retail presentation, readiness, and publication state</p>
+          <h1 className="text-xl font-bold text-slate-900">{t('listings.title')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('listings.subtitle')}</p>
         </div>
         <Link
           href={`/dashboard/stores/${store_id}/catalog/products`}
           className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 self-start"
         >
-          View Products Catalog
+          {t('listings.viewProducts')}
         </Link>
       </div>
 
       {/* Filters */}
       <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-          <Filter className="w-3.5 h-3.5" /> Status:
+          <Filter className="w-3.5 h-3.5" /> {t('listings.filterStatusLabel')}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 font-normal focus:outline-none"
           >
-            <option value="all">All Statuses</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="unpublished">Unpublished</option>
-            <option value="archived">Archived</option>
+            <option value="all">{t('listings.allStatuses')}</option>
+            <option value="draft">{t('listings.statusDraft')}</option>
+            <option value="published">{t('listings.statusPublished')}</option>
+            <option value="unpublished">{t('listings.statusUnpublished')}</option>
+            <option value="archived">{t('listings.statusArchived')}</option>
           </select>
         </div>
 
         <div className="text-xs text-slate-500">
-          Showing <span className="font-semibold text-slate-800">{filteredListings.length}</span> of {listings.length} listings
+          {t('listings.showingPrefix')} <span className="font-semibold text-slate-800">{filteredListings.length}</span>{' '}
+          {t('listings.showingSuffix').replace('{total}', String(listings.length))}
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-500 animate-pulse">Loading store listings...</div>
+          <div className="p-8 text-center text-xs text-slate-500 animate-pulse">{t('listings.loading')}</div>
         ) : filteredListings.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
             <Boxes className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            No store listings found matching status filter.
+            {t('listings.emptyFiltered')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Listing ID</th>
-                  <th className="px-4 py-3">Product ID</th>
-                  <th className="px-4 py-3">Source Type</th>
-                  <th className="px-4 py-3">Market</th>
-                  <th className="px-4 py-3">Publish Status</th>
-                  <th className="px-4 py-3">Availability</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('listings.colListingId')}</th>
+                  <th className="px-4 py-3">{t('listings.colProductId')}</th>
+                  <th className="px-4 py-3">{t('listings.colSourceType')}</th>
+                  <th className="px-4 py-3">{t('listings.colMarket')}</th>
+                  <th className="px-4 py-3">{t('listings.colPublishStatus')}</th>
+                  <th className="px-4 py-3">{t('listings.colAvailability')}</th>
+                  <th className="px-4 py-3 text-right">{t('listings.colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -105,11 +108,11 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
                     <td className="px-4 py-3">
                       {l.supplier_offer_id ? (
                         <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded text-[10px] font-medium border border-amber-200">
-                          Supplier Backed
+                          {t('listings.supplierBacked')}
                         </span>
                       ) : (
                         <span className="bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded text-[10px] font-medium border border-indigo-200">
-                          Seller Owned
+                          {t('listings.sellerOwned')}
                         </span>
                       )}
                     </td>
@@ -135,11 +138,11 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
                     <td className="px-4 py-3">
                       {l.status === 'published' ? (
                         <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Active Supply
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {t('listings.activeSupply')}
                         </span>
                       ) : (
                         <span className="text-[11px] text-slate-400 font-normal">
-                          {l.status === 'draft' ? 'Draft (Unpublished)' : 'Inactive'}
+                          {l.status === 'draft' ? t('listings.draftUnpublished') : t('listings.inactive')}
                         </span>
                       )}
                     </td>
@@ -148,7 +151,7 @@ export default function StoreListingsPage({ params }: { params: Promise<{ store_
                         href={`/dashboard/stores/${store_id}/catalog/listings/${l.id}`}
                         className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                       >
-                        Manage <ArrowUpRight className="w-3 h-3" />
+                        {t('listings.manage')} <ArrowUpRight className="w-3 h-3" />
                       </Link>
                     </td>
                   </tr>

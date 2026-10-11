@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { MerchantConsoleError } from '@/lib/api/merchant-console';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export type SupplyQueryState<T> =
   | { status: 'loading' }
@@ -62,11 +63,12 @@ export function SupplyLoading() {
 }
 
 export function SupplyError({ retryHint = true }: { retryHint?: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950" role="alert" data-testid="supply-error">
-      <h2 className="text-base font-semibold text-red-900 dark:text-red-200">Something went wrong</h2>
+      <h2 className="text-base font-semibold text-red-900 dark:text-red-200">{t('supply.state.errorTitle')}</h2>
       <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-        {retryHint ? 'The data could not be loaded. Try again in a moment.' : 'The data could not be loaded.'}
+        {retryHint ? t('supply.state.errorRetryMessage') : t('supply.state.errorMessage')}
       </p>
     </div>
   );

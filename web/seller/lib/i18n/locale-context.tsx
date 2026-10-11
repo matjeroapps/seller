@@ -7,6 +7,15 @@ import arDict from '@/locales/ar.json';
 export type Locale = 'en' | 'ar';
 export type Direction = 'ltr' | 'rtl';
 
+export type ServerMessage =
+  | string
+  | {
+      message?: string;
+      message_en?: string;
+      message_ar?: string;
+      detail?: string;
+    };
+
 interface LocaleContextType {
   locale: Locale;
   direction: Direction;
@@ -14,6 +23,7 @@ interface LocaleContextType {
   setLocale: (nextLocale: Locale) => void;
   toggleLocale: () => void;
   t: (key: string, fallback?: string) => string;
+  serverMessage: (message: ServerMessage, fallback?: string) => string;
 }
 
 const dictionaries: Record<Locale, any> = {
@@ -45,6 +55,12 @@ function resolveNestedKey(obj: any, path: string): string | undefined {
     }
   }
   return typeof current === 'string' ? current : undefined;
+}
+
+function resolveServerMessage(message: ServerMessage, locale: Locale, fallback = ''): string {
+  if (typeof message === 'string') return message;
+  const localized = locale === 'ar' ? message.message_ar : message.message_en;
+  return localized || message.message || message.message_en || message.message_ar || message.detail || fallback;
 }
 
 const LocaleContext = createContext<LocaleContextType | null>(null);
@@ -109,6 +125,11 @@ export function LocaleProvider({
     [locale]
   );
 
+  const serverMessage = useCallback(
+    (message: ServerMessage, fallback?: string): string => resolveServerMessage(message, locale, fallback),
+    [locale]
+  );
+
   return (
     <LocaleContext.Provider
       value={{
@@ -118,6 +139,7 @@ export function LocaleProvider({
         setLocale,
         toggleLocale,
         t,
+        serverMessage,
       }}
     >
       {children}
@@ -135,7 +157,9 @@ export function useTranslation() {
       isRtl: false,
       setLocale: () => {},
       toggleLocale: () => {},
-      t: (key: string, fallback?: string) => fallback ?? key,
+      t: (key: string, fallback?: string) =>
+        resolveNestedKey(dictionaries.en, key) ?? fallback ?? key,
+      serverMessage: (message: ServerMessage, fallback?: string) => resolveServerMessage(message, 'en', fallback),
     };
   }
   return context;
