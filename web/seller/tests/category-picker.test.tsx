@@ -90,6 +90,20 @@ describe('CategoryPicker', () => {
     expect((screen.getByLabelText('Archived Cat') as HTMLInputElement).disabled).toBe(false);
   });
 
+  it('renders nested categories with valid list structure (no <li> directly inside <li>)', () => {
+    const { container } = renderPicker();
+    const rootItem = screen.getByLabelText('Electronics').closest('li');
+    expect(rootItem).not.toBeNull();
+    // Child rows are wrapped in a nested grouping <ul>, never direct children of the parent <li>.
+    const nestedGroup = rootItem!.querySelector(':scope > ul[role="group"]');
+    expect(nestedGroup).not.toBeNull();
+    expect(nestedGroup!.querySelector('input')).toBe(screen.getByLabelText('Audio'));
+    // No <li> element is a direct child of any other <li>.
+    container.querySelectorAll('li li').forEach((nestedItem) => {
+      expect(nestedItem.parentElement!.tagName).toBe('UL');
+    });
+  });
+
   it('emits the updated selection through onChange', () => {
     const onChange = vi.fn();
     renderPicker({ onChange });

@@ -153,7 +153,13 @@ export function CategoryPicker({
             )}
           </label>
         </div>
-        {node.children.map((child) => renderNode(child, depth + 1))}
+        {node.children.length > 0 && (
+          // Nested <ul> keeps the list markup valid: an <li> must not be a
+          // direct child of another <li> (React DOM/hydration warning).
+          <ul role="group" className="space-y-0.5">
+            {node.children.map((child) => renderNode(child, depth + 1))}
+          </ul>
+        )}
       </li>
     );
   };
