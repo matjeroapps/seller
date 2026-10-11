@@ -60,8 +60,14 @@ type CoreCapabilities interface {
 	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
 	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)
-	CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error)
+	CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey ...string) (*coreclient.VariantWithDetails, error)
+	// CreateVariantItem forwards one proposed item through the existing per-variant
+	// creation route and reports the per-item outcome (created / already_exists)
+	// the batch coordinator needs for mixed results.
+	CreateVariantItem(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey string) (*coreclient.VariantWithDetails, string, error)
 	UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error)
+	DeleteVariant(ctx context.Context, subject, storeID, productID, variantID string) error
+	ArchiveVariant(ctx context.Context, subject, storeID, productID, variantID string) (*coreclient.Variant, error)
 	CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error)
 	UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error)
 	CreateMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.MediaUploadRequest) (*coreclient.MediaUploadResponse, error)
@@ -207,6 +213,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 
 			r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
 			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)
+			r.Delete("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleDeleteVariant)
+			r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive", deps.handleArchiveVariant)
 
 			r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus", deps.handleCreateSKU)
 			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}", deps.handleUpdateSKU)

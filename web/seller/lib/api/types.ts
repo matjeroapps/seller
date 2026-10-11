@@ -129,11 +129,14 @@ export interface VariantAttributeValueDetail {
   value_code: string;
 }
 
+export type VariantStatus = 'active' | 'inactive' | 'archived';
+export type SkuStatus = 'active' | 'inactive' | 'archived';
+
 export interface ProductVariant {
   id: string;
   product_id: string;
   code: string;
-  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  status: VariantStatus | string;
   attribute_values?: VariantAttributeValueDetail[];
   sku?: ProductSku;
   created_at: string;
@@ -145,7 +148,7 @@ export interface ProductSku {
   variant_id: string;
   code: string;
   barcode?: string;
-  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  status: SkuStatus | string;
   weight_grams?: number | null;
   length_mm?: number | null;
   width_mm?: number | null;
@@ -157,7 +160,7 @@ export interface ProductSku {
 
 export interface CreateProductVariantPayload {
   code: string;
-  status: 'draft' | 'active' | 'inactive' | 'archived' | string;
+  status: VariantStatus | string;
   sku_code?: string;
   barcode?: string;
   attribute_values?: Array<{
@@ -171,6 +174,36 @@ export interface CreateProductVariantPayload {
     height_mm?: number;
   };
   price_minor_units?: number;
+}
+
+export interface UpdateProductVariantPayload {
+  code: string;
+  status: VariantStatus | string;
+  attribute_values?: Array<{
+    attribute_id: string;
+    attribute_value_id: string;
+  }>;
+}
+
+export type VariantBatchItemStatus = 'created' | 'already_exists' | 'failed' | 'skipped';
+
+export interface VariantBatchError {
+  code: 'validation_error' | 'invalid_argument' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'resource_in_use' | 'service_unavailable' | 'unavailable' | string;
+  message: string;
+}
+
+export interface VariantBatchResultItem {
+  client_item_id: string;
+  status: VariantBatchItemStatus;
+  variant?: ProductVariant;
+  sku?: ProductSku;
+  error?: VariantBatchError;
+}
+
+export interface VariantBatchResult {
+  items: VariantBatchResultItem[];
+  created_count: number;
+  failed_count: number;
 }
 
 export interface InventorySummary {

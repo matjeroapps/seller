@@ -144,7 +144,14 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 	case coreclient.CodeInsufficientInventory:
 		httpx.WriteError(w, http.StatusConflict, "insufficient_inventory", "insufficient inventory")
 	case coreclient.CodeConflict:
-		httpx.WriteError(w, http.StatusConflict, "conflict", "conflict")
+		// Per-item variant batch conflicts carry the conflicting variant/SKU
+		// code and the actionable next step from Core; all other conflicts keep
+		// the coarse public message.
+		msg := "conflict"
+		if coreErr.Message != "" && coreErr.Message != "conflict" {
+			msg = coreErr.Message
+		}
+		httpx.WriteError(w, http.StatusConflict, "conflict", msg)
 	case coreclient.CodeStoreEntitlementExceeded:
 		httpx.WriteError(w, http.StatusConflict, coreclient.CodeStoreEntitlementExceeded, "active store entitlement exceeded")
 	case coreclient.CodeUploadInProgress:

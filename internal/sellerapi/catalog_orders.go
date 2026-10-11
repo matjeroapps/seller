@@ -646,7 +646,11 @@ func (deps Dependencies) handleCreateVariant(w http.ResponseWriter, r *http.Requ
 	}
 
 	if (body.SKUCode != nil && *body.SKUCode != "") || len(body.AttributeValues) > 0 || body.WeightGrams != nil || body.Dimensions != nil {
-		v, err := deps.Core.CreateVariantWithOptions(r.Context(), subject, storeID, productID, coreclient.CreateVariantParams{
+		idempotencyKey := r.Header.Get("Idempotency-Key")
+		if idempotencyKey == "" {
+			idempotencyKey = r.Header.Get("X-Idempotency-Key")
+		}
+		v, outcome, err := deps.Core.CreateVariantItem(r.Context(), subject, storeID, productID, coreclient.CreateVariantParams{
 			Code:            body.Code,
 			Status:          body.Status,
 			SKUCode:         body.SKUCode,
@@ -655,9 +659,15 @@ func (deps Dependencies) handleCreateVariant(w http.ResponseWriter, r *http.Requ
 			WeightGrams:     body.WeightGrams,
 			Dimensions:      body.Dimensions,
 			PriceMinorUnits: body.PriceMinorUnits,
-		})
+		}, idempotencyKey)
 		if err != nil {
 			actorhttp.WriteCoreError(w, err)
+			return
+		}
+		// A canonical combination a prior successful write already created
+		// returns the existing resource with 200; first writes stay 201.
+		if outcome == coreclient.VariantOutcomeAlreadyExists {
+			httpx.WriteJSON(w, http.StatusOK, v)
 			return
 		}
 		httpx.WriteJSON(w, http.StatusCreated, v)
@@ -692,6 +702,31 @@ func (deps Dependencies) handleUpdateVariant(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, v)
+}
+
+func (deps Dependencies) handleDeleteVariant(w http.ResponseWriter, r *http.Request) {
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	if err := deps.Core.DeleteVariant(r.Context(), subject, chi.URLParam(r, "store_id"), chi.URLParam(r, "product_id"), chi.URLParam(r, "variant_id")); err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (deps Dependencies) handleArchiveVariant(w http.ResponseWriter, r *http.Request) {
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	variant, err := deps.Core.ArchiveVariant(r.Context(), subject, chi.URLParam(r, "store_id"), chi.URLParam(r, "product_id"), chi.URLParam(r, "variant_id"))
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, variant)
 }
 
 type skuRequest struct {

@@ -263,10 +263,19 @@ func (s *stubCore) ArchiveProduct(ctx context.Context, subject, storeID, product
 func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }
-func (s *stubCore) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error) {
+func (s *stubCore) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey ...string) (*coreclient.VariantWithDetails, error) {
 	return &coreclient.VariantWithDetails{}, s.err
 }
+func (s *stubCore) CreateVariantItem(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey string) (*coreclient.VariantWithDetails, string, error) {
+	return &coreclient.VariantWithDetails{}, coreclient.VariantOutcomeCreated, s.err
+}
 func (s *stubCore) UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error) {
+	return &coreclient.Variant{}, s.err
+}
+func (s *stubCore) DeleteVariant(ctx context.Context, subject, storeID, productID, variantID string) error {
+	return s.err
+}
+func (s *stubCore) ArchiveVariant(ctx context.Context, subject, storeID, productID, variantID string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }
 func (s *stubCore) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error) {

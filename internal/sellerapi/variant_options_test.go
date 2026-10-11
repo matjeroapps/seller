@@ -16,20 +16,28 @@ import (
 
 type variantMockCore struct {
 	stubCore
-	lastStoreID       string
-	lastProductID     string
-	lastVariantParams coreclient.CreateVariantParams
-	legacyCode        string
-	legacyStatus      string
-	variantResponse   *coreclient.VariantWithDetails
-	err               error
+	lastStoreID        string
+	lastProductID      string
+	lastVariantParams  coreclient.CreateVariantParams
+	lastIdempotencyKey string
+	legacyCode         string
+	legacyStatus       string
+	variantResponse    *coreclient.VariantWithDetails
+	outcome            string
+	err                error
+	updates            []variantLifecycleCall
+	deletes            []variantLifecycleCall
+	archives           []variantLifecycleCall
 }
 
-func (m *variantMockCore) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error) {
+func (m *variantMockCore) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey ...string) (*coreclient.VariantWithDetails, error) {
 	m.subject = subject
 	m.lastStoreID = storeID
 	m.lastProductID = productID
 	m.lastVariantParams = params
+	if len(idempotencyKey) > 0 {
+		m.lastIdempotencyKey = idempotencyKey[0]
+	}
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -83,6 +91,18 @@ func (m *variantMockCore) CreateVariantWithOptions(ctx context.Context, subject,
 	}, nil
 }
 
+func (m *variantMockCore) CreateVariantItem(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey string) (*coreclient.VariantWithDetails, string, error) {
+	v, err := m.CreateVariantWithOptions(ctx, subject, storeID, productID, params, idempotencyKey)
+	if err != nil {
+		return nil, "", err
+	}
+	outcome := m.outcome
+	if outcome == "" {
+		outcome = coreclient.VariantOutcomeCreated
+	}
+	return v, outcome, nil
+}
+
 func (m *variantMockCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
 	m.subject = subject
 	m.lastStoreID = storeID
@@ -125,6 +145,7 @@ func TestSellerAPI_VariantOptionsAndSKUSpecs(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/seller/stores/"+storeID+"/products/"+productID+"/variants", strings.NewReader(payload))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", "variant-item-color-black")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
@@ -151,6 +172,9 @@ func TestSellerAPI_VariantOptionsAndSKUSpecs(t *testing.T) {
 		}
 		if len(mock.lastVariantParams.AttributeValues) != 1 {
 			t.Fatalf("expected 1 attribute value, got %d", len(mock.lastVariantParams.AttributeValues))
+		}
+		if mock.lastIdempotencyKey != "variant-item-color-black" {
+			t.Fatalf("expected forwarded idempotency key, got %q", mock.lastIdempotencyKey)
 		}
 
 		var res map[string]any

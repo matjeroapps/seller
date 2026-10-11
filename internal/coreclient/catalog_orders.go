@@ -3,6 +3,7 @@ package coreclient
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"time"
@@ -62,6 +63,25 @@ type CreateVariantParams struct {
 	WeightGrams     *int                    `json:"weight_grams,omitempty"`
 	Dimensions      *VariantDimensionsDTO   `json:"dimensions,omitempty"`
 	PriceMinorUnits *int64                  `json:"price_minor_units,omitempty"`
+}
+
+type VariantBatchError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type VariantBatchResultItem struct {
+	ClientItemID string              `json:"client_item_id"`
+	Status       string              `json:"status"`
+	Variant      *VariantWithDetails `json:"variant,omitempty"`
+	SKU          *SKU                `json:"sku,omitempty"`
+	Error        *VariantBatchError  `json:"error,omitempty"`
+}
+
+type VariantBatchResult struct {
+	Items        []VariantBatchResultItem `json:"items"`
+	CreatedCount int                      `json:"created_count"`
+	FailedCount  int                      `json:"failed_count"`
 }
 
 type VariantAttributeValueDetail struct {
@@ -461,10 +481,40 @@ func (c *Client) CreateVariantWithAttributes(ctx context.Context, subject, store
 	return &res, nil
 }
 
-func (c *Client) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params CreateVariantParams) (*VariantWithDetails, error) {
+// Per-item variant creation outcomes. Core reports a retried canonical
+// combination whose prior write succeeded with 200 and the existing resource;
+// first writes are 201. There is no batch endpoint: the batch coordinator
+// submits one item per request and maps each per-item outcome itself.
+const (
+	VariantOutcomeCreated       = "created"
+	VariantOutcomeAlreadyExists = "already_exists"
+)
+
+// CreateVariantItem performs one per-item variant creation and maps the Core
+// response onto a per-item outcome. The idempotency key is the stable key the
+// batch coordinator derived for the item; retries must reuse it unchanged.
+func (c *Client) CreateVariantItem(ctx context.Context, subject, storeID, productID string, params CreateVariantParams, idempotencyKey string) (*VariantWithDetails, string, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants", url.PathEscape(storeID), url.PathEscape(productID))
 	var res VariantWithDetails
-	if err := c.post(ctx, path, params, requestOptions{Subject: subject}, &res); err != nil {
+	opts := requestOptions{Subject: subject, IdempotencyKey: idempotencyKey}
+	_, status, err := c.do(ctx, http.MethodPost, path, nil, params, opts, &res)
+	if err != nil {
+		return nil, "", err
+	}
+	if status == http.StatusOK {
+		return &res, VariantOutcomeAlreadyExists, nil
+	}
+	return &res, VariantOutcomeCreated, nil
+}
+
+func (c *Client) CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params CreateVariantParams, idempotencyKey ...string) (*VariantWithDetails, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants", url.PathEscape(storeID), url.PathEscape(productID))
+	var res VariantWithDetails
+	opts := requestOptions{Subject: subject}
+	if len(idempotencyKey) > 0 {
+		opts.IdempotencyKey = idempotencyKey[0]
+	}
+	if err := c.post(ctx, path, params, opts, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -475,6 +525,20 @@ func (c *Client) UpdateVariant(ctx context.Context, subject, storeID, productID,
 	body := map[string]any{"code": code, "status": status}
 	var res Variant
 	if err := c.put(ctx, path, body, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *Client) DeleteVariant(ctx context.Context, subject, storeID, productID, variantID string) error {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
+	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
+}
+
+func (c *Client) ArchiveVariant(ctx context.Context, subject, storeID, productID, variantID string) (*Variant, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s/archive", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
+	var res Variant
+	if err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil

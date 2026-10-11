@@ -735,10 +735,20 @@ func sellerRoutes() []RouteSpec {
 				PathStringParam("product_id", "Product identifier"),
 			},
 			RequestBody: struct {
-				Code   string `json:"code"`
-				Status string `json:"status"`
+				Code            string                             `json:"code"`
+				Status          string                             `json:"status"`
+				SKUCode         *string                            `json:"sku_code,omitempty"`
+				Barcode         *string                            `json:"barcode,omitempty"`
+				AttributeValues []coreclient.AttributeValueMapping `json:"attribute_values,omitempty"`
+				WeightGrams     *int                               `json:"weight_grams,omitempty"`
+				Dimensions      *coreclient.VariantDimensionsDTO   `json:"dimensions,omitempty"`
+				PriceMinorUnits *int64                             `json:"price_minor_units,omitempty"`
 			}{},
-			Responses: AuthCreatedResponses("Variant created", coreclient.Variant{}),
+			Responses: append([]ResponseSpec{
+				// A canonical combination a prior successful write already
+				// created returns the existing variant detail with 200.
+				OKResponse("Existing variant for the canonical combination returned unchanged (already_exists)", coreclient.VariantWithDetails{}),
+			}, AuthCreatedResponses("Variant item created", coreclient.VariantWithDetails{})...),
 		},
 		{
 			Method:      http.MethodPut,
@@ -757,6 +767,43 @@ func sellerRoutes() []RouteSpec {
 				Status string `json:"status"`
 			}{},
 			Responses: AuthOKResponses("Variant updated", coreclient.Variant{}),
+		},
+		{
+			Method:      http.MethodDelete,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}",
+			OperationID: "deleteProductVariant",
+			Summary:     "Delete a product variant",
+			Description: "Deletes the variant, its selected-value junction rows and its associated SKU records atomically, but only while nothing operationally references it; a variant referenced by inventory or orders returns 409 resource_in_use and the caller should archive instead.",
+			Tags:        []string{"Variants"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("variant_id", "Variant identifier"),
+			},
+			Responses: []ResponseSpec{
+				{Status: http.StatusNoContent, Description: "Variant deleted"},
+				ErrorResponse(http.StatusUnauthorized, "Unauthorized"),
+				ErrorResponse(http.StatusForbidden, "Forbidden"),
+				ErrorResponse(http.StatusNotFound, "Not found"),
+				ErrorResponse(http.StatusConflict, "resource_in_use: the variant is referenced and cannot be deleted"),
+				ErrorResponse(http.StatusInternalServerError, "Internal error"),
+			},
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive",
+			OperationID: "archiveProductVariant",
+			Summary:     "Archive a product variant",
+			Description: "Follows the existing product archive convention: marks the variant archived and non-sellable, deactivates its active SKUs, and preserves historical SKUs, junction rows and inventory snapshots. Repeated archive is idempotent as a lifecycle outcome.",
+			Tags:        []string{"Variants"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+				PathStringParam("variant_id", "Variant identifier"),
+			},
+			Responses: AuthOKResponses("Variant archived", coreclient.Variant{}),
 		},
 		{
 			Method:      http.MethodPost,
