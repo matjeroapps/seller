@@ -67,12 +67,7 @@ func (c *Client) GetStoreBalance(ctx context.Context, subject, storeID string) (
 	path := fmt.Sprintf("/internal/v1/stores/%s/finance/balance", url.PathEscape(storeID))
 	var bal StoreBalanceResponse
 	if err := c.get(ctx, path, nil, requestOptions{Subject: subject}, &bal); err != nil {
-		return &StoreBalanceResponse{
-			AvailableMinor: 0,
-			PendingMinor:   0,
-			Currency:       "SAR",
-			UpdatedAt:      time.Now().UTC(),
-		}, nil
+		return nil, err
 	}
 	return &bal, nil
 }

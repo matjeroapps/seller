@@ -62,7 +62,134 @@ async function renderPage(ui: React.ReactElement) {
   return utils!;
 }
 
-describe('Dashboard Overview Null Safety & Zero Data (T010-T012)', () => {
+type AnyStore = { id: string; code: string; name: string; status: string; market_code: string };
+
+function wsStore(id: string, status = 'active'): AnyStore {
+  return { id, code: id.replace(/[^a-z0-9]/gi, '').toLowerCase(), name: `Store ${id}`, status, market_code: 'SA' };
+}
+
+function workspace(id: string, stores: AnyStore[], overrides: Record<string, unknown> = {}) {
+  return {
+    merchant_id: id,
+    merchant_code: id.toUpperCase(),
+    legal_name: `Merchant ${id}`,
+    merchant_status: 'active',
+    membership: { id: `mem-${id}`, status: 'active', permissions: ['retail.orders.manage'] },
+    stores,
+    ...overrides
+  } as any;
+}
+
+describe('Direct entry resolution from /dashboard (US1 entry cases)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi.getStores.mockResolvedValue({ items: [] });
+  });
+
+  async function renderWith(bootstrap: unknown) {
+    fetchConsole.mockResolvedValue(bootstrap as any);
+    await renderPage(<DashboardOverview />);
+  }
+
+  it('directly enters the only enterable workspace and its single active authorized store (draft store tolerated)', async () => {
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [workspace('m-1', [wsStore('s-1'), wsStore('s-draft', 'draft')])] });
+
+    await waitFor(
+      () => {
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard/merchants/m-1/stores/s-1');
+      },
+      { timeout: 1000 }
+    );
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not direct-enter when the only workspace has multiple active stores and keeps explicit selection', async () => {
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [workspace('m-1', [wsStore('s-1'), wsStore('s-2')])] });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('merchant-workspace-card-M-1')).toBeInTheDocument(), { timeout: 1000 });
+  });
+
+  it('keeps the workspace chooser when more than one workspace is enterable', async () => {
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [workspace('m-1', [wsStore('s-1')]), workspace('m-2', [wsStore('s-9')])] });
+
+    await waitFor(async () => {
+      expect(screen.getByTestId('merchant-workspace-card-M-1')).toBeInTheDocument();
+      expect(screen.getByTestId('merchant-workspace-card-M-2')).toBeInTheDocument();
+    }, { timeout: 1000 });
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('does not direct-enter a fallback store when the only workspace has zero active stores', async () => {
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [workspace('m-1', [wsStore('s-1', 'draft')])] });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard/merchants/m-1/stores/s-1');
+    await waitFor(() => expect(screen.getByTestId('merchant-workspace-card-M-1')).toBeInTheDocument(), { timeout: 1000 });
+  });
+
+  it('routes zero enterable workspaces to the honest onboarding/access state', async () => {
+    await renderWith({
+      contract_version: 'merchant-console/v1',
+      workspaces: [workspace('m-1', [], { membership: { id: 'mem-1', status: 'invited', permissions: [] } })]
+    });
+
+    await waitFor(
+      () => {
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard/onboarding');
+      },
+      { timeout: 1000 }
+    );
+  });
+
+  it('excludes inactive and historical workspace records from the enterable count', async () => {
+    await renderWith({
+      contract_version: 'merchant-console/v1',
+      workspaces: [
+        workspace('m-1', [wsStore('s-1')]),
+        workspace('m-2', [wsStore('s-2')], { merchant_status: 'suspended', membership: { id: 'mem-2', status: 'active', permissions: [] } }),
+        workspace('m-3', [wsStore('s-3')], { membership: { id: 'mem-3', status: 'suspended', permissions: [] } })
+      ]
+    });
+
+    await waitFor(
+      () => {
+        expect(mockReplace).toHaveBeenCalledWith('/dashboard/merchants/m-1/stores/s-1');
+      },
+      { timeout: 1000 }
+    );
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('never infers a legacy store entry when zero enterable workspaces exist, even with exactly one active legacy store', async () => {
+    mockApi.getStores.mockResolvedValue({
+      items: [
+        {
+          id: 'st-active',
+          merchant_id: 'm-1',
+          name: 'Legacy Active Store',
+          slug: 'legacy-active',
+          status: 'active',
+          currency: 'SAR'
+        }
+      ]
+    });
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [] });
+
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard/onboarding');
+    expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/stores/st-active');
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard/stores/st-active');
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('direct-enter requires exactly one active legacy store rather than any single store', async () => {
+    mockApi.getStores.mockResolvedValue({ items: [{ id: 'st-draft', status: 'draft', name: 'Draft', slug: 'st-draft' }] });
+    await renderWith({ contract_version: 'merchant-console/v1', workspaces: [] });
+
+    expect(mockReplace).not.toHaveBeenCalledWith('/dashboard/stores/st-draft');
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard/onboarding');
+  });
+});
   beforeEach(() => {
     vi.clearAllMocks();
     fetchConsole.mockResolvedValue({
@@ -72,6 +199,7 @@ describe('Dashboard Overview Null Safety & Zero Data (T010-T012)', () => {
     } as any);
   });
 
+describe('Dashboard Overview Null Safety & Zero Data (T010-T012)', () => {
   it('DashboardOverview handles null items payload without throwing TypeError', async () => {
     // Simulates API returning null or object without items array
     mockApi.getStores.mockResolvedValue(null as any);

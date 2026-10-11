@@ -4,6 +4,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { isOperableWorkspace, type MerchantWorkspace } from '@/lib/api/merchant-console';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 /**
  * Merchant workspace switcher (Feature 025). Rendered only when the principal
@@ -21,6 +22,7 @@ export function MerchantWorkspaceSwitcher({
   selectedMerchantId?: string;
   onSelect: (merchantId: string) => void;
 }) {
+  const { t } = useTranslation();
   const operable = workspaces.filter(isOperableWorkspace);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,14 +55,14 @@ export function MerchantWorkspaceSwitcher({
         data-testid="merchant-workspace-switcher"
       >
         <span className="store-switcher__meta">
-          <span className="store-switcher__label">Merchant workspace</span>
+          <span className="store-switcher__label">{t('merchantWorkspaceSwitcher.label')}</span>
           <span className="store-switcher__name">{selected?.legal_name || selected?.merchant_code}</span>
-          <span className="store-switcher__code">{selected?.membership.status}</span>
+          <span className="store-switcher__code">{t(`statuses.${selected?.membership.status}`, selected?.membership.status)}</span>
         </span>
         <ChevronDown aria-hidden="true" className="h-4 w-4" />
       </button>
       {isOpen && (
-        <div className="store-switcher__menu" role="listbox" aria-label="Merchant workspaces">
+        <div className="store-switcher__menu" role="listbox" aria-label={t('merchantWorkspaceSwitcher.listLabel')}>
           {operable.map((ws) => (
             <button
               key={ws.merchant_id}
@@ -76,7 +78,7 @@ export function MerchantWorkspaceSwitcher({
             >
               <span>
                 <span className="store-switcher__name">{ws.legal_name}</span>
-                <span className="store-switcher__code">{ws.merchant_code}</span>
+                <span className="store-switcher__code mh-ltr-token" dir="ltr">{ws.merchant_code}</span>
               </span>
               {ws.merchant_id === selected?.merchant_id && <Check aria-hidden="true" className="h-4 w-4" />}
             </button>

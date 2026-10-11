@@ -27,9 +27,11 @@ const order = (id: string, status: string): SellerOrder => ({
 });
 
 describe('dashboard model', () => {
-  it('formats minor-unit money for seller finance values', () => {
+  it('formats minor-unit money with the authoritative record currency only', () => {
     expect(formatMinorMoney(12345, 'SAR')).toBe('SAR\u00a0123.45');
-    expect(formatMinorMoney(12000, 'SAR')).toBe('SAR\u00a0120');
+    expect(formatMinorMoney(0, 'EGP')).toBe('EGP\u00a00');
+    expect(formatMinorMoney(12000, '')).toBe('Unavailable');
+    expect(formatMinorMoney(undefined, 'SAR')).toBe('Unavailable');
   });
 
   it('sorts low stock inventory by urgency and caps the rail list', () => {

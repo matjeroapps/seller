@@ -30,6 +30,10 @@
   --storefront-panel: #ffffff;
 }
 
+/* Dark mode is an explicit Seller state only (never the OS preference): the
+   shell writes data-theme on <html> (see SellerShell), Tailwind `dark:`
+   variants are bound to [data-theme="dark"] in tailwind.config.ts, and this
+   is the only dark-palette source in the stylesheet. */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --color-background: #0f172a;
@@ -67,6 +71,11 @@ body {
 button,
 a {
   touch-action: manipulation;
+}
+
+.mh-ltr-token {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 :focus-visible {

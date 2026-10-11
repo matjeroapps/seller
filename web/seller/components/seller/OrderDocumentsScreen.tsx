@@ -5,6 +5,7 @@ import { sellerClient } from '@/lib/api/client';
 import type { SellerOrderDetail } from '@/lib/api/types';
 import { CapabilityState } from './CapabilityState';
 import { createUnavailableState } from '@/lib/screens/state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { Printer, FileText, Download } from 'lucide-react';
 
 interface OrderDocumentsScreenProps {
@@ -16,6 +17,7 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
   const [order, setOrder] = useState<SellerOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     loadOrder();
@@ -28,7 +30,7 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
       const data = await sellerClient.getStoreOrderDetail(storeId, orderId);
       setOrder(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load order details.');
+      setError(err.message || t('orders.detail.loadFailed', 'Failed to load order details.'));
     } finally {
       setLoading(false);
     }
@@ -43,16 +45,19 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
       <CapabilityState
         state={{
           status: 'loading',
-          title: 'Loading Order Documents',
-          description: 'Preparing document markup for print...',
+          title: t('orders.documents.loadingTitle', 'Loading Order Documents'),
+          description: t('orders.documents.loadingDescription', 'Preparing document markup for print...'),
         }}
       />
     );
   }
 
   const zatcaExportState = createUnavailableState(
-    'PDF Export & ZATCA E-Invoicing Signing',
-    'Server-side PDF generation, shipping label PDF downloads, and ZATCA Phase 2 e-invoice XML/PDF signing are not supported by Core.'
+    t('orders.documents.zatcaTitle', 'PDF Export & ZATCA E-Invoicing Signing'),
+    t(
+      'orders.documents.zatcaDescription',
+      'Server-side PDF generation, shipping label PDF downloads, and ZATCA Phase 2 e-invoice XML/PDF signing are not supported by Core.'
+    )
   );
 
   return (
@@ -60,10 +65,10 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
       <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Order Documents #{order?.order_number || orderId}
+            {t('orders.documents.title', 'Order Documents {orderNumber}').replace('{orderNumber}', `#${order?.order_number || orderId}`)}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Print packing slips and order receipts directly from your browser.
+            {t('orders.documents.subtitle', 'Print packing slips and order receipts directly from your browser.')}
           </p>
         </div>
 
@@ -72,7 +77,7 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
           onClick={handlePrint}
           className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500"
         >
-          <Printer className="h-4 w-4" /> Print Document
+          <Printer className="h-4 w-4" /> {t('orders.documents.printDocument', 'Print Document')}
         </button>
       </div>
 
@@ -86,34 +91,34 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
       <div className="rounded-lg border bg-white p-8 shadow-sm dark:bg-slate-900 space-y-6 print:border-none print:shadow-none">
         <div className="flex justify-between border-b pb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">PACKING SLIP & RECEIPT</h2>
-            <p className="text-xs text-slate-500">Store ID: {storeId}</p>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('orders.documents.packingSlipTitle', 'PACKING SLIP & RECEIPT')}</h2>
+            <p className="text-xs text-slate-500">{t('orders.documents.storeIdLabel', 'Store ID:')} {storeId}</p>
           </div>
           <div className="text-end">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Order: #{order?.order_number}</p>
-            <p className="text-xs text-slate-500">Date: {order?.created_at ? new Date(order.created_at).toLocaleDateString() : ''}</p>
-            <p className="text-xs font-semibold text-emerald-600">Status: {order?.status}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('orders.documents.orderLabel', 'Order:')} #{order?.order_number}</p>
+            <p className="text-xs text-slate-500">{t('orders.documents.dateLabel', 'Date:')} {order?.created_at ? new Date(order.created_at).toLocaleDateString() : ''}</p>
+            <p className="text-xs font-semibold text-emerald-600">{t('orders.documents.statusLabel', 'Status:')} {order?.status}</p>
           </div>
         </div>
 
         {order?.shipping_address && (
           <div className="text-xs space-y-1">
-            <p className="font-semibold text-slate-900 dark:text-white">Shipping Recipient:</p>
+            <p className="font-semibold text-slate-900 dark:text-white">{t('orders.documents.recipientLabel', 'Shipping Recipient:')}</p>
             <p>{order.shipping_address.recipient_name}</p>
             <p>{order.shipping_address.address_line_1}</p>
             <p>{order.shipping_address.city}, {order.shipping_address.country_code}</p>
-            <p>Phone: {order.shipping_address.phone}</p>
+            <p>{t('orders.documents.phoneLabel', 'Phone:')} {order.shipping_address.phone}</p>
           </div>
         )}
 
         <table className="w-full text-start text-xs border-collapse">
           <thead>
             <tr className="border-b bg-slate-50 dark:bg-slate-800">
-              <th className="p-2 text-start">Item</th>
-              <th className="p-2 text-start">SKU</th>
-              <th className="p-2 text-end">Qty</th>
-              <th className="p-2 text-end">Unit Price</th>
-              <th className="p-2 text-end">Total</th>
+              <th className="p-2 text-start">{t('orders.documents.colItem', 'Item')}</th>
+              <th className="p-2 text-start">{t('orders.documents.colSku', 'SKU')}</th>
+              <th className="p-2 text-end">{t('orders.documents.colQty', 'Qty')}</th>
+              <th className="p-2 text-end">{t('orders.documents.colUnitPrice', 'Unit Price')}</th>
+              <th className="p-2 text-end">{t('orders.documents.colTotal', 'Total')}</th>
             </tr>
           </thead>
           <tbody>
@@ -132,7 +137,7 @@ export function OrderDocumentsScreen({ storeId, orderId }: OrderDocumentsScreenP
         <div className="flex justify-end pt-4">
           <div className="w-48 space-y-1 text-xs text-end">
             <div className="flex justify-between font-semibold border-t pt-2 text-slate-900 dark:text-white text-sm">
-              <span>Total:</span>
+              <span>{t('orders.documents.totalLabel', 'Total:')}</span>
               <span>{order?.currency} {((order?.total || 0) / 100).toFixed(2)}</span>
             </div>
           </div>

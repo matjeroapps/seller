@@ -61,7 +61,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const { locale, toggleLocale, direction } = useTranslation();
+  const { toggleLocale, direction, t } = useTranslation();
   const [profileOpen, setProfileOpen] = useState(false);
   const [catalogQuery, setCatalogQuery] = useState('');
   const [consoleState, setConsoleState] = useState<ConsoleState>({ status: 'legacy' });
@@ -81,6 +81,10 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
     }
     // Cancel stale in-flight requests and drop previous workspace data on
     // switch: every merchant-scoped view reloads from the selected workspace.
+    // The per-merchant abort keying means a resolution finished for the
+    // previously selected workspace is never applied to the newly selected
+    // one, and a remount while a resolution is in flight cannot resolve the
+    // same merchant's bootstrap twice.
     const controller = new AbortController();
     setConsoleState({ status: 'loading' });
     fetchMerchantConsole(merchantId, controller.signal)
@@ -91,6 +95,11 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
           setConsoleState({ status: 'denied' });
           return;
         }
+        // Only a bootstrap whose selected workspace still matches the current
+        // URL is applied — a redirect/dataview that raced with this one cannot
+        // restage a stale workspace or an out-of-date store selection.
+        const currentUrlMerchant = pathname.match(/\/dashboard\/merchants\/([^/]+)/)?.[1];
+        if (currentUrlMerchant !== merchantId) return;
         setConsoleState({ status: 'ready', console: bootstrap, merchantId });
       })
       .catch((error: unknown) => {
@@ -125,8 +134,8 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
 
   const workspaceRoot = inMerchantContext && merchantId ? `/dashboard/merchants/${merchantId}` : null;
   const breadcrumbs = [
-    { label: 'Dashboard', path: workspaceRoot || (legacyStoreId ? `/dashboard/stores/${legacyStoreId}` : '/dashboard') },
-    ...(activeItem && activeItem.id !== 'dashboard' && activeItem.id !== 'workspace-dashboard' ? [{ label: activeItem.label, path: activeItem.path }] : [])
+    { label: t('nav.dashboard'), path: workspaceRoot || (legacyStoreId ? `/dashboard/stores/${legacyStoreId}` : '/dashboard') },
+    ...(activeItem && activeItem.id !== 'dashboard' && activeItem.id !== 'workspace-dashboard' ? [{ label: t(activeItem.labelKey || '', activeItem.label), path: activeItem.path }] : [])
   ];
 
   useEffect(() => {
@@ -164,16 +173,16 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
   return (
     <SellerShellUserProvider user={user}>
       <div className="seller-app-shell" data-theme={theme}>
-      <aside className={`seller-sidebar ${mobileNavOpen ? 'is-open' : ''}`} aria-label="Seller navigation">
+      <aside className={`seller-sidebar ${mobileNavOpen ? 'is-open' : ''}`} aria-label={t('shell.sellerNavigation')}>
         <div className="seller-sidebar__brand">
-          <button type="button" className="seller-brand" onClick={() => navigate(currentStoreId ? `/dashboard/stores/${currentStoreId}` : '/dashboard')}>
+          <button type="button" className="seller-brand" onClick={() => navigate(storeBase || workspaceRoot || '/dashboard')}>
             <span className="seller-brand__mark">M</span>
             <span>
               <span className="seller-brand__name">MatjerHub</span>
-              <span className="seller-brand__meta">Seller Portal</span>
+              <span className="seller-brand__meta">{t('shell.sellerPortal')}</span>
             </span>
           </button>
-          <button type="button" className="seller-icon-button seller-sidebar__close" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation">
+          <button type="button" className="seller-icon-button seller-sidebar__close" onClick={() => setMobileNavOpen(false)} aria-label={t('shell.closeNavigation')}>
             <X aria-hidden="true" />
           </button>
         </div>
@@ -210,7 +219,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
                   aria-current={pathname === item.path ? 'page' : undefined}
                 >
                   <span className="seller-nav-item__icon">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey || '', item.label)}</span>
                 </button>
                 {item.children && isExpanded && (
                   <div className="seller-nav-children">
@@ -223,7 +232,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
                         aria-current={pathname === child.path ? 'page' : undefined}
                       >
                         <span className="seller-nav-item__icon">{child.icon}</span>
-                        <span>{child.label}</span>
+                        <span>{t(child.labelKey || '', child.label)}</span>
                       </button>
                     ))}
                   </div>
@@ -234,15 +243,15 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
         </nav>
       </aside>
 
-      {mobileNavOpen && <button type="button" aria-label="Close navigation overlay" className="seller-sidebar-overlay" onClick={() => setMobileNavOpen(false)} />}
+      {mobileNavOpen && <button type="button" aria-label={t('shell.closeNavigationOverlay')} className="seller-sidebar-overlay" onClick={() => setMobileNavOpen(false)} />}
 
       <div className="seller-workspace">
         <header className="seller-topbar">
           <div className="seller-topbar__left">
-            <button type="button" className="seller-icon-button seller-topbar__menu" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
+            <button type="button" className="seller-icon-button seller-topbar__menu" onClick={() => setMobileNavOpen(true)} aria-label={t('shell.openNavigation')}>
               <Menu aria-hidden="true" />
             </button>
-            <nav className="seller-breadcrumbs" aria-label="Breadcrumb">
+            <nav className="seller-breadcrumbs" aria-label={t('shell.breadcrumb')}>
               {breadcrumbs.map((crumb, index) => (
                 <span key={crumb.path} className="seller-breadcrumbs__item">
                   {index > 0 && <span className="seller-breadcrumbs__divider">/</span>}
@@ -257,7 +266,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
           <form className="seller-search-command" role="search" onSubmit={submitCatalogSearch}>
             <Search aria-hidden="true" />
             <label className="sr-only" htmlFor="seller-catalog-search">
-              Search catalog
+              {t('shell.searchCatalog')}
             </label>
             <input
               id="seller-catalog-search"
@@ -265,12 +274,12 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
               name="query"
               value={catalogQuery}
               onChange={(event) => setCatalogQuery(event.target.value)}
-              placeholder="Search catalog"
-              aria-label="Search catalog"
+              placeholder={t('shell.searchCatalog')}
+              aria-label={t('shell.searchCatalog')}
               autoComplete="off"
             />
-            <button type="submit" className="sr-only" aria-label="Submit catalog search">
-              Search
+            <button type="submit" className="sr-only" aria-label={t('shell.submitCatalogSearch')}>
+              {t('common.search')}
             </button>
           </form>
 
@@ -279,14 +288,14 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
               type="button"
               className="seller-icon-button"
               onClick={toggleLocale}
-              aria-label={direction === 'ltr' ? 'Switch to Arabic layout' : 'Switch to English layout'}
+              aria-label={direction === 'ltr' ? t('shell.switchToArabicLayout') : t('shell.switchToEnglishLayout')}
             >
               <Globe2 aria-hidden="true" />
             </button>
-            <button type="button" className="seller-icon-button" onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))} aria-label="Toggle color mode">
+            <button type="button" className="seller-icon-button" onClick={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))} aria-label={t('shell.toggleColorMode')}>
               {theme === 'light' ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
             </button>
-            <button type="button" className="seller-icon-button" onClick={() => navigate(settingsPath)} aria-label="Help and settings">
+            <button type="button" className="seller-icon-button" onClick={() => navigate(settingsPath)} aria-label={t('shell.helpAndSettings')}>
               <CircleHelp aria-hidden="true" />
             </button>
             <div className="seller-profile">
@@ -297,7 +306,7 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
                   <span>
                     {consoleState.status === 'ready' && selectedWorkspace
                       ? `${selectedWorkspace.legal_name} · ${selectedWorkspace.membership.status}`
-                      : user.roles[0] || 'Seller'}
+                      : user.roles[0] || t('shell.sellerRole')}
                   </span>
                 </span>
                 <ChevronDown aria-hidden="true" />
@@ -306,15 +315,15 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
                 <div className="seller-profile__menu">
                   <button type="button" onClick={() => navigate(profilePath)}>
                     <Settings aria-hidden="true" />
-                    Account settings
+                    {t('shell.accountSettings')}
                   </button>
                   <button type="button" onClick={() => navigate('/dashboard')}>
                     <Store aria-hidden="true" />
-                    Switch workspace
+                    {t('shell.switchWorkspace')}
                   </button>
                   <button type="button" onClick={() => navigate('/logout')}>
                     <LogOut aria-hidden="true" />
-                    Sign out
+                    {t('shell.signOut')}
                   </button>
                 </div>
               )}
@@ -326,14 +335,14 @@ export function SellerShell({ children, user }: { children: ReactNode; user: Sel
           {consoleState.status === 'denied' ? (
             <MerchantAccessDenied
               backPath="/dashboard"
-              title="Merchant workspace unavailable"
-              message="This merchant workspace is not accessible for your account, or your membership is not active."
+              title={t('merchantAccessDenied.unavailableTitle')}
+              message={t('merchantAccessDenied.unavailableMessage')}
             />
           ) : consoleState.status === 'error' ? (
             <div className="space-y-2" role="alert" data-testid="merchant-console-error">
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Console unavailable</h1>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('shell.consoleUnavailableTitle')}</h1>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                The merchant workspace context could not be loaded. Retry from the dashboard.
+                {t('shell.consoleUnavailableMessage')}
               </p>
             </div>
           ) : (

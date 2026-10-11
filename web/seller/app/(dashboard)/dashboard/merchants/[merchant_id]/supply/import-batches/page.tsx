@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { merchantSupplyApi, type SupplyImportBatch } from '@/lib/api/merchant-console';
 import { MerchantAccessDenied } from '@/components/shell/MerchantAccessDenied';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function SupplyImportBatchesPage({ params }: { params: Promise<{ merchant_id: string }> }) {
   const { merchant_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'empty' } | { status: 'ready'; data: SupplyImportBatch[] }
   >({ status: 'loading' });
@@ -32,14 +34,14 @@ export default function SupplyImportBatchesPage({ params }: { params: Promise<{ 
   return (
     <div className="space-y-6" data-testid="supply-import-batches">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Import batches</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Staged provider imports. Nothing is published without an explicit approved decision.</p>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t('supply.importBatches.title')}</h1>
+        <p className="text-xs text-slate-500 mt-0.5">{t('supply.importBatches.subtitle')}</p>
       </div>
 
       {state.status === 'loading' && <SupplyLoading />}
       {state.status === 'error' && <SupplyError />}
       {state.status === 'empty' && (
-        <SupplyEmpty title="No import batches" message="Staged import batches from your supply connections will appear here." />
+        <SupplyEmpty title={t('supply.importBatches.emptyTitle')} message={t('supply.importBatches.emptyBody')} />
       )}
       {state.status === 'ready' && (
         <ul className="space-y-3">
@@ -53,10 +55,10 @@ export default function SupplyImportBatchesPage({ params }: { params: Promise<{ 
                   <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{batch.provider}</span>
                   <span className="text-xs text-slate-500">{batch.batch_type}</span>
                   <span className="text-xs font-semibold uppercase rounded px-1.5 py-0.5 bg-slate-100 text-slate-600">{batch.status}</span>
-                  {batch.first_import && <span className="text-[10px] font-semibold uppercase rounded px-1.5 py-0.5 bg-blue-100 text-blue-800">first import</span>}
+                  {batch.first_import && <span className="text-[10px] font-semibold uppercase rounded px-1.5 py-0.5 bg-blue-100 text-blue-800">{t('supply.importBatches.firstImport')}</span>}
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  {batch.record_count} records · {batch.approved_count} approved · {batch.rejected_count} rejected · {batch.duplicate_count} duplicates
+                  {batch.record_count} {t('supply.importBatches.records')} · {batch.approved_count} {t('supply.importBatches.approved')} · {batch.rejected_count} {t('supply.importBatches.rejected')} · {batch.duplicate_count} {t('supply.importBatches.duplicates')}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">{new Date(batch.created_at).toLocaleString()}</div>
               </Link>

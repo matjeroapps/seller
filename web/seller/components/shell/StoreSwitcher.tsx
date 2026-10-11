@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Store as StoreIcon, ChevronDown, Plus, Check } from 'lucide-react';
+import { Store as StoreIcon, ChevronDown, Check } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { Store } from '@/lib/api/types';
 import type { MerchantWorkspaceStore } from '@/lib/api/merchant-console';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export function StoreSwitcher({
   currentStoreId,
@@ -20,15 +21,13 @@ export function StoreSwitcher({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   const [stores, setStores] = useState<Store[]>([]);
   const [activeLimit, setActiveLimit] = useState<number>(1);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [creating, setCreating] = useState<boolean>(false);
-  const [newStoreName, setNewStoreName] = useState<string>('');
-  const [newStoreCode, setNewStoreCode] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
@@ -62,9 +61,15 @@ export function StoreSwitcher({
     };
   }, [currentStoreId, pathname, router]);
 
-  const selectedStore = workspaceStores
-    ? workspaceStores.find((s) => s.id === currentStoreId) || workspaceStores[0]
-    : stores.find((s) => s.id === currentStoreId) || stores[0];
+  // Only the URL-selected store is "current". There is no fallback: before the
+  // route selects a store (or if the routed store is stale/not authorized for
+  // this workspace) the switcher shows an explicit unselected state while the
+  // authorized store listing stays navigable.
+  const selectedStore = currentStoreId
+    ? workspaceStores
+      ? workspaceStores.find((s) => s.id === currentStoreId)
+      : stores.find((s) => s.id === currentStoreId)
+    : undefined;
 
   const handleSelectStore = (storeId: string) => {
     setIsOpen(false);
@@ -82,45 +87,14 @@ export function StoreSwitcher({
     }
   };
 
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  const handleCreateStore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStoreName || !newStoreCode) return;
-    setCreateError(null);
-    try {
-      const workspace = workspaceMerchantId
-        ? { id: workspaceMerchantId }
-        : await sellerApi.ensureRetailWorkspace({
-            code: `merchant-${newStoreCode}`,
-            legal_name: newStoreName
-          });
-      const merchantId = workspace.id;
-      const created = await sellerApi.createStore({
-        name: newStoreName,
-        code: newStoreCode,
-        market_code: 'SA',
-        merchant_id: merchantId
-      });
-      setCreating(false);
-      setNewStoreName('');
-      setNewStoreCode('');
-      setStores((prev) => [...prev, created]);
-      setIsOpen(false);
-      router.push(`/dashboard/merchants/${merchantId}/stores/${created.id}`);
-    } catch (err: any) {
-      setCreateError(err.message || 'Failed to create store');
-    }
-  };
-
   if (loading && !workspaceStores) {
     return (
       <button
         type="button"
         disabled
-        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 rounded border border-slate-200 animate-pulse cursor-not-allowed opacity-75"
+        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 rounded border border-slate-200 dark:border-slate-700 animate-pulse cursor-not-allowed opacity-75"
       >
-        <StoreIcon className="w-4 h-4" /> Loading stores...
+        <StoreIcon className="w-4 h-4" /> {t('storeSwitcher.loadingStores')}
       </button>
     );
   }
@@ -130,12 +104,12 @@ export function StoreSwitcher({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-800 bg-white border border-slate-200 rounded-md shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400"
+        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
         aria-expanded={isOpen}
         data-testid="store-switcher"
       >
-        <StoreIcon className="w-4 h-4 text-slate-600" />
-        <span className="truncate max-w-[140px]">{selectedStore ? selectedStore.name : 'Select Store'}</span>
+        <StoreIcon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+        <span className="truncate max-w-[140px]">{selectedStore ? selectedStore.name : t('storeSwitcher.selectStore')}</span>
         {selectedStore && (
           <span
             className={`px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase ${
@@ -146,19 +120,19 @@ export function StoreSwitcher({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            {selectedStore.status}
+            {t(`statuses.${selectedStore.status}`, selectedStore.status)}
           </span>
         )}
         <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 z-50 mt-1 w-64 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 divide-y divide-slate-100 focus:outline-none">
+        <div className="absolute left-0 z-50 mt-1 w-64 rounded-md bg-white dark:bg-slate-900 shadow-lg ring-1 ring-black dark:ring-slate-700 ring-opacity-5 divide-y divide-slate-100 dark:divide-slate-800 focus:outline-none">
           <div className="p-2">
-            <div className="flex items-center justify-between px-2 py-1 text-xs text-slate-500 font-semibold">
-              <span>Stores</span>
-              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-medium text-slate-600">
-                Active: {activeCount} / {activeLimit}
+            <div className="flex items-center justify-between px-2 py-1 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+              <span>{t('storeSwitcher.stores')}</span>
+              <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                {t('storeSwitcher.activeCount').replace('{active}', String(activeCount)).replace('{limit}', String(activeLimit))}
               </span>
             </div>
             <div className="mt-1 space-y-0.5 max-h-48 overflow-y-auto">
@@ -170,12 +144,12 @@ export function StoreSwitcher({
                   data-store-id={s.id}
                   data-testid={`store-switcher-option-${s.code}`}
                   className={`w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-md text-left transition-colors ${
-                    s.id === selectedStore?.id ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-700 hover:bg-slate-50'
+                    s.id === selectedStore?.id ? 'bg-slate-100 dark:bg-slate-800 font-medium text-slate-900 dark:text-slate-50' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="truncate pr-2">
                     <div className="truncate font-medium">{s.name}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{s.code} · {s.market_code}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate"><span className="mh-ltr-token" dir="ltr">{s.code} · {s.market_code}</span></div>
                   </div>
                   <div className="flex items-center gap-1">
                     <span
@@ -187,64 +161,13 @@ export function StoreSwitcher({
                           : 'bg-slate-100 text-slate-600'
                       }`}
                     >
-                      {s.status}
+                      {t(`statuses.${s.status}`, s.status)}
                     </span>
                     {s.id === selectedStore?.id && <Check className="w-3.5 h-3.5 text-emerald-600" />}
                   </div>
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="p-2">
-            {!creating ? (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-md border border-slate-200"
-              >
-                <Plus className="w-3.5 h-3.5" /> Create Store
-              </button>
-            ) : (
-              <form onSubmit={handleCreateStore} className="space-y-2 p-1">
-                {createError && (
-                  <div className="text-[11px] text-rose-600 bg-rose-50 p-1.5 rounded border border-rose-200">
-                    {createError}
-                  </div>
-                )}
-                <input
-                  type="text"
-                  placeholder="Store Name"
-                  value={newStoreName}
-                  onChange={(e) => setNewStoreName(e.target.value)}
-                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Store Code (e.g. store-a)"
-                  value={newStoreCode}
-                  onChange={(e) => setNewStoreCode(e.target.value)}
-                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded"
-                  required
-                />
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCreating(false)}
-                    className="px-2 py-1 text-[11px] text-slate-600 hover:underline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-2.5 py-1 text-[11px] font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ import { CategoryPicker } from '@/components/seller/CategoryPicker';
 import { ProductMediaWorkspace } from '@/components/seller/ProductMediaWorkspace';
 import { VariantOptionsModal } from '@/components/seller/VariantOptionsModal';
 import { sellerApi } from '@/lib/api/client';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { formatMoney } from '@/lib/money';
 import type {
   CreateProductVariantPayload,
@@ -143,6 +144,7 @@ export default function StoreProductDetailPage({
   params: Promise<{ store_id: string; product_id: string }>;
 }) {
   const { store_id, product_id } = use(params);
+  const { t } = useTranslation();
 
   const [detail, setDetail] = useState<SellerProductDetail | null>(null);
   const [mediaAssets, setMediaAssets] = useState<StoreMediaAsset[]>([]);
@@ -199,7 +201,7 @@ export default function StoreProductDetailPage({
       sellerApi.listStoreMedia(store_id).catch(() => ({ items: [] })),
       sellerApi.listProductMediaReferences(store_id, product_id).catch(() => ({ items: [] })),
       sellerApi.listStoreCategories(store_id).catch((err: any) => {
-        setCategoryLoadError(err.message || 'Failed to load categories');
+        setCategoryLoadError(err.message || t('products.errorLoadCategories'));
         return [];
       })
     ]);
@@ -209,6 +211,7 @@ export default function StoreProductDetailPage({
     setCategories(categoriesRes);
     if (categoriesRes.length > 0) setCategoryLoadError(null);
     resetEditableState(nextDetail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product_id, resetEditableState, store_id]);
 
   useEffect(() => {
@@ -216,7 +219,7 @@ export default function StoreProductDetailPage({
     setLoading(true);
     loadDetail()
       .catch((err: any) => {
-        if (isMounted) setError(err.message || 'Failed to load product details');
+        if (isMounted) setError(err.message || t('products.errorLoadDetails'));
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -249,7 +252,7 @@ export default function StoreProductDetailPage({
     event.preventDefault();
     if (!detail || !canManageProduct) return;
     if (!form.enName.trim() || !form.slug.trim()) {
-      setError('Product name and slug are required.');
+      setError(t('products.requiredNameSlug'));
       return;
     }
     setSaving(true);
@@ -282,9 +285,9 @@ export default function StoreProductDetailPage({
       });
       setDetail(updated);
       resetEditableState(updated);
-      setNotice('Product details saved.');
+      setNotice(t('products.noticeSaved'));
     } catch (err: any) {
-      setError(err.message || 'Failed to save product details');
+      setError(err.message || t('products.errorSaveDetails'));
     } finally {
       setSaving(false);
     }
@@ -297,9 +300,9 @@ export default function StoreProductDetailPage({
     setNotice(null);
     try {
       await sellerApi.updateProductStatus(store_id, product_id, newStatus);
-      await refreshAfterMutation(`Product status changed to ${newStatus}.`);
+      await refreshAfterMutation(`${t('products.statusChangedPrefix')}${newStatus}.`);
     } catch (err: any) {
-      setError(err.message || 'Failed to update product status');
+      setError(err.message || t('products.errorUpdateStatus'));
     } finally {
       setWorking(false);
     }
@@ -318,9 +321,9 @@ export default function StoreProductDetailPage({
     try {
       await sellerApi.archiveProduct(store_id, product_id);
       setShowArchiveModal(false);
-      await refreshAfterMutation('Product archived.');
+      await refreshAfterMutation(t('products.noticeArchived'));
     } catch (err: any) {
-      setError(err.message || 'Failed to archive product');
+      setError(err.message || t('products.errorArchive'));
     } finally {
       setWorking(false);
     }
@@ -338,9 +341,9 @@ export default function StoreProductDetailPage({
         status: newVariant.status
       });
       setNewVariant({ code: '', status: 'active' });
-      await refreshAfterMutation('Variant added.');
+      await refreshAfterMutation(t('products.noticeVariantAdded'));
     } catch (err: any) {
-      setError(err.message || 'Failed to add variant');
+      setError(err.message || t('products.errorAddVariant'));
     } finally {
       setWorking(false);
     }
@@ -354,9 +357,9 @@ export default function StoreProductDetailPage({
     try {
       await sellerApi.createProductVariant(store_id, product_id, payload);
       setShowVariantOptionsModal(false);
-      await refreshAfterMutation('Variant and SKU specifications created.');
+      await refreshAfterMutation(t('products.noticeVariantSpecsCreated'));
     } catch (err: any) {
-      setError(err.message || 'Failed to create variant with specifications');
+      setError(err.message || t('products.errorVariantSpecs'));
       throw err;
     } finally {
       setWorking(false);
@@ -367,7 +370,7 @@ export default function StoreProductDetailPage({
     if (!canManageProduct) return;
     const edit = variantEdits[variant.id];
     if (!edit?.code.trim()) {
-      setError('Variant code is required.');
+      setError(t('products.requiredVariantCode'));
       return;
     }
     setWorking(true);
@@ -378,9 +381,9 @@ export default function StoreProductDetailPage({
         code: edit.code.trim(),
         status: edit.status
       });
-      await refreshAfterMutation('Variant updated.');
+      await refreshAfterMutation(t('products.noticeVariantUpdated'));
     } catch (err: any) {
-      setError(err.message || 'Failed to update variant');
+      setError(err.message || t('products.errorUpdateVariant'));
     } finally {
       setWorking(false);
     }
@@ -390,7 +393,7 @@ export default function StoreProductDetailPage({
     if (!canManageProduct) return;
     const draft = newSkuByVariant[variantID] || { code: '', barcode: '', status: 'active' };
     if (!draft.code.trim()) {
-      setError('SKU code is required.');
+      setError(t('products.requiredSkuCode'));
       return;
     }
     setWorking(true);
@@ -403,9 +406,9 @@ export default function StoreProductDetailPage({
         status: draft.status
       });
       setNewSkuByVariant((prev) => ({ ...prev, [variantID]: { code: '', barcode: '', status: 'active' } }));
-      await refreshAfterMutation('SKU added.');
+      await refreshAfterMutation(t('products.noticeSkuAdded'));
     } catch (err: any) {
-      setError(err.message || 'Failed to add SKU');
+      setError(err.message || t('products.errorAddSku'));
     } finally {
       setWorking(false);
     }
@@ -415,7 +418,7 @@ export default function StoreProductDetailPage({
     if (!canManageProduct) return;
     const edit = skuEdits[sku.id];
     if (!edit?.code.trim()) {
-      setError('SKU code is required.');
+      setError(t('products.requiredSkuCode'));
       return;
     }
     setWorking(true);
@@ -427,24 +430,24 @@ export default function StoreProductDetailPage({
         barcode: edit.barcode.trim() || undefined,
         status: edit.status
       });
-      await refreshAfterMutation('SKU updated.');
+      await refreshAfterMutation(t('products.noticeSkuUpdated'));
     } catch (err: any) {
-      setError(err.message || 'Failed to update SKU');
+      setError(err.message || t('products.errorUpdateSku'));
     } finally {
       setWorking(false);
     }
   };
 
   if (loading) {
-    return <div className="p-6 text-sm text-slate-500 animate-pulse">Loading product details...</div>;
+    return <div className="p-6 text-sm text-slate-500 animate-pulse">{t('products.loadingDetail')}</div>;
   }
 
   if (!detail || !product) {
     return (
       <div className="p-8 text-center space-y-3">
-        <div className="text-sm text-slate-500">{error || 'Product not found in this store context.'}</div>
+        <div className="text-sm text-slate-500">{error || t('products.notFound')}</div>
         <Link href={`/dashboard/stores/${store_id}/catalog/products`} className="text-xs text-indigo-600 hover:underline">
-          Back to Products Catalog
+          {t('products.backToCatalog')}
         </Link>
       </div>
     );
@@ -457,7 +460,7 @@ export default function StoreProductDetailPage({
           <Link
             href={`/dashboard/stores/${store_id}/catalog/products`}
             className="mt-1 rounded-lg p-2 text-slate-500 hover:bg-white hover:text-slate-800"
-            aria-label="Back to product catalog"
+            aria-label={t('products.backAria')}
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
@@ -467,7 +470,7 @@ export default function StoreProductDetailPage({
               <StatusBadge status={product.status} />
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Source: <span className="font-medium text-slate-700">{product.source}</span> · Slug:{' '}
+              {t('products.sourcePrefix')}<span className="font-medium text-slate-700">{product.source}</span> · {t('products.slugPrefix')}{' '}
               <code className="rounded bg-slate-100 px-1.5 py-0.5">{product.slug}</code>
             </p>
           </div>
@@ -479,7 +482,7 @@ export default function StoreProductDetailPage({
               href={`/dashboard/stores/${store_id}/catalog/listings/${listing.id}`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
             >
-              <ExternalLink className="h-3.5 w-3.5" /> View Store Listing
+              <ExternalLink className="h-3.5 w-3.5" /> {t('products.viewListing')}
             </Link>
           )}
 
@@ -489,7 +492,7 @@ export default function StoreProductDetailPage({
               onChange={(event) => handleStatusChange(event.target.value)}
               disabled={working}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-              aria-label="Change product status"
+              aria-label={t('products.changeStatusAria')}
             >
               {productStatusOptions.map((status) => (
                 <option key={status} value={status}>
@@ -506,7 +509,7 @@ export default function StoreProductDetailPage({
               onClick={handleArchive}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
-              <Archive className="h-3.5 w-3.5" /> Archive / Remove
+              <Archive className="h-3.5 w-3.5" /> {t('products.archiveRemove')}
             </button>
           )}
         </div>
@@ -528,63 +531,63 @@ export default function StoreProductDetailPage({
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Listing</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('products.cardListing')}</div>
           <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
-            {listing?.status ? <StatusBadge status={listing.status} /> : 'No listing'}
+            {listing?.status ? <StatusBadge status={listing.status} /> : t('products.noListing')}
           </div>
-          <p className="mt-2 text-xs text-slate-500">ID: {listing?.id || '—'}</p>
+          <p className="mt-2 text-xs text-slate-500">{t('products.listingIdPrefix')}{listing?.id || '—'}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Readiness</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('products.cardReadiness')}</div>
           <div className="mt-2 text-sm font-bold text-slate-900">
-            {detail.publish_readiness?.is_ready ? 'Ready to publish' : 'Needs attention'}
+            {detail.publish_readiness?.is_ready ? t('products.readyToPublish') : t('products.needsAttention')}
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            {(detail.publish_readiness?.reasons || []).slice(0, 1).join(', ') || 'No readiness blockers reported.'}
+            {(detail.publish_readiness?.reasons || []).slice(0, 1).join(', ') || t('products.noBlockers')}
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Inventory</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('products.cardInventory')}</div>
           <div className="mt-2 text-sm font-bold text-slate-900">
-            {detail.inventory_summary?.total_available ?? 0} available
+            {detail.inventory_summary?.total_available ?? 0} {t('products.unitsAvailableSuffix')}
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            {detail.inventory_summary?.total_on_hand ?? 0} on hand · {detail.inventory_summary?.total_reserved ?? 0} reserved
+            {detail.inventory_summary?.total_on_hand ?? 0} {t('products.stockOnHand')} · {detail.inventory_summary?.total_reserved ?? 0} {t('products.stockReserved')}
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current price</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('products.cardPrice')}</div>
           <div className="mt-2 text-sm font-bold text-slate-900">
-            {formatMoney(detail.current_price, "Not set")}
+            {formatMoney(detail.current_price, t('products.moneyNotSet'))}
           </div>
-          <p className="mt-2 text-xs text-slate-500">Created: {formatDate(product.created_at)}</p>
+          <p className="mt-2 text-xs text-slate-500">{t('products.createdPrefix')}{formatDate(product.created_at)}</p>
         </div>
       </section>
 
       <form onSubmit={handleSaveProduct} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-950">Product content</h2>
-            <p className="text-xs text-slate-500">Edit customer-facing title, description, slug, and localized copy.</p>
+            <h2 className="text-base font-bold text-slate-950">{t('products.contentTitle')}</h2>
+            <p className="text-xs text-slate-500">{t('products.contentSubtitle')}</p>
           </div>
           <button
             type="submit"
             disabled={!canManageProduct || saving}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Product Details'}
+            <Save className="h-4 w-4" /> {saving ? t('products.saving') : t('products.saveDetails')}
           </button>
         </div>
 
         {!canManageProduct && (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            This product cannot be edited because it is either supplier-backed or archived.
+            {t('products.readOnlyNotice')}
           </div>
         )}
 
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">English title *</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelEnTitle')}</span>
             <input
               value={form.enName}
               onChange={(event) => setForm((prev) => ({ ...prev, enName: event.target.value }))}
@@ -593,7 +596,7 @@ export default function StoreProductDetailPage({
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">Product slug *</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelSlug')}</span>
             <input
               value={form.slug}
               onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
@@ -602,7 +605,7 @@ export default function StoreProductDetailPage({
             />
           </label>
           <label className="space-y-1.5 lg:col-span-2">
-            <span className="text-xs font-semibold text-slate-700">English description</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelEnDescription')}</span>
             <textarea
               value={form.enDescription}
               onChange={(event) => setForm((prev) => ({ ...prev, enDescription: event.target.value }))}
@@ -612,27 +615,27 @@ export default function StoreProductDetailPage({
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">English SEO meta title</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelEnSeoTitle')}</span>
             <input
               value={form.enMetaTitle}
               onChange={(event) => setForm((prev) => ({ ...prev, enMetaTitle: event.target.value }))}
               disabled={!canManageProduct}
-              placeholder="SEO meta title for search engines"
+              placeholder={t('products.enSeoTitlePlaceholder')}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">English SEO meta description</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelEnSeoDescription')}</span>
             <input
               value={form.enMetaDescription}
               onChange={(event) => setForm((prev) => ({ ...prev, enMetaDescription: event.target.value }))}
               disabled={!canManageProduct}
-              placeholder="SEO meta description snippet"
+              placeholder={t('products.enSeoDescriptionPlaceholder')}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">Arabic title</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelArTitle')}</span>
             <input
               value={form.arName}
               onChange={(event) => setForm((prev) => ({ ...prev, arName: event.target.value }))}
@@ -642,7 +645,7 @@ export default function StoreProductDetailPage({
             />
           </label>
           <div className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">Categories</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.categoriesLabel')}</span>
             <CategoryPicker
               storeId={store_id}
               categories={categories}
@@ -654,7 +657,7 @@ export default function StoreProductDetailPage({
             />
           </div>
           <label className="space-y-1.5 lg:col-span-2">
-            <span className="text-xs font-semibold text-slate-700">Arabic description</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelArDescription')}</span>
             <textarea
               value={form.arDescription}
               onChange={(event) => setForm((prev) => ({ ...prev, arDescription: event.target.value }))}
@@ -665,24 +668,24 @@ export default function StoreProductDetailPage({
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">Arabic SEO meta title</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelArSeoTitle')}</span>
             <input
               value={form.arMetaTitle}
               onChange={(event) => setForm((prev) => ({ ...prev, arMetaTitle: event.target.value }))}
               disabled={!canManageProduct}
               dir="rtl"
-              placeholder="عنوان SEO باللغة العربية"
+              placeholder={t('products.arSeoTitlePlaceholder')}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold text-slate-700">Arabic SEO meta description</span>
+            <span className="text-xs font-semibold text-slate-700">{t('products.labelArSeoDescription')}</span>
             <input
               value={form.arMetaDescription}
               onChange={(event) => setForm((prev) => ({ ...prev, arMetaDescription: event.target.value }))}
               disabled={!canManageProduct}
               dir="rtl"
-              placeholder="وصف SEO باللغة العربية"
+              placeholder={t('products.arSeoDescriptionPlaceholder')}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50"
             />
           </label>
@@ -692,9 +695,9 @@ export default function StoreProductDetailPage({
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-950">Variants & SKUs</h2>
+            <h2 className="text-base font-bold text-slate-950">{t('products.variantsTitle')}</h2>
             <p className="text-xs text-slate-500">
-              Manage sellable product variants and their SKU records. At least one active variant with one active SKU is required for publishing.
+              {t('products.variantsSubtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -704,10 +707,10 @@ export default function StoreProductDetailPage({
               disabled={!canManageProduct || working}
               className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
             >
-              <Layers className="h-3.5 w-3.5" /> Configure Variant & Specs
+              <Layers className="h-3.5 w-3.5" /> {t('products.configureVariant')}
             </button>
             <div className="text-xs text-slate-500">
-              {productVariants(detail).length} variants · {productSkus(detail).length} SKUs
+              {productVariants(detail).length} {t('products.variantsCountSuffix')}{productSkus(detail).length} SKUs
             </div>
           </div>
         </div>
@@ -717,7 +720,7 @@ export default function StoreProductDetailPage({
             value={newVariant.code}
             onChange={(event) => setNewVariant((prev) => ({ ...prev, code: event.target.value }))}
             disabled={!canManageProduct}
-            placeholder="Variant code, e.g. default, color-red, size-xl"
+            placeholder={t('products.variantPlaceholder')}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"
           />
           <select
@@ -737,14 +740,14 @@ export default function StoreProductDetailPage({
             disabled={!canManageProduct || working || !newVariant.code.trim()}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" /> Add Variant
+            <Plus className="h-4 w-4" /> {t('products.addVariant')}
           </button>
         </form>
 
         <div className="mt-5 space-y-4">
           {productVariants(detail).length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-              No variants yet. Add the default variant before publishing this product.
+              {t('products.noVariants')}
             </div>
           ) : (
             productVariants(detail).map((variant) => {
@@ -789,7 +792,7 @@ export default function StoreProductDetailPage({
                       disabled={!canManageProduct || working}
                       className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
-                      Save Variant
+                      {t('products.saveVariant')}
                     </button>
                   </div>
 
@@ -810,11 +813,11 @@ export default function StoreProductDetailPage({
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 text-slate-500">
                         <tr>
-                          <th className="px-3 py-2 font-semibold">SKU code</th>
-                          <th className="px-3 py-2 font-semibold">Barcode</th>
-                          <th className="px-3 py-2 font-semibold">Weight & Specs</th>
-                          <th className="px-3 py-2 font-semibold">Status</th>
-                          <th className="px-3 py-2 font-semibold text-right">Actions</th>
+                          <th className="px-3 py-2 font-semibold">{t('products.colSkuCode')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('products.colBarcode')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('products.colWeightSpecs')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('products.colStatus')}</th>
+                          <th className="px-3 py-2 font-semibold text-right">{t('products.colActions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -887,7 +890,7 @@ export default function StoreProductDetailPage({
                                   disabled={!canManageProduct || working}
                                   className="rounded border border-slate-200 px-3 py-1 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                 >
-                                  Save
+                                  {t('common.save')}
                                 </button>
                               </td>
                             </tr>
@@ -896,7 +899,7 @@ export default function StoreProductDetailPage({
                         {variantSkus.length === 0 && (
                           <tr>
                             <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
-                              No SKUs for this variant yet.
+                              {t('products.noSkus')}
                             </td>
                           </tr>
                         )}
@@ -914,7 +917,7 @@ export default function StoreProductDetailPage({
                         }))
                       }
                       disabled={!canManageProduct}
-                      placeholder="New SKU code"
+                      placeholder={t('products.skuPlaceholder')}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs disabled:bg-slate-50"
                     />
                     <input
@@ -926,7 +929,7 @@ export default function StoreProductDetailPage({
                         }))
                       }
                       disabled={!canManageProduct}
-                      placeholder="Barcode (optional)"
+                      placeholder={t('products.barcodePlaceholder')}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs disabled:bg-slate-50"
                     />
                     <select
@@ -952,7 +955,7 @@ export default function StoreProductDetailPage({
                       disabled={!canManageProduct || working || !skuDraft.code.trim()}
                       className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
                     >
-                      Add SKU
+                      {t('products.addSku')}
                     </button>
                   </div>
                 </div>
@@ -964,29 +967,29 @@ export default function StoreProductDetailPage({
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="border-b border-slate-100 pb-3 text-base font-bold text-slate-950">Product information</h2>
+          <h2 className="border-b border-slate-100 pb-3 text-base font-bold text-slate-950">{t('products.infoTitle')}</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
             <div>
-              <span className="font-medium text-slate-500">Product ID</span>
+              <span className="font-medium text-slate-500">{t('products.infoProductId')}</span>
               <div className="mt-1 font-mono text-slate-800">{product.id}</div>
             </div>
             <div>
-              <span className="font-medium text-slate-500">Source discriminator</span>
+              <span className="font-medium text-slate-500">{t('products.infoSourceDiscriminator')}</span>
               <div className="mt-1 font-semibold text-slate-800">{product.source}</div>
             </div>
             <div>
-              <span className="font-medium text-slate-500">Created at</span>
+              <span className="font-medium text-slate-500">{t('products.infoCreatedAt')}</span>
               <div className="mt-1 text-slate-800">{formatDate(product.created_at)}</div>
             </div>
             <div>
-              <span className="font-medium text-slate-500">Last updated</span>
+              <span className="font-medium text-slate-500">{t('products.infoLastUpdated')}</span>
               <div className="mt-1 text-slate-800">{formatDate(product.updated_at)}</div>
             </div>
           </div>
 
           {detail.publish_readiness?.reasons?.length > 0 && (
             <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <div className="text-xs font-bold text-amber-900">Publish readiness blockers</div>
+              <div className="text-xs font-bold text-amber-900">{t('products.infoReadyBlockers')}</div>
               <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-800">
                 {detail.publish_readiness.reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -998,20 +1001,20 @@ export default function StoreProductDetailPage({
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-base font-bold text-slate-950">Inventory locations</h2>
+            <h2 className="text-base font-bold text-slate-950">{t('products.locationsTitle')}</h2>
             <Package className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-4 space-y-2">
             {(detail.inventory_summary?.locations || []).length === 0 ? (
               <div className="rounded-xl bg-slate-50 p-5 text-center text-xs text-slate-500">
-                No inventory snapshots linked to this product yet.
+                {t('products.noLocations')}
               </div>
             ) : (
               detail.inventory_summary.locations.map((location) => (
                 <div key={`${location.location_id}-${location.sku_id}`} className="rounded-xl border border-slate-100 p-3 text-xs">
                   <div className="font-semibold text-slate-900">{location.location_name || location.location_id}</div>
                   <div className="mt-1 text-slate-500">
-                    SKU {location.sku_id} · {location.available_qty} available · {location.reserved_qty} reserved
+                    SKU {location.sku_id} · {location.available_qty} {t('products.skuAvailableSuffix')} · {location.reserved_qty} {t('products.skuReservedSuffix')}
                   </div>
                 </div>
               ))
@@ -1031,10 +1034,10 @@ export default function StoreProductDetailPage({
 
       <ConfirmModal
         isOpen={showArchiveModal}
-        title="Archive Product"
-        description="Archive this product? It will be removed from active catalog management. Published listings may need to be unpublished first."
-        confirmLabel="Archive Product"
-        cancelLabel="Keep Product"
+        title={t("products.confirmArchiveTitle")}
+        description={t("products.confirmArchiveDescription")}
+        confirmLabel={t("products.confirmArchiveConfirm")}
+        cancelLabel={t("products.confirmArchiveCancel")}
         variant="danger"
         loading={working}
         onConfirm={confirmArchive}

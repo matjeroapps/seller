@@ -6,6 +6,7 @@ import { PlugZap } from 'lucide-react';
 import { merchantSupplyApi, type SupplyConnection } from '@/lib/api/merchant-console';
 import { MerchantAccessDenied } from '@/components/shell/MerchantAccessDenied';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 const statusBadge = (status: string) => {
   const active = status === 'ACTIVE';
@@ -17,6 +18,7 @@ const statusBadge = (status: string) => {
 
 export default function SupplyConnectionsPage({ params }: { params: Promise<{ merchant_id: string }> }) {
   const { merchant_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'empty' } | { status: 'ready'; data: SupplyConnection[] }
   >({ status: 'loading' });
@@ -40,16 +42,16 @@ export default function SupplyConnectionsPage({ params }: { params: Promise<{ me
   return (
     <div className="space-y-6" data-testid="supply-connections">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Supply connections</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Provider connections owned by this merchant workspace</p>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t('supply.connections.title')}</h1>
+        <p className="text-xs text-slate-500 mt-0.5">{t('supply.connections.subtitle')}</p>
       </div>
 
       {state.status === 'loading' && <SupplyLoading />}
       {state.status === 'error' && <SupplyError />}
       {state.status === 'empty' && (
         <SupplyEmpty
-          title="No supply connections yet"
-          message="Connect a supply source to start importing provider catalog into staging. Nothing is published automatically."
+          title={t('supply.connections.emptyTitle')}
+          message={t('supply.connections.emptyBody')}
         />
       )}
       {state.status === 'ready' && (
@@ -61,7 +63,7 @@ export default function SupplyConnectionsPage({ params }: { params: Promise<{ me
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{conn.name}</div>
                   <div className="text-xs text-slate-500">
-                    {conn.provider} · {conn.connection_type} · health {conn.health_status}
+                    {conn.provider} · {conn.connection_type} · {t('supply.state.healthLabel')} {conn.health_status}
                   </div>
                 </div>
                 <span className={`ml-auto ${statusBadge(conn.status)}`}>{conn.status}</span>

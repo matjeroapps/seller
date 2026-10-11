@@ -6,6 +6,7 @@ import { Truck, Search, Download, CheckCircle2, AlertCircle, Percent, ShieldAler
 import { sellerApi } from '@/lib/api/client';
 import type { SupplierCatalogItem } from '@/lib/api/types';
 import { formatMoney, minorAmount, minorToMajor } from '@/lib/money';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function StoreSupplierOffersPage({
   params
@@ -17,6 +18,7 @@ export default function StoreSupplierOffersPage({
       ? use(params as Promise<{ store_id: string }>)
       : (params as unknown as { store_id: string }) || {};
   const { store_id } = unwrappedParams;
+  const { t } = useTranslation();
 
   const [offers, setOffers] = useState<SupplierCatalogItem[]>([]);
   const [query, setQuery] = useState('');
@@ -40,13 +42,14 @@ export default function StoreSupplierOffersPage({
         setLoading(false);
       })
       .catch((err) => {
-        setNotification({ type: 'error', message: err.message || 'Failed to load supplier offers' });
+        setNotification({ type: 'error', message: err.message || t('supplierOffers.errorLoad') });
         setLoading(false);
       });
   };
 
   useEffect(() => {
     loadOffers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store_id]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -81,13 +84,13 @@ export default function StoreSupplierOffersPage({
       setSelectedOffer(null);
       setNotification({
         type: 'success',
-        message: `Offer imported atomically with ${pct}% markup and initial retail price saved.`,
+        message: `${t('supplierOffers.importSuccessPrefix')} ${pct}% ${t('supplierOffers.importSuccessSuffix')}`,
         listingId: listing.id,
       });
     } catch (err: any) {
       setNotification({
         type: 'error',
-        message: err.message || 'Failed to import supplier offer',
+        message: err.message || t('supplierOffers.errorImport'),
       });
     } finally {
       setImportingOfferId(null);
@@ -111,14 +114,14 @@ export default function StoreSupplierOffersPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Supplier Offers Catalog</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Discover active supplier offers eligible for store import</p>
+          <h1 className="text-xl font-bold text-slate-900">{t('supplierOffers.title')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('supplierOffers.subtitle')}</p>
         </div>
         <Link
           href={`/dashboard/stores/${store_id}/catalog/listings`}
           className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 self-start"
         >
-          View Store Listings
+          {t('supplierOffers.viewStoreListings')}
         </Link>
       </div>
 
@@ -143,7 +146,7 @@ export default function StoreSupplierOffersPage({
                 href={`/dashboard/stores/${store_id}/catalog/listings`}
                 className="underline font-medium ml-1 hover:text-emerald-700"
               >
-                Go to Listings
+                {t('supplierOffers.goToListings')}
               </Link>
             )}
           </div>
@@ -163,24 +166,24 @@ export default function StoreSupplierOffersPage({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search supplier offers by product name, supplier, or category..."
+            placeholder={t('supplierOffers.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-slate-800 text-white rounded-md hover:bg-slate-900">
-          Search
+          {t('common.search')}
         </button>
       </form>
 
       {/* Offers Grid */}
       {loading ? (
-        <div className="p-6 text-sm text-slate-500 animate-pulse">Loading eligible supplier offers...</div>
+        <div className="p-6 text-sm text-slate-500 animate-pulse">{t('supplierOffers.loading')}</div>
       ) : offers.length === 0 ? (
         <div className="p-8 bg-white border border-slate-200 rounded-lg text-center text-xs text-slate-500">
           <Truck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          No eligible supplier offers available for this store market.
+          {t('supplierOffers.empty')}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -191,12 +194,12 @@ export default function StoreSupplierOffersPage({
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">{offer.product_name}</h3>
-                    <div className="text-[11px] text-slate-500">Supplier: {offer.supplier_name}</div>
+                    <div className="text-[11px] text-slate-500">{t('supplierOffers.supplierLabel')}{offer.supplier_name}</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {importedListingId && (
                       <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
-                        Imported
+                        {t('supplierOffers.imported')}
                       </span>
                     )}
                     <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">
@@ -207,24 +210,24 @@ export default function StoreSupplierOffersPage({
 
                 <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100">
                   <div>
-                    <span className="text-slate-400">Offer Price:</span>
+                    <span className="text-slate-400">{t('supplierOffers.offerPrice')}</span>
                     <div className="font-semibold text-slate-800">
                       {formatMoney(offer.price)}
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-400">Availability:</span>
+                    <span className="text-slate-400">{t('supplierOffers.availability')}</span>
                     <div className="font-semibold text-slate-800">
-                      {offer.is_available ? `${offer.available_qty ?? 'In Stock'}` : 'Unavailable'}
+                      {offer.is_available ? (offer.available_qty ?? t('supplierOffers.inStock')) : t('common.unavailable')}
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-400">MOQ:</span>
+                    <span className="text-slate-400">{t('supplierOffers.moq')}</span>
                     <div className="font-semibold text-slate-800">{offer.minimum_order_quantity ?? 1}</div>
                   </div>
                   <div>
-                    <span className="text-slate-400">SKU:</span>
-                    <div className="font-semibold text-slate-800">{offer.sku_code || 'N/A'}</div>
+                    <span className="text-slate-400">{t('supplierOffers.sku')}</span>
+                    <div className="font-semibold text-slate-800">{offer.sku_code || t('supplierOffers.notAvailable')}</div>
                   </div>
                 </div>
 
@@ -240,10 +243,10 @@ export default function StoreSupplierOffersPage({
                 >
                   <Download className="w-3.5 h-3.5" />
                   {importingOfferId === offer.offer_id
-                    ? 'Importing...'
+                    ? t('supplierOffers.importing')
                     : importedListingId
-                    ? 'Re-configure Import'
-                    : 'Import to Store Catalog'}
+                    ? t('supplierOffers.reconfigureImport')
+                    : t('supplierOffers.importToCatalog')}
                 </button>
               </div>
             );
@@ -258,7 +261,7 @@ export default function StoreSupplierOffersPage({
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Download className="w-4 h-4 text-indigo-600" />
-                Configure Supplier Offer Import & Markup
+                {t('supplierOffers.configureImportTitle')}
               </h3>
               <button
                 type="button"
@@ -271,13 +274,13 @@ export default function StoreSupplierOffersPage({
 
             <div className="space-y-1 text-xs">
               <div className="font-semibold text-slate-900">{selectedOffer.product_name}</div>
-              <div className="text-slate-500">Upstream Wholesale Cost: <span className="font-mono font-medium">{wholesaleVal.toFixed(2)} {currency}</span></div>
+              <div className="text-slate-500">{t('supplierOffers.wholesaleCostLabel')}<span className="font-mono font-medium">{wholesaleVal.toFixed(2)} {currency}</span></div>
             </div>
 
             {/* Markup & Economics inputs */}
             <div className="space-y-3 text-xs p-3 bg-slate-50 border border-slate-200 rounded-md">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Target Markup Percentage (%)</label>
+                <label className="block font-medium text-slate-700 mb-1">{t('supplierOffers.targetMarkup')}</label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <input
@@ -308,7 +311,7 @@ export default function StoreSupplierOffersPage({
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">
-                  Shipping Subsidy Policy
+                  {t('supplierOffers.shippingPolicy')}
                 </label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer">
@@ -320,7 +323,7 @@ export default function StoreSupplierOffersPage({
                       onChange={() => setShippingSubsidy('buyer_paid')}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    Buyer pays shipping
+                    {t('supplierOffers.buyerPaysShipping')}
                   </label>
                   <label className="flex items-center gap-1.5 text-slate-700 cursor-pointer">
                     <input
@@ -331,14 +334,14 @@ export default function StoreSupplierOffersPage({
                       onChange={() => setShippingSubsidy('seller_free')}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    Seller-subsidized free shipping
+                    {t('supplierOffers.sellerFreeShipping')}
                   </label>
                 </div>
               </div>
 
               {shippingSubsidy === 'seller_free' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Est. Shipping Cost per Order:</span>
+                  <span className="text-slate-500">{t('supplierOffers.estShippingCost')}</span>
                   <input
                     type="number"
                     step="0.5"
@@ -354,11 +357,11 @@ export default function StoreSupplierOffersPage({
             {/* Economics Live Summary */}
             <div className="p-3 bg-white border border-slate-200 rounded-md space-y-1.5 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Target Retail Price</span>
+                <span>{t('supplierOffers.targetRetailPrice')}</span>
                 <span className="font-mono font-bold text-slate-900">{targetRetailVal.toFixed(2)} {currency}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Estimated Net Profit</span>
+                <span>{t('supplierOffers.estNetProfit')}</span>
                 <span className={`font-mono font-bold ${netProfitVal >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                   {netProfitVal.toFixed(2)} {currency} ({netProfitPercent.toFixed(1)}%)
                 </span>
@@ -370,7 +373,7 @@ export default function StoreSupplierOffersPage({
               <div className="p-3 bg-rose-50 border border-rose-300 rounded-md flex items-start gap-2 text-xs text-rose-900">
                 <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <strong>Unsafe Margin Warning:</strong> Free shipping deduction exceeds gross markup profit. Increase your markup % to prevent net loss.
+                  <strong>{t('supplierOffers.unsafeMarginTitle')}</strong> {t('supplierOffers.unsafeMarginBody')}
                 </div>
               </div>
             )}
@@ -382,7 +385,7 @@ export default function StoreSupplierOffersPage({
                 onClick={() => setSelectedOffer(null)}
                 className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -390,7 +393,7 @@ export default function StoreSupplierOffersPage({
                 onClick={handleConfirmImport}
                 className="px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-md disabled:opacity-50"
               >
-                {importingOfferId ? 'Importing...' : 'Confirm & Import to Store Catalog'}
+                {importingOfferId ? t('supplierOffers.importing') : t('supplierOffers.confirmImport')}
               </button>
             </div>
           </div>
@@ -399,3 +402,4 @@ export default function StoreSupplierOffersPage({
     </div>
   );
 }
+

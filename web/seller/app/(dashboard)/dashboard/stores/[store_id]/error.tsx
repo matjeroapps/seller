@@ -5,6 +5,8 @@ import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { useTranslation } from '@/lib/i18n/locale-context';
+
 export default function StoreSegmentError({
   error,
   reset,
@@ -14,6 +16,7 @@ export default function StoreSegmentError({
 }) {
   const params = useParams();
   const storeId = params?.store_id as string | undefined;
+  const { t } = useTranslation();
 
   useEffect(() => {
     console.error('Store segment error boundary caught:', error);
@@ -30,16 +33,16 @@ export default function StoreSegmentError({
 
       <div className="space-y-1.5">
         <h2 className="text-base font-bold text-slate-900">
-          Store Operations Encountered an Error
+          {t('storeOverview.errorBoundaryTitle', 'Store Operations Encountered an Error')}
         </h2>
         <p className="text-xs text-slate-500">
-          {error.message || 'Failed to complete the requested operation for this store.'}
+          {error.message || t('storeOverview.errorBoundaryFallback', 'Failed to complete the requested operation for this store.')}
         </p>
       </div>
 
       {error.digest && (
         <div className="text-[10px] font-mono text-slate-400 bg-slate-50 py-1 px-2 rounded border border-slate-100">
-          Error Digest: {error.digest}
+          {t('storeOverview.errorBoundaryDigestLabel', 'Error Digest:')} {error.digest}
         </div>
       )}
 
@@ -50,7 +53,7 @@ export default function StoreSegmentError({
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />
-          Retry Operation
+          {t('storeOverview.retryOperation', 'Retry Operation')}
         </button>
         {storeId && (
           <Link
@@ -58,7 +61,7 @@ export default function StoreSegmentError({
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Store Overview
+            {t('storeOverview.backToStoreOverview', 'Store Overview')}
           </Link>
         )}
       </div>

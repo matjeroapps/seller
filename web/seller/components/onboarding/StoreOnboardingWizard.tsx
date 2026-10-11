@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, Container, PageHeader, Stack, Badge } from '@matjerhub/ui-sdk';
 import { Store, Palette, Rocket, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Globe, Coins, ShieldCheck } from 'lucide-react';
 import { ThemeSelectionCard, type ThemeOption } from './ThemeSelectionCard';
-import { sellerApi } from '@/lib/api/client';
+import { sellerApi, ApiError } from '@/lib/api/client';
 import { fetchMerchantConsole, hasActiveCapability, isOperableWorkspace, type MerchantWorkspace } from '@/lib/api/merchant-console';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 const THEMES: ThemeOption[] = [
   {
@@ -29,6 +30,7 @@ const THEMES: ThemeOption[] = [
 
 export function StoreOnboardingWizard() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Wizard Step State (1: Store Basics, 2: Theme Selection, 3: Review & Submit)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -160,9 +162,20 @@ export function StoreOnboardingWizard() {
         `/dashboard/merchants/${merchantId}/stores/${createdStore.id}`
       );
     } catch (err: any) {
-      const message =
-        err.message || 'Failed to create store. Please check the slug for uniqueness and try again.';
-      setError(message);
+      // Core rejects additional-store attempts from a merchant that already
+      // holds one or more store records. Surface an actionable, localized
+      // message instead of the generic create-failure copy.
+      if (err instanceof ApiError && err.code === 'store_entitlement_exceeded') {
+        setError(
+          t(
+            'onboarding.additionalStoreRejected',
+            'Only one store can be created in this phase. Open your existing store from the store switcher to continue managing it.'
+          )
+        );
+      } else {
+        const message = err.message || 'Failed to create store. Please check the slug for uniqueness and try again.';
+        setError(message);
+      }
       setIsSubmitting(false);
     }
   };

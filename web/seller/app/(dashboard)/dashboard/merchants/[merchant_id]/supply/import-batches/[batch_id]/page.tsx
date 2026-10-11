@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { merchantSupplyApi, type SupplyImportBatchDetail } from '@/lib/api/merchant-console';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function SupplyImportBatchDetailPage({
   params
@@ -12,6 +13,7 @@ export default function SupplyImportBatchDetailPage({
   params: Promise<{ merchant_id: string; batch_id: string }>;
 }) {
   const { merchant_id, batch_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'empty' } | { status: 'ready'; data: SupplyImportBatchDetail }
   >({ status: 'loading' });
@@ -37,12 +39,14 @@ export default function SupplyImportBatchDetailPage({
         href={`/dashboard/merchants/${merchant_id}/supply/import-batches`}
         className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
       >
-        ← Import batches
+        ← {t('nav.importBatches')}
       </Link>
 
       {state.status === 'loading' && <SupplyLoading />}
       {state.status === 'error' && <SupplyError />}
-      {state.status === 'empty' && <SupplyEmpty title="No staged records" message="This batch has no staged records." />}
+      {state.status === 'empty' && (
+        <SupplyEmpty title={t('supply.importBatches.detailEmptyTitle')} message={t('supply.importBatches.detailEmptyBody')} />
+      )}
       {state.status === 'ready' && (
         <>
           <div>
@@ -50,18 +54,18 @@ export default function SupplyImportBatchDetailPage({
               {state.data.batch.provider} · {state.data.batch.batch_type}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Batch status <span className="font-semibold">{state.data.batch.status}</span> · staged exactly as persisted; nothing shown here is published.
+              {t('supply.importBatches.batchStatusLabel')} <span className="font-semibold">{state.data.batch.status}</span> · {t('supply.importBatches.stagedDisclaimer')}
             </p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
               <thead className="bg-slate-50 dark:bg-slate-900">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">Entity</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">External product</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">SKU</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">Status</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">{t('supply.importBatches.colEntity')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">{t('supply.importBatches.colExternalProduct')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">{t('supply.importBatches.colSku')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">{t('supply.importBatches.colTitle')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500">{t('supply.importBatches.colStatus')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">

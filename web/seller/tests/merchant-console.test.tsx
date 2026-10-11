@@ -1,16 +1,26 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
 
+import { LocaleProvider } from '../lib/i18n/locale-context';
 import { MerchantWorkspaceSwitcher } from '../components/shell/MerchantWorkspaceSwitcher';
 import MerchantWorkspacePage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/page';
 import SupplyConnectionsPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/connections/page';
 import SupplyImportBatchesPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/import-batches/page';
 import SupplyMappingsPage from '../app/(dashboard)/dashboard/merchants/[merchant_id]/supply/mappings/page';
 import { fetchMerchantConsole, merchantSupplyApi, type MerchantConsoleBootstrap } from '../lib/api/merchant-console';
+import { DashboardOverview } from '../components/dashboard/DashboardOverview';
+
+const { mockSellerApi } = vi.hoisted(() => ({ mockSellerApi: { getStores: vi.fn() } }));
+
+vi.mock('../lib/api/client', () => ({ sellerApi: mockSellerApi, sellerClient: mockSellerApi }));
+
+const { navMocks } = vi.hoisted(() => ({
+  navMocks: { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), refresh: vi.fn() }
+}));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => navMocks,
   usePathname: () => '/dashboard/merchants/m-1',
   useSearchParams: () => new URLSearchParams()
 }));
@@ -48,11 +58,12 @@ const workspace = (overrides: Partial<MerchantWorkspace> = {}): MerchantWorkspac
 });
 
 // The pages consume `use(params)`, which suspends until the params promise
-// resolves; rendering is therefore awaited inside act.
+// resolves; rendering is therefore awaited inside act. Pages are localized via
+// useTranslation, so a fixed English LocaleProvider keeps dictionary values stable.
 async function renderPage(ui: React.ReactElement) {
   let utils: ReturnType<typeof render>;
   await act(async () => {
-    utils = render(ui);
+    utils = render(<LocaleProvider initialLocale="en">{ui}</LocaleProvider>);
   });
   return utils!;
 }
@@ -137,6 +148,57 @@ describe('Merchant workspace switcher (US3)', () => {
     );
     expect(screen.getByTestId('merchant-workspace-switcher')).toBeInTheDocument();
     expect(screen.queryByText('Suspended Merchant')).not.toBeInTheDocument();
+  });
+});
+
+describe('Merchant console chooser & access states (US1)', () => {
+  const workspaceStore = (id: string, status = 'active') => ({
+    id,
+    code: id.toLowerCase(),
+    name: `Store ${id}`,
+    status,
+    market_code: 'SA'
+  });
+
+  beforeEach(() => {
+    mockSellerApi.getStores.mockResolvedValue({ items: [] });
+  });
+
+  function entryWorkspace(id: string, stores: ReturnType<typeof workspaceStore>[] = [], overrides: Partial<MerchantWorkspace> = {}) {
+    return workspace({
+      merchant_id: id,
+      merchant_code: id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+      legal_name: `Merchant ${id}`,
+      stores,
+      ...overrides
+    });
+  }
+
+  it('shows no workspace chooser blocking direct entry for one enterable workspace with exactly one active store', async () => {
+    fetchConsole.mockResolvedValue({
+      contract_version: 'merchant-console/v1',
+      selected_merchant_id: 'm-1',
+      workspaces: [entryWorkspace('m-1', [workspaceStore('s-1'), workspaceStore('s-draft', 'draft')])]
+    } as MerchantConsoleBootstrap);
+
+    await renderPage(<DashboardOverview />);
+
+    expect(await screen.findByTestId('merchant-workspace-card-M1')).toBeInTheDocument();
+    expect(navMocks.replace).toHaveBeenCalledWith('/dashboard/merchants/m-1/stores/s-1');
+  });
+
+  it('keeps explicit workspace selection for multiple enterable workspaces, without direct entry', async () => {
+    fetchConsole.mockResolvedValue({
+      contract_version: 'merchant-console/v1',
+      selected_merchant_id: 'm-1',
+      workspaces: [entryWorkspace('m-1', [workspaceStore('s-1')]), entryWorkspace('m-2', [workspaceStore('s-2')])]
+    } as MerchantConsoleBootstrap);
+
+    await renderPage(<DashboardOverview />);
+
+    expect(await screen.findByTestId('merchant-workspace-card-M1')).toBeInTheDocument();
+    expect(screen.getByTestId('merchant-workspace-card-M2')).toBeInTheDocument();
+    expect(navMocks.replace).not.toHaveBeenCalled();
   });
 });
 

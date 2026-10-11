@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 export type SellerNavigationItem = Omit<NavItem, 'children'> & {
+  labelKey?: string;
   roles?: string[];
   permissions?: string[];
   tenantScoped?: boolean;
@@ -46,12 +47,14 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'dashboard',
       label: 'Dashboard',
+      labelKey: 'nav.dashboard',
       icon: <LayoutDashboard aria-hidden="true" className={iconClassName} />,
       path: storePrefix
     },
     {
       id: 'catalog',
       label: 'Catalog',
+      labelKey: 'nav.catalog',
       icon: <Tags aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/catalog/products`,
       tenantScoped: true,
@@ -59,36 +62,42 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
         {
           id: 'products',
           label: 'Products',
+      labelKey: 'nav.products',
           icon: <PackageSearch aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/catalog/products`
         },
         {
           id: 'supplier-offers',
           label: 'Supplier Offers',
+      labelKey: 'nav.supplierOffers',
           icon: <Truck aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/catalog/supplier-offers`
         },
         {
           id: 'listings',
           label: 'Listings',
+      labelKey: 'nav.listings',
           icon: <Boxes aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/catalog/listings`
         },
         {
           id: 'categories',
           label: 'Categories',
+      labelKey: 'nav.categories',
           icon: <FolderTree aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/catalog/categories`
         },
         {
           id: 'inventory',
           label: 'Inventory',
+      labelKey: 'nav.inventory',
           icon: <ChartNoAxesColumn aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/inventory`
         },
         {
           id: 'media',
           label: 'Media Library',
+      labelKey: 'nav.media',
           icon: <ImageIcon aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/media`
         }
@@ -97,6 +106,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'orders',
       label: 'Orders',
+      labelKey: 'nav.orders',
       icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/orders`,
       tenantScoped: true,
@@ -104,6 +114,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
         {
           id: 'orders-list',
           label: 'Orders list',
+      labelKey: 'nav.ordersList',
           icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/orders`
         }
@@ -112,6 +123,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'storefront',
       label: 'Storefront',
+      labelKey: 'nav.storefront',
       icon: <Store aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/storefront`,
       tenantScoped: true
@@ -119,6 +131,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'finance',
       label: 'Finance',
+      labelKey: 'nav.finance',
       icon: <CreditCard aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/finance`,
       tenantScoped: true,
@@ -126,6 +139,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
         {
           id: 'finance-overview',
           label: 'Wallet',
+      labelKey: 'nav.wallet',
           icon: <CreditCard aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/finance`
         }
@@ -134,6 +148,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'integrations',
       label: 'Integrations',
+      labelKey: 'nav.integrations',
       icon: <PlugZap aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/integrations`,
       tenantScoped: true
@@ -141,6 +156,7 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
     {
       id: 'settings',
       label: 'Settings',
+      labelKey: 'nav.settings',
       icon: <Settings aria-hidden="true" className={iconClassName} />,
       path: `${storePrefix}/settings`,
       tenantScoped: true,
@@ -148,12 +164,14 @@ export function getNavigationForStore(storeId?: string, _roles: string[] = [], i
         {
           id: 'store-settings',
           label: 'Store settings',
+      labelKey: 'nav.storeSettings',
           icon: <Settings aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/settings`
         },
         {
           id: 'account',
           label: 'Profile & account',
+      labelKey: 'nav.account',
           icon: <UserCog aria-hidden="true" className={iconClassName} />,
           path: `${storePrefix}/account`
         }
@@ -218,6 +236,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'workspace-dashboard',
       label: 'Dashboard',
+      labelKey: 'nav.dashboard',
       icon: <LayoutDashboard aria-hidden="true" className={iconClassName} />,
       path: workspacePrefix
     }
@@ -228,6 +247,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'catalog',
         label: 'Catalog',
+      labelKey: 'nav.catalog',
         icon: <Tags aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/catalog/products`,
         tenantScoped: true,
@@ -236,6 +256,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'products',
             label: 'Products',
+      labelKey: 'nav.products',
             icon: <PackageSearch aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/catalog/products`,
             capability: 'retail'
@@ -243,6 +264,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'supplier-offers',
             label: 'Supplier Offers',
+      labelKey: 'nav.supplierOffers',
             icon: <Truck aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/catalog/supplier-offers`,
             capability: 'retail'
@@ -250,6 +272,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'listings',
             label: 'Listings',
+      labelKey: 'nav.listings',
             icon: <Boxes aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/catalog/listings`,
             capability: 'retail'
@@ -257,6 +280,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'categories',
             label: 'Categories',
+      labelKey: 'nav.categories',
             icon: <FolderTree aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/catalog/categories`,
             capability: 'retail'
@@ -264,6 +288,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'inventory',
             label: 'Inventory',
+      labelKey: 'nav.inventory',
             icon: <ChartNoAxesColumn aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/inventory`,
             capability: 'retail'
@@ -271,6 +296,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'media',
             label: 'Media Library',
+      labelKey: 'nav.media',
             icon: <ImageIcon aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/media`,
             capability: 'retail'
@@ -280,6 +306,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'orders',
         label: 'Orders',
+      labelKey: 'nav.orders',
         icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/orders`,
         tenantScoped: true,
@@ -288,6 +315,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'orders-list',
             label: 'Orders list',
+      labelKey: 'nav.ordersList',
             icon: <ShoppingBag aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/orders`,
             capability: 'retail'
@@ -297,6 +325,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'storefront',
         label: 'Storefront',
+      labelKey: 'nav.storefront',
         icon: <Store aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/storefront`,
         tenantScoped: true,
@@ -305,6 +334,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'finance',
         label: 'Finance',
+      labelKey: 'nav.finance',
         icon: <CreditCard aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/finance`,
         tenantScoped: true,
@@ -313,6 +343,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
           {
             id: 'finance-overview',
             label: 'Wallet',
+      labelKey: 'nav.wallet',
             icon: <CreditCard aria-hidden="true" className={iconClassName} />,
             path: `${storePrefix}/finance`,
             capability: 'retail'
@@ -322,6 +353,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'integrations',
         label: 'Integrations',
+      labelKey: 'nav.integrations',
         icon: <PlugZap aria-hidden="true" className={iconClassName} />,
         path: `${storePrefix}/integrations`,
         tenantScoped: true,
@@ -334,6 +366,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-connections',
       label: 'Connections',
+      labelKey: 'nav.connections',
       icon: <PlugZap aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/connections`,
       capability: 'supply'
@@ -341,6 +374,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-import-batches',
       label: 'Import batches',
+      labelKey: 'nav.importBatches',
       icon: <Layers aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/import-batches`,
       capability: 'supply'
@@ -348,6 +382,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-review-cases',
       label: 'Review cases',
+      labelKey: 'nav.reviewCases',
       icon: <ScanSearch aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/review-cases`,
       capability: 'supply'
@@ -355,6 +390,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-mappings',
       label: 'Mappings',
+      labelKey: 'nav.mappings',
       icon: <ArrowLeftRight aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/mappings`,
       capability: 'supply'
@@ -362,6 +398,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-synchronization',
       label: 'Synchronization',
+      labelKey: 'nav.synchronization',
       icon: <ChartNoAxesColumn aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/synchronization`,
       capability: 'supply'
@@ -369,6 +406,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
     {
       id: 'supply-fulfillment',
       label: 'Fulfillment',
+      labelKey: 'nav.fulfillment',
       icon: <Truck aria-hidden="true" className={iconClassName} />,
       path: `${workspacePrefix}/supply/fulfillment`,
       capability: 'supply'
@@ -378,6 +416,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
   items.push({
     id: 'supply',
     label: 'Supply',
+      labelKey: 'nav.supply',
     icon: <Truck aria-hidden="true" className={iconClassName} />,
     path: `${workspacePrefix}/supply/connections`,
     tenantScoped: true,
@@ -388,6 +427,7 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
   items.push({
     id: 'settings',
     label: 'Settings',
+      labelKey: 'nav.settings',
     icon: <Settings aria-hidden="true" className={iconClassName} />,
     path: storePrefix ? `${storePrefix}/settings` : workspacePrefix,
     tenantScoped: true,
@@ -395,12 +435,14 @@ export function getNavigationForMerchantWorkspace(context: MerchantWorkspaceNavi
       {
         id: 'store-settings',
         label: 'Store settings',
+      labelKey: 'nav.storeSettings',
         icon: <Settings aria-hidden="true" className={iconClassName} />,
         path: storePrefix ? `${storePrefix}/settings` : workspacePrefix
       },
       {
         id: 'account',
         label: 'Profile & account',
+      labelKey: 'nav.account',
         icon: <UserCog aria-hidden="true" className={iconClassName} />,
         path: storePrefix ? `${storePrefix}/account` : workspacePrefix
       }

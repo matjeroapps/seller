@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { sellerApi } from '@/lib/api/client';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import {
   buildDashboardModel,
   formatCompactNumber,
@@ -72,12 +73,14 @@ const emptyState: DashboardState = {
   unavailable: []
 };
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Dashboard data could not be loaded.';
+function errMessageOf(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
-function statusLabel(value?: string) {
-  return value ? value.replace(/[_-]/g, ' ') : 'Unknown';
+// Formats an authoritative server status enum for display; known statuses are
+// localized, any other server status is shown verbatim without translation.
+function formatStatusLabel(value?: string) {
+  return value ? value.replace(/[_-]/g, ' ') : '';
 }
 
 function storefrontUrl(host?: string) {
@@ -86,8 +89,8 @@ function storefrontUrl(host?: string) {
   return host.startsWith('http') ? host : `https://${host}`;
 }
 
-function formatRelativeDate(value?: string) {
-  if (!value) return 'Not updated';
+function formatTimestamp(value?: string) {
+  if (!value) return undefined;
 
   return new Intl.DateTimeFormat('en', {
     month: 'short',
@@ -97,8 +100,19 @@ function formatRelativeDate(value?: string) {
   }).format(new Date(value));
 }
 
+function formatTemplate(template: string, values: Record<string, string | number>) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(values[key] ?? ''));
+}
+
 export default function StoreOverviewPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
+  const { t } = useTranslation();
+  const localizedStatusLabel = (value?: string) => {
+    if (!value) return t('storeOverview.unknownStatus', 'Unknown');
+    return t(`statuses.${value.replace(/[_-]/g, '_').toLowerCase()}`, formatStatusLabel(value));
+  };
+  const errMessage = (error: unknown) =>
+    errMessageOf(error, t('storeOverview.loadFailed', 'Dashboard data could not be loaded.'));
   const [dashboard, setDashboard] = useState<DashboardState>(emptyState);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -114,7 +128,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       setFatalError(null);
 
       const storesResult = await sellerApi.getStores().catch((error: unknown) => {
-        throw new Error(getErrorMessage(error));
+        throw new Error(errMessage(error));
       });
 
       const [
@@ -142,11 +156,11 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       if (!isMounted) return;
 
       const unavailable: DashboardUnavailableSection[] = [];
-      const getValue = <T,>(section: DashboardUnavailableSection, result: PromiseSettledResult<T>, fallback: T): T => {
+      function getValue<T>(section: DashboardUnavailableSection, result: PromiseSettledResult<T>, fallback: T): T {
         if (result.status === 'fulfilled') return result.value;
         unavailable.push(section);
         return fallback;
-      };
+      }
 
       const themeResponse = getValue<ThemeInstallationResponse | null>('theme', themeResult, null);
       const ordersResponse = getValue('orders', ordersResult, { orders: [], total: 0, limit: 8, offset: 0 });
@@ -173,7 +187,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
     loadDashboard().catch((error: unknown) => {
       if (!isMounted) return;
-      setFatalError(getErrorMessage(error));
+      setFatalError(errMessage(error));
       setLoading(false);
     });
 
@@ -205,6 +219,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
   const basePath = `/dashboard/stores/${store_id}`;
   const publicStorefrontUrl = storefrontUrl(dashboard.storefrontHost);
+  const hasBalanceCurrency = Boolean(dashboard.balance?.currency?.trim());
+  const availablePayoutLabel = dashboard.balance && hasBalanceCurrency ? formatMinorMoney(dashboard.balance.available_minor, dashboard.balance.currency) : t('common.unavailable', 'Unavailable');
+  const pendingPayoutLabel = dashboard.balance && hasBalanceCurrency ? `${formatMinorMoney(dashboard.balance.pending_minor, dashboard.balance.currency)} ${t('storeOverview.payoutPendingSuffix', 'pending')}` : t('storeOverview.financeUnavailable', 'Finance data unavailable');
 
   const handleStatusChange = async (newStatus: Store['status']) => {
     if (!currentStore) return;
@@ -218,7 +235,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
         stores: previous.stores.map((store) => (store.id === store_id ? updated : store))
       }));
     } catch (error: unknown) {
-      setActionError(getErrorMessage(error));
+      setActionError(errMessage(error));
     } finally {
       setUpdatingAction(null);
     }
@@ -232,7 +249,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       const updated = await sellerApi.updateStoreOperationalState(store_id, { checkout_status: nextStatus });
       setDashboard((previous) => ({ ...previous, operationalState: updated }));
     } catch (error: unknown) {
-      setActionError(getErrorMessage(error));
+      setActionError(errMessage(error));
     } finally {
       setUpdatingAction(null);
     }
@@ -256,11 +273,11 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       <div className="seller-dashboard">
         <div className="seller-empty-state">
           <AlertTriangle aria-hidden="true" />
-          <h1>Seller dashboard is unavailable</h1>
+          <h1>{t('storeOverview.unavailableTitle', 'Seller dashboard is unavailable')}</h1>
           <p>{fatalError}</p>
           <button type="button" onClick={() => setReloadKey((value) => value + 1)}>
             <RefreshCw aria-hidden="true" />
-            Retry
+            {t('storeOverview.retry', 'Retry')}
           </button>
         </div>
       </div>
@@ -279,7 +296,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
       {dashboard.unavailable.length > 0 && (
         <div className="seller-alert seller-alert--warning" role="status">
           <AlertTriangle aria-hidden="true" />
-          <span>Some operational sections are temporarily unavailable: {dashboard.unavailable.join(', ')}.</span>
+          <span>
+            {formatTemplate(t('storeOverview.sectionsUnavailable', 'Some operational sections are temporarily unavailable: {{sections}}.'), { sections: dashboard.unavailable.join(', ') })}
+          </span>
         </div>
       )}
 
@@ -290,78 +309,82 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
             <span>{currentStore?.code || store_id}</span>
           </div>
           <div className="seller-dashboard-hero__title-row">
-            <h1>{currentStore?.name || 'Store Dashboard'}</h1>
+            <h1>{currentStore?.name || t('storeOverview.dashboardTitle', 'Store Dashboard')}</h1>
             <span className={`seller-status-badge seller-status-badge--${currentStore?.status || 'neutral'}`}>
-              {statusLabel(currentStore?.status)}
+              {localizedStatusLabel(currentStore?.status)}
             </span>
           </div>
           <div className="seller-dashboard-hero__meta">
-            <span>Market {currentStore?.market_code || 'SA'}</span>
+            <span>{t('storeOverview.marketLabel', 'Market')} {currentStore?.market_code || 'SA'}</span>
             <span>{model.currency}</span>
-            <span>{dashboard.storefrontHost || 'Storefront host pending'}</span>
-            <span>{model.checkoutAccepting ? 'Checkout accepting orders' : 'Checkout paused'}</span>
+            <span>{dashboard.storefrontHost || t('storeOverview.storefrontHostPending', 'Storefront host pending')}</span>
+            <span>{model.checkoutAccepting ? t('storeOverview.checkoutAccepting', 'Checkout accepting orders') : t('storeOverview.checkoutPaused', 'Checkout paused')}</span>
           </div>
         </div>
 
         <div className="seller-dashboard-hero__actions">
           <button type="button" onClick={handleCheckoutToggle} disabled={updatingAction === 'checkout'}>
             <CirclePause aria-hidden="true" />
-            {updatingAction === 'checkout' ? 'Updating...' : model.checkoutAccepting ? 'Pause checkout' : 'Resume checkout'}
+            {updatingAction === 'checkout'
+              ? t('storeOverview.updating', 'Updating...')
+              : model.checkoutAccepting
+                ? t('storeOverview.pauseCheckout', 'Pause checkout')
+                : t('storeOverview.resumeCheckout', 'Resume checkout')}
           </button>
           {currentStore?.status === 'active' ? (
             <button type="button" onClick={() => handleStatusChange('inactive')} disabled={updatingAction === 'status'}>
-              {updatingAction === 'status' ? 'Updating...' : 'Deactivate store'}
+              {updatingAction === 'status' ? t('storeOverview.updating', 'Updating...') : t('storeOverview.deactivateStore', 'Deactivate store')}
             </button>
           ) : (
             <button type="button" onClick={() => handleStatusChange('active')} disabled={updatingAction === 'status'}>
-              {updatingAction === 'status' ? 'Updating...' : 'Activate store'}
+              {updatingAction === 'status' ? t('storeOverview.updating', 'Updating...') : t('storeOverview.activateStore', 'Activate store')}
             </button>
           )}
           <Link className="seller-primary-action" href={`${basePath}/catalog/products/new`}>
             <PackagePlus aria-hidden="true" />
-            Add product
+            {t('storeOverview.addProduct', 'Add product')}
           </Link>
           {publicStorefrontUrl && (
             <a className="seller-secondary-link" href={publicStorefrontUrl} target="_blank" rel="noreferrer">
-              Visit storefront
+              {t('storeOverview.visitStorefront', 'Visit storefront')}
               <ExternalLink aria-hidden="true" />
             </a>
           )}
         </div>
       </section>
 
-      <section className="seller-dashboard__kpis" aria-label="Store performance summary">
+      <section className="seller-dashboard__kpis" aria-label={t('storeOverview.performanceSummaryAria', 'Store performance summary')}>
         <Link href={`${basePath}/catalog/products`} className="seller-kpi-card">
           <span className="seller-kpi-card__icon seller-kpi-card__icon--blue">
             <Package aria-hidden="true" />
           </span>
-          <span className="seller-kpi-card__label">Products</span>
+          <span className="seller-kpi-card__label">{t('storeOverview.kpiProducts', 'Products')}</span>
           <strong>{formatCompactNumber(dashboard.products.length)}</strong>
-          <span>{model.activeProducts} active</span>
+          <span>{model.activeProducts} {t('storeOverview.activeSuffix', 'active')}</span>
         </Link>
         <Link href={`${basePath}/orders`} className="seller-kpi-card">
           <span className="seller-kpi-card__icon seller-kpi-card__icon--green">
             <ShoppingBag aria-hidden="true" />
           </span>
-          <span className="seller-kpi-card__label">Orders</span>
-          <strong>{dashboard.unavailable.includes('orders') ? 'Unavailable' : formatCompactNumber(model.totalOrders)}</strong>
-          <span>{model.pendingOrders.length} waiting</span>
+          <span className="seller-kpi-card__label">{t('storeOverview.kpiOrders', 'Orders')}</span>
+          <strong>{dashboard.unavailable.includes('orders') ? t('common.unavailable', 'Unavailable') : formatCompactNumber(model.totalOrders)}</strong>
+          <span>{model.pendingOrders.length} {t('storeOverview.waitingSuffix', 'waiting')}</span>
         </Link>
         <Link href={`${basePath}/catalog/listings`} className="seller-kpi-card">
           <span className="seller-kpi-card__icon seller-kpi-card__icon--teal">
             <Activity aria-hidden="true" />
           </span>
-          <span className="seller-kpi-card__label">Published listings</span>
+          <span className="seller-kpi-card__label">{t('storeOverview.kpiPublishedListings', 'Published listings')}</span>
           <strong>{model.publishedListings}</strong>
-          <span>{model.draftListings + model.unpublishedListings} not live</span>
+          <span>{model.draftListings + model.unpublishedListings} {t('storeOverview.notLiveSuffix', 'not live')}</span>
         </Link>
         <Link href={`${basePath}/finance`} className="seller-kpi-card">
           <span className="seller-kpi-card__icon seller-kpi-card__icon--amber">
             <Banknote aria-hidden="true" />
           </span>
-          <span className="seller-kpi-card__label">Available payout</span>
-          <strong>{dashboard.balance ? formatMinorMoney(dashboard.balance.available_minor, dashboard.balance.currency) : 'Unavailable'}</strong>
-          <span>{dashboard.balance ? `${formatMinorMoney(dashboard.balance.pending_minor, dashboard.balance.currency)} pending` : 'Finance API offline'}</span>
+          <span className="seller-kpi-card__label">{t('storeOverview.kpiAvailablePayout', 'Available payout')}</span>
+          <strong>{availablePayoutLabel}</strong>
+          <span>{pendingPayoutLabel}</span>
         </Link>
       </section>
 
@@ -370,12 +393,12 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel seller-panel--attention">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Attention center</span>
-                <h2>What needs a seller decision</h2>
+                <span className="seller-section-kicker">{t('storeOverview.attentionKicker', 'Attention center')}</span>
+                <h2>{t('storeOverview.attentionTitle', 'What needs a seller decision')}</h2>
               </div>
               <button type="button" onClick={() => setReloadKey((value) => value + 1)}>
                 <RefreshCw aria-hidden="true" />
-                Refresh
+                {t('common.refresh', 'Refresh')}
               </button>
             </div>
             <div className="seller-attention-grid">
@@ -392,29 +415,29 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel seller-operations-panel">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Operations</span>
-                <h2>Store readiness and flow</h2>
+                <span className="seller-section-kicker">{t('storeOverview.operationsKicker', 'Operations')}</span>
+                <h2>{t('storeOverview.operationsTitle', 'Store readiness and flow')}</h2>
               </div>
-              <span className="seller-readiness-pill">{model.completedLaunchTasks}/{model.totalLaunchTasks} tasks ready</span>
+              <span className="seller-readiness-pill">{`${model.completedLaunchTasks}/${model.totalLaunchTasks} ${t('storeOverview.tasksReady', 'tasks ready')}`}</span>
             </div>
-            <div className="seller-readiness-meter" aria-label={`Launch readiness ${model.readinessPercent}%`}>
+            <div className="seller-readiness-meter" aria-label={formatTemplate(t('storeOverview.launchReadinessAria', 'Launch readiness {{percent}}%'), { percent: model.readinessPercent })}>
               <span style={{ inlineSize: `${model.readinessPercent}%` }} />
             </div>
             <div className="seller-operations-list">
               <div>
                 <CheckCircle2 aria-hidden="true" />
-                <span>Products and listings</span>
-                <strong>{dashboard.products.length} products / {model.publishedListings} live</strong>
+                <span>{t('storeOverview.opsProductsListings', 'Products and listings')}</span>
+                <strong>{formatTemplate(t('storeOverview.opsProductsListingsValue', '{{products}} products / {{listings}} live'), { products: dashboard.products.length, listings: model.publishedListings })}</strong>
               </div>
               <div>
                 <CheckCircle2 aria-hidden="true" />
-                <span>Theme status</span>
-                <strong>{model.themeNeedsPublish ? 'Draft changes pending' : dashboard.themeInstallation ? 'Published' : 'Not installed'}</strong>
+                <span>{t('storeOverview.opsThemeStatus', 'Theme status')}</span>
+                <strong>{model.themeNeedsPublish ? t('storeOverview.themeDraftPending', 'Draft changes pending') : dashboard.themeInstallation ? t('storeOverview.themePublished', 'Published') : t('storeOverview.themeNotInstalled', 'Not installed')}</strong>
               </div>
               <div>
                 <CheckCircle2 aria-hidden="true" />
-                <span>Checkout state</span>
-                <strong>{model.checkoutAccepting ? 'Accepting orders' : 'Paused'}</strong>
+                <span>{t('storeOverview.opsCheckoutState', 'Checkout state')}</span>
+                <strong>{model.checkoutAccepting ? t('storeOverview.opsAccepting', 'Accepting orders') : t('storeOverview.opsPaused', 'Paused')}</strong>
               </div>
             </div>
           </section>
@@ -422,23 +445,23 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Recent orders</span>
-                <h2>Latest storefront demand</h2>
+                <span className="seller-section-kicker">{t('storeOverview.recentOrdersKicker', 'Recent orders')}</span>
+                <h2>{t('storeOverview.recentOrdersTitle', 'Latest storefront demand')}</h2>
               </div>
-              <Link href={`${basePath}/orders`}>View all</Link>
+              <Link href={`${basePath}/orders`}>{t('storeOverview.viewAll', 'View all')}</Link>
             </div>
             {dashboard.orders.length === 0 ? (
-              <div className="seller-inline-empty">No recent orders found for this store.</div>
+              <div className="seller-inline-empty">{t('storeOverview.noRecentOrders', 'No recent orders found for this store.')}</div>
             ) : (
               <div className="seller-orders-table">
                 {dashboard.orders.map((order) => (
                   <Link href={`${basePath}/orders/${order.id}`} key={order.id} className="seller-orders-row">
                     <span>
                       <strong>{order.order_number}</strong>
-                      <small>{order.recipient_name || 'Guest customer'}</small>
+                      <small>{order.recipient_name || t('storeOverview.guestCustomer', 'Guest customer')}</small>
                     </span>
-                    <span>{statusLabel(order.status)}</span>
-                    <span>{order.item_count} items</span>
+                    <span>{localizedStatusLabel(order.status)}</span>
+                    <span>{order.item_count} {t('storeOverview.itemsSuffix', 'items')}</span>
                     <span>{formatMinorMoney(order.total, order.currency)}</span>
                   </Link>
                 ))}
@@ -451,26 +474,26 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Quick actions</span>
-                <h2>Daily seller tasks</h2>
+                <span className="seller-section-kicker">{t('storeOverview.quickActionsKicker', 'Quick actions')}</span>
+                <h2>{t('storeOverview.quickActionsTitle', 'Daily seller tasks')}</h2>
               </div>
             </div>
             <div className="seller-quick-actions">
               <Link href={`${basePath}/catalog/products/new`}>
                 <PackagePlus aria-hidden="true" />
-                Create product
+                {t('storeOverview.createProduct', 'Create product')}
               </Link>
               <Link href={`${basePath}/catalog/supplier-offers`}>
                 <Truck aria-hidden="true" />
-                Import supplier offer
+                {t('storeOverview.importSupplierOffer', 'Import supplier offer')}
               </Link>
               <Link href={`${basePath}/inventory`}>
                 <Boxes aria-hidden="true" />
-                Adjust inventory
+                {t('storeOverview.adjustInventory', 'Adjust inventory')}
               </Link>
               <Link href={`${basePath}/integrations`}>
                 <PlugZap aria-hidden="true" />
-                Connect channel
+                {t('storeOverview.connectChannel', 'Connect channel')}
               </Link>
             </div>
           </section>
@@ -478,19 +501,19 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Stock alerts</span>
-                <h2>Inventory at risk</h2>
+                <span className="seller-section-kicker">{t('storeOverview.stockAlertsKicker', 'Stock alerts')}</span>
+                <h2>{t('storeOverview.stockAlertsTitle', 'Inventory at risk')}</h2>
               </div>
             </div>
             {model.lowStockItems.length === 0 ? (
-              <div className="seller-inline-empty">No low stock SKUs.</div>
+              <div className="seller-inline-empty">{t('storeOverview.noLowStock', 'No low stock SKUs.')}</div>
             ) : (
               <div className="seller-rail-list">
                 {model.lowStockItems.map((item) => (
                   <Link href={`${basePath}/inventory`} key={item.id}>
                     <span>
                       <strong>{item.sku_code || item.sku_id}</strong>
-                      <small>{item.location_name || 'Primary location'}</small>
+                      <small>{item.location_name || t('storeOverview.primaryLocation', 'Primary location')}</small>
                     </span>
                     <em>{item.available_qty}</em>
                   </Link>
@@ -502,13 +525,13 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Connected channels</span>
-                <h2>Sales surfaces</h2>
+                <span className="seller-section-kicker">{t('storeOverview.channelsKicker', 'Connected channels')}</span>
+                <h2>{t('storeOverview.channelsTitle', 'Sales surfaces')}</h2>
               </div>
             </div>
             <div className="seller-channel-stack">
               {dashboard.connections.length === 0 ? (
-                <div className="seller-inline-empty">No channels connected.</div>
+                <div className="seller-inline-empty">{t('storeOverview.noChannels', 'No channels connected.')}</div>
               ) : (
                 dashboard.connections.slice(0, 4).map((connection) => (
                   <Link href={`${basePath}/integrations`} key={connection.id}>
@@ -516,7 +539,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
                       <strong>{connection.name}</strong>
                       <small>{connection.provider}</small>
                     </span>
-                    <em className={`seller-channel-status seller-channel-status--${connection.status}`}>{statusLabel(connection.status)}</em>
+                    <em className={`seller-channel-status seller-channel-status--${connection.status}`}>{localizedStatusLabel(connection.status)}</em>
                   </Link>
                 ))
               )}
@@ -526,14 +549,14 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
           <section className="seller-panel seller-ledger-card">
             <div className="seller-panel__header">
               <div>
-                <span className="seller-section-kicker">Settlement ledger</span>
-                <h2>Balance snapshot</h2>
+                <span className="seller-section-kicker">{t('storeOverview.ledgerKicker', 'Settlement ledger')}</span>
+                <h2>{t('storeOverview.ledgerTitle', 'Balance snapshot')}</h2>
               </div>
             </div>
-            <strong>{dashboard.balance ? formatMinorMoney(dashboard.balance.available_minor, dashboard.balance.currency) : 'Unavailable'}</strong>
-            <span>Updated {formatRelativeDate(dashboard.balance?.updated_at)}</span>
+            <strong>{availablePayoutLabel}</strong>
+            <span>{t('storeOverview.lastUpdatedPrefix', 'Updated')} {formatTimestamp(dashboard.balance?.updated_at) || t('storeOverview.notUpdated', 'Not updated')}</span>
             <Link href={`${basePath}/finance`}>
-              Open finance
+              {t('storeOverview.openFinance', 'Open finance')}
               <ArrowUpRight aria-hidden="true" />
             </Link>
           </section>

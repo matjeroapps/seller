@@ -10,12 +10,9 @@ export default async function AnalyticsPage({ params }: Props) {
   const { store_id } = await params;
   return (
     <UnsupportedCapabilityScreen
-      eyebrow="Analytics"
-      title="Advanced analytics are not available yet"
-      description="Advanced reports, cohorts, scheduled exports, and channel analytics need dedicated analytics contracts. The dashboard overview remains available for operational summaries."
+      copyKey="unsupported.analytics"
       storeId={store_id}
       primaryHref={`/dashboard/stores/${store_id}`}
-      primaryLabel="View dashboard overview"
     />
   );
 }

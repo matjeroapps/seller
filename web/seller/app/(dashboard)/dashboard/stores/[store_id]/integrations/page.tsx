@@ -4,8 +4,17 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { Link2, Plus, RefreshCw, CheckCircle2, AlertCircle, Layers, Key, Webhook, Copy, Trash2, ShieldCheck } from 'lucide-react';
 import { ConfirmModal } from '@/components/seller/ConfirmModal';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi } from '@/lib/api/client';
 import type { IntegrationConnection, ExternalEntityMapping, SellerSyncJob, ApiKey, WebhookSubscription } from '@/lib/api/types';
+
+const TAB_LABEL_KEYS = {
+  API_KEYS: 'integrations.tabApiKeys',
+  WEBHOOKS: 'integrations.tabWebhooks',
+  CONNECTIONS: 'integrations.tabConnections',
+  MAPPINGS: 'integrations.tabMappings',
+  SYNC_JOBS: 'integrations.tabSyncJobs'
+} as const;
 
 export default function StoreIntegrationsPage({
   params
@@ -13,6 +22,7 @@ export default function StoreIntegrationsPage({
   params: Promise<{ store_id: string }>;
 }) {
   const { store_id } = use(params);
+  const { t } = useTranslation();
 
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const [mappings, setMappings] = useState<ExternalEntityMapping[]>([]);
@@ -21,7 +31,7 @@ export default function StoreIntegrationsPage({
   const [webhooks, setWebhooks] = useState<WebhookSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'API_KEYS' | 'WEBHOOKS' | 'CONNECTIONS' | 'MAPPINGS' | 'SYNC_JOBS'>('API_KEYS');
-  
+
   // Connection state
   const [selectedConnection, setSelectedConnection] = useState<string>('');
   const [selectedEntityType, setSelectedEntityType] = useState<string>('product');
@@ -57,6 +67,14 @@ export default function StoreIntegrationsPage({
     'product.created', 'product.updated',
     'inventory.adjusted',
     'order.created', 'order.status_changed'
+  ];
+
+  const PROVIDER_OPTIONS: { value: string; labelKey: string }[] = [
+    { value: 'salla', labelKey: 'integrations.providerSalla' },
+    { value: 'shopify', labelKey: 'integrations.providerShopify' },
+    { value: 'woocommerce', labelKey: 'integrations.providerWooCommerce' },
+    { value: 'easyorders', labelKey: 'integrations.providerEasyOrders' },
+    { value: 'custom_api', labelKey: 'integrations.providerCustomApi' }
   ];
 
   const fetchConnections = () => {
@@ -245,10 +263,8 @@ export default function StoreIntegrationsPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">External Integration Foundation & Developer Console</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage provider sync connections, scoped Developer API keys, real-time Webhooks, and inspect channel sync job logs.
-          </p>
+          <h1 className="text-xl font-bold text-slate-900">{t('integrations.title')}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{t('integrations.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {activeTab === 'API_KEYS' && (
@@ -261,7 +277,7 @@ export default function StoreIntegrationsPage({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
             >
               <Key className="w-4 h-4" />
-              Generate New API Key
+              {t('integrations.actionGenerateKey')}
             </button>
           )}
           {activeTab === 'WEBHOOKS' && (
@@ -271,7 +287,7 @@ export default function StoreIntegrationsPage({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
             >
               <Webhook className="w-4 h-4" />
-              Subscribe Webhook
+              {t('integrations.actionSubscribeWebhook')}
             </button>
           )}
           {activeTab === 'CONNECTIONS' && (
@@ -281,7 +297,7 @@ export default function StoreIntegrationsPage({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md hover:bg-slate-800 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Add Integration Connection
+              {t('integrations.actionAddConnection')}
             </button>
           )}
         </div>
@@ -292,19 +308,15 @@ export default function StoreIntegrationsPage({
         <div className="flex items-start gap-2.5">
           <Layers className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold text-indigo-900 block">
-              Multi-Channel Supply & Retail Integrations Managed in Merchant Hub
-            </span>
-            <span className="text-indigo-700">
-              This store console is dedicated to direct Store API Keys and Webhook subscriptions. Channel connections (Salla, Shopify, WooCommerce) and catalog sync jobs are configured centrally in Merchant Workspace.
-            </span>
+            <span className="font-semibold text-indigo-900 block">{t('integrations.bannerTitle')}</span>
+            <span className="text-indigo-700">{t('integrations.bannerBody')}</span>
           </div>
         </div>
         <Link
           href="/dashboard"
           className="px-3.5 py-1.5 bg-white text-indigo-700 font-semibold border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors shrink-0 text-center shadow-sm"
         >
-          Open Merchant Hub
+          {t('integrations.bannerLink')}
         </Link>
       </div>
 
@@ -321,7 +333,7 @@ export default function StoreIntegrationsPage({
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {tab.replace('_', ' ')}
+            {t(TAB_LABEL_KEYS[tab])}
           </button>
         ))}
       </div>
@@ -329,16 +341,14 @@ export default function StoreIntegrationsPage({
       {/* Main Content */}
       {loading ? (
         <div className="p-8 bg-white border border-slate-200 rounded-lg text-xs text-slate-500 animate-pulse">
-          Loading developer console...
+          {t('integrations.loadingConsole')}
         </div>
       ) : activeTab === 'CONNECTIONS' ? (
         connections.length === 0 ? (
           <div className="p-8 bg-white border border-slate-200 rounded-lg text-center space-y-3">
             <Link2 className="w-8 h-8 text-slate-300 mx-auto" />
-            <div className="text-xs font-medium text-slate-700">No integration connections found</div>
-            <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-              Connect external channels like Salla, Shopify, WooCommerce, or custom API webhooks to synchronize products, orders, and inventory.
-            </p>
+            <div className="text-xs font-medium text-slate-700">{t('integrations.connectionsEmptyTitle')}</div>
+            <p className="text-[11px] text-slate-500 max-w-sm mx-auto">{t('integrations.connectionsEmptyBody')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -351,7 +361,7 @@ export default function StoreIntegrationsPage({
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900">{conn.name}</h3>
-                      <p className="text-[11px] text-slate-400 font-mono">ID: {conn.id}</p>
+                      <p className="text-[11px] text-slate-400 font-mono">{t('integrations.idLabel')} {conn.id}</p>
                     </div>
                   </div>
                   <span
@@ -366,14 +376,14 @@ export default function StoreIntegrationsPage({
                   </span>
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Provider: <strong className="text-slate-700 uppercase">{conn.provider}</strong></span>
+                  <span>{t('integrations.providerLabel')} <strong className="text-slate-700 uppercase">{conn.provider}</strong></span>
                   <button
                     type="button"
                     onClick={() => handleTriggerSyncJob(conn.id)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-medium transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    Trigger Sync Job
+                    {t('integrations.triggerSyncJob')}
                   </button>
                 </div>
               </div>
@@ -387,7 +397,7 @@ export default function StoreIntegrationsPage({
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-slate-600" />
-                Store Developer API Keys
+                {t('integrations.apiKeysTitle')}
               </h2>
               <button
                 type="button"
@@ -395,29 +405,27 @@ export default function StoreIntegrationsPage({
                 className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Refresh Keys
+                {t('integrations.refreshKeys')}
               </button>
             </div>
 
             {apiKeys.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500 space-y-2">
                 <Key className="w-8 h-8 text-slate-300 mx-auto" />
-                <p>No API keys generated for this store yet.</p>
-                <p className="text-[11px] text-slate-400">
-                  Generate live or test API keys to interact with `/v1/public/...` gateway endpoints for custom ERPs, mobile apps, or inventory tools.
-                </p>
+                <p>{t('integrations.apiKeysEmpty')}</p>
+                <p className="text-[11px] text-slate-400">{t('integrations.apiKeysEmptyHint')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-700 font-medium">
                     <tr>
-                      <th className="p-2.5">Name</th>
-                      <th className="p-2.5">Prefix</th>
-                      <th className="p-2.5">Scopes</th>
-                      <th className="p-2.5">Status</th>
-                      <th className="p-2.5">Created At</th>
-                      <th className="p-2.5 text-right">Actions</th>
+                      <th className="p-2.5">{t('integrations.colName')}</th>
+                      <th className="p-2.5">{t('integrations.colPrefix')}</th>
+                      <th className="p-2.5">{t('integrations.colScopes')}</th>
+                      <th className="p-2.5">{t('integrations.colStatus')}</th>
+                      <th className="p-2.5">{t('integrations.colCreatedAt')}</th>
+                      <th className="p-2.5 text-right">{t('integrations.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -453,7 +461,7 @@ export default function StoreIntegrationsPage({
                               onClick={() => handleRevokeApiKey(key.id)}
                               className="px-2 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded text-[11px] font-medium transition-colors"
                             >
-                              Revoke
+                              {t('integrations.revoke')}
                             </button>
                           )}
                         </td>
@@ -472,7 +480,7 @@ export default function StoreIntegrationsPage({
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                 <Webhook className="w-4 h-4 text-slate-600" />
-                Real-Time Webhook Subscriptions
+                {t('integrations.webhooksTitle')}
               </h2>
               <button
                 type="button"
@@ -480,28 +488,26 @@ export default function StoreIntegrationsPage({
                 className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Refresh Subscriptions
+                {t('integrations.refreshSubscriptions')}
               </button>
             </div>
 
             {webhooks.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500 space-y-2">
                 <Webhook className="w-8 h-8 text-slate-300 mx-auto" />
-                <p>No webhook subscriptions registered.</p>
-                <p className="text-[11px] text-slate-400">
-                  Receive real-time HTTPS push notifications whenever products are updated, inventory changes, or new orders arrive.
-                </p>
+                <p>{t('integrations.webhooksEmpty')}</p>
+                <p className="text-[11px] text-slate-400">{t('integrations.webhooksEmptyHint')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-700 font-medium">
                     <tr>
-                      <th className="p-2.5">Target Endpoint URL</th>
-                      <th className="p-2.5">Subscribed Events</th>
-                      <th className="p-2.5">Status</th>
-                      <th className="p-2.5">Created At</th>
-                      <th className="p-2.5 text-right">Actions</th>
+                      <th className="p-2.5">{t('integrations.colTargetUrl')}</th>
+                      <th className="p-2.5">{t('integrations.colSubscribedEvents')}</th>
+                      <th className="p-2.5">{t('integrations.colStatus')}</th>
+                      <th className="p-2.5">{t('integrations.colCreatedAt')}</th>
+                      <th className="p-2.5 text-right">{t('integrations.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -545,7 +551,7 @@ export default function StoreIntegrationsPage({
         <div className="space-y-4">
           <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-4 text-xs">
             <div className="space-y-1">
-              <label className="block text-slate-500 font-medium">Select Connection</label>
+              <label className="block text-slate-500 font-medium">{t('integrations.mappingConnectionLabel')}</label>
               <select
                 value={selectedConnection}
                 onChange={(e) => setSelectedConnection(e.target.value)}
@@ -560,15 +566,15 @@ export default function StoreIntegrationsPage({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-slate-500 font-medium">Entity Type</label>
+              <label className="block text-slate-500 font-medium">{t('integrations.mappingEntityTypeLabel')}</label>
               <select
                 value={selectedEntityType}
                 onChange={(e) => setSelectedEntityType(e.target.value)}
                 className="px-3 py-1.5 border border-slate-200 rounded-md bg-white text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-slate-900"
               >
-                {['product', 'variant', 'inventory', 'order', 'fulfillment', 'customer'].map((t) => (
-                  <option key={t} value={t}>
-                    {t.toUpperCase()}
+                {['product', 'variant', 'inventory', 'order', 'fulfillment', 'customer'].map((entityType) => (
+                  <option key={entityType} value={entityType}>
+                    {entityType.toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -580,31 +586,29 @@ export default function StoreIntegrationsPage({
               className="mt-5 px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Refresh Mappings
+              {t('integrations.refreshMappings')}
             </button>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Layers className="w-4 h-4 text-slate-600" />
-              External-to-Internal Entity Mapping Registry
+              {t('integrations.mappingsTitle')}
             </h2>
 
             {mappings.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                No external entity mappings recorded for this connection and entity type.
-              </div>
+              <div className="p-6 text-center text-xs text-slate-500">{t('integrations.mappingsEmpty')}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-slate-700 font-medium">
                     <tr>
-                      <th className="p-2.5">Mapping ID</th>
-                      <th className="p-2.5">Internal ID</th>
-                      <th className="p-2.5">External ID</th>
-                      <th className="p-2.5">Status</th>
-                      <th className="p-2.5">Direction</th>
-                      <th className="p-2.5">Last Synced</th>
+                      <th className="p-2.5">{t('integrations.colMappingId')}</th>
+                      <th className="p-2.5">{t('integrations.colInternalId')}</th>
+                      <th className="p-2.5">{t('integrations.colExternalId')}</th>
+                      <th className="p-2.5">{t('integrations.colStatus')}</th>
+                      <th className="p-2.5">{t('integrations.colDirection')}</th>
+                      <th className="p-2.5">{t('integrations.colLastSynced')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -634,7 +638,7 @@ export default function StoreIntegrationsPage({
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-slate-600" />
-              Channel Sync Job Log
+              {t('integrations.syncJobsTitle')}
             </h2>
             <button
               type="button"
@@ -642,25 +646,23 @@ export default function StoreIntegrationsPage({
               className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1 text-xs transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Refresh Jobs
+              {t('integrations.refreshJobs')}
             </button>
           </div>
 
           {syncJobs.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-500">
-              No channel sync jobs recorded yet for this store.
-            </div>
+            <div className="p-6 text-center text-xs text-slate-500">{t('integrations.syncJobsEmpty')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 text-slate-700 font-medium">
                   <tr>
-                    <th className="p-2.5">Job ID</th>
-                    <th className="p-2.5">Connection ID</th>
-                    <th className="p-2.5">Sync Type</th>
-                    <th className="p-2.5">Status</th>
-                    <th className="p-2.5">Processed / Total</th>
-                    <th className="p-2.5">Created At</th>
+                    <th className="p-2.5">{t('integrations.colJobId')}</th>
+                    <th className="p-2.5">{t('integrations.colConnectionId')}</th>
+                    <th className="p-2.5">{t('integrations.colSyncType')}</th>
+                    <th className="p-2.5">{t('integrations.colStatus')}</th>
+                    <th className="p-2.5">{t('integrations.colProcessedTotal')}</th>
+                    <th className="p-2.5">{t('integrations.colCreatedAt')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -685,7 +687,7 @@ export default function StoreIntegrationsPage({
                         </span>
                       </td>
                       <td className="p-2.5 font-mono text-[11px]">
-                        {job.processed_items} / {job.total_items} {job.failed_items > 0 && <span className="text-rose-600">({job.failed_items} failed)</span>}
+                        {job.processed_items} / {job.total_items} {job.failed_items > 0 && <span className="text-rose-600">({job.failed_items} {t('integrations.failedSuffix')}</span>}
                       </td>
                       <td className="p-2.5 text-slate-400">{new Date(job.created_at).toLocaleString()}</td>
                     </tr>
@@ -701,29 +703,29 @@ export default function StoreIntegrationsPage({
       {showConnectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
-            <h3 className="text-base font-bold text-slate-900">Add Integration Connection</h3>
+            <h3 className="text-base font-bold text-slate-900">{t('integrations.connectModalTitle')}</h3>
             <form onSubmit={handleCreateConnection} className="space-y-4 text-xs">
               <div className="space-y-1">
-                <label className="block text-slate-600 font-medium">Integration Provider</label>
+                <label className="block text-slate-600 font-medium">{t('integrations.providerFieldLabel')}</label>
                 <select
                   value={provider}
                   onChange={(e) => setProvider(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-800"
                 >
-                  <option value="salla">Salla Platform</option>
-                  <option value="shopify">Shopify Store</option>
-                  <option value="woocommerce">WooCommerce Store</option>
-                  <option value="easyorders">EasyOrders</option>
-                  <option value="custom_api">Custom API Webhook Channel</option>
+                  {PROVIDER_OPTIONS.map((providerOption) => (
+                    <option key={providerOption.value} value={providerOption.value}>
+                      {t(providerOption.labelKey)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="block text-slate-600 font-medium">Connection Display Name</label>
+                <label className="block text-slate-600 font-medium">{t('integrations.connectionNameLabel')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Salla Main Store Sync"
+                  placeholder={t('integrations.connectionNamePlaceholder')}
                   value={connectionName}
                   onChange={(e) => setConnectionName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
@@ -736,13 +738,13 @@ export default function StoreIntegrationsPage({
                   onClick={() => setShowConnectModal(false)}
                   className="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md font-medium"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
                 >
-                  Create Connection
+                  {t('integrations.createConnection')}
                 </button>
               </div>
             </form>
@@ -756,7 +758,7 @@ export default function StoreIntegrationsPage({
           <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Key className="w-5 h-5 text-slate-700" />
-              Generate API Key
+              {t('integrations.apiKeyModalTitle')}
             </h3>
 
             {createdRawKey ? (
@@ -764,10 +766,12 @@ export default function StoreIntegrationsPage({
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 space-y-1">
                   <p className="font-semibold flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
-                    Save your API key securely!
+                    {t('integrations.saveKeyWarning')}
                   </p>
                   <p className="text-[11px]">
-                    This secret key will <strong>never be displayed again</strong>. Copy and store it safely in your server environment.
+                    {t('integrations.saveNeverPrefix')}
+                    <strong>{t('integrations.saveNeverStrong')}</strong>
+                    {t('integrations.saveNeverSuffix')}
                   </p>
                 </div>
 
@@ -777,7 +781,7 @@ export default function StoreIntegrationsPage({
                     type="button"
                     onClick={() => navigator.clipboard.writeText(createdRawKey)}
                     className="p-1 hover:bg-slate-800 rounded text-slate-300 transition-colors shrink-0"
-                    title="Copy to clipboard"
+                    title={t('integrations.copyToClipboard')}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
@@ -789,18 +793,18 @@ export default function StoreIntegrationsPage({
                     onClick={() => setShowApiKeyModal(false)}
                     className="px-4 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
                   >
-                    Done
+                    {t('integrations.done')}
                   </button>
                 </div>
               </div>
             ) : (
               <form onSubmit={handleCreateApiKey} className="space-y-4 text-xs">
                 <div className="space-y-1">
-                  <label className="block text-slate-600 font-medium">Key Name / Description</label>
+                  <label className="block text-slate-600 font-medium">{t('integrations.keyNameLabel')}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. ERP Inventory Sync Service"
+                    placeholder={t('integrations.keyNamePlaceholder')}
                     value={apiKeyName}
                     onChange={(e) => setApiKeyName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
@@ -808,7 +812,7 @@ export default function StoreIntegrationsPage({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-slate-600 font-medium">Granted API Scopes</label>
+                  <label className="block text-slate-600 font-medium">{t('integrations.scopesLabel')}</label>
                   <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-md bg-slate-50">
                     {AVAILABLE_SCOPES.map((scope) => (
                       <label key={scope} className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-700">
@@ -830,13 +834,13 @@ export default function StoreIntegrationsPage({
                     onClick={() => setShowApiKeyModal(false)}
                     className="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md font-medium"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
                     className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
                   >
-                    Generate Key
+                    {t('integrations.generateKey')}
                   </button>
                 </div>
               </form>
@@ -851,11 +855,11 @@ export default function StoreIntegrationsPage({
           <div className="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Webhook className="w-5 h-5 text-slate-700" />
-              Subscribe Real-Time Webhook
+              {t('integrations.webhookModalTitle')}
             </h3>
             <form onSubmit={handleCreateWebhook} className="space-y-4 text-xs">
               <div className="space-y-1">
-                <label className="block text-slate-600 font-medium">Target Endpoint HTTPS URL</label>
+                <label className="block text-slate-600 font-medium">{t('integrations.targetUrlLabel')}</label>
                 <input
                   type="url"
                   required
@@ -867,7 +871,7 @@ export default function StoreIntegrationsPage({
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-slate-600 font-medium">Subscribed Events</label>
+                <label className="block text-slate-600 font-medium">{t('integrations.eventsLabel')}</label>
                 <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-md bg-slate-50">
                   {AVAILABLE_EVENTS.map((event) => (
                     <label key={event} className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-700">
@@ -889,13 +893,13 @@ export default function StoreIntegrationsPage({
                   onClick={() => setShowWebhookModal(false)}
                   className="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md font-medium"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-md font-medium"
                 >
-                  Save Subscription
+                  {t('integrations.saveSubscription')}
                 </button>
               </div>
             </form>
@@ -906,10 +910,10 @@ export default function StoreIntegrationsPage({
       {/* Revoke API Key Modal */}
       <ConfirmModal
         isOpen={Boolean(revokeKeyId)}
-        title="Revoke Developer API Key"
-        description="Are you sure you want to revoke this API key? External systems and applications using this key will immediately be denied access."
-        confirmLabel="Revoke Key"
-        cancelLabel="Keep Key"
+        title={t('integrations.revokeModalTitle')}
+        description={t('integrations.revokeModalDescription')}
+        confirmLabel={t('integrations.revokeConfirm')}
+        cancelLabel={t('integrations.revokeCancel')}
         variant="danger"
         loading={isRevoking}
         onConfirm={confirmRevokeApiKey}
@@ -919,10 +923,10 @@ export default function StoreIntegrationsPage({
       {/* Delete Webhook Modal */}
       <ConfirmModal
         isOpen={Boolean(deleteWebhookId)}
-        title="Delete Webhook Subscription"
-        description="Are you sure you want to delete this webhook subscription? Live event push notifications to this destination URL will stop immediately."
-        confirmLabel="Delete Webhook"
-        cancelLabel="Keep Webhook"
+        title={t('integrations.deleteWebhookModalTitle')}
+        description={t('integrations.deleteWebhookModalDescription')}
+        confirmLabel={t('integrations.deleteWebhookConfirm')}
+        cancelLabel={t('integrations.keepWebhook')}
         variant="danger"
         loading={isDeletingWebhook}
         onConfirm={confirmDeleteWebhook}

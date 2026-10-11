@@ -12,18 +12,19 @@ import {
 } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { SellerOrder } from '@/lib/api/types';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import { getStatusBadge } from '@/components/seller/OrderStatusBadge';
 export { getStatusBadge };
 
 const STATUS_FILTERS = [
-  { key: 'all', label: 'All Orders' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'processing', label: 'Processing' },
-  { key: 'ready_for_shipping', label: 'Ready for Shipping' },
-  { key: 'shipped', label: 'Shipped' },
-  { key: 'delivered', label: 'Delivered' },
-  { key: 'cancelled', label: 'Cancelled' }
+  { key: 'all', labelKey: 'orders.filterAll' },
+  { key: 'pending', labelKey: 'orders.filterPending' },
+  { key: 'confirmed', labelKey: 'orders.filterConfirmed' },
+  { key: 'processing', labelKey: 'orders.filterProcessing' },
+  { key: 'ready_for_shipping', labelKey: 'orders.filterReadyForShipping' },
+  { key: 'shipped', labelKey: 'orders.filterShipped' },
+  { key: 'delivered', labelKey: 'orders.filterDelivered' },
+  { key: 'cancelled', labelKey: 'orders.filterCancelled' }
 ];
 
 export default function StoreOrdersPage({
@@ -43,6 +44,7 @@ export default function StoreOrdersPage({
   const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useTranslation();
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -55,7 +57,7 @@ export default function StoreOrdersPage({
       setOrders(res.orders || []);
       setTotal(res.total || 0);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load store orders';
+      const msg = err instanceof Error ? err.message : t('orders.loadFailed', 'Failed to load store orders');
       setError(msg);
     } finally {
       setLoading(false);
@@ -77,10 +79,10 @@ export default function StoreOrdersPage({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Orders Management
+            {t('orders.title', 'Orders Management')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Track customer orders, manage picking, packing, dispatch, and manual fulfillment.
+            {t('orders.subtitle', 'Track customer orders, manage picking, packing, dispatch, and manual fulfillment.')}
           </p>
         </div>
 
@@ -91,7 +93,7 @@ export default function StoreOrdersPage({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('common.refresh', 'Refresh')}
         </button>
       </div>
 
@@ -110,7 +112,7 @@ export default function StoreOrdersPage({
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey, tab.key)}
             </button>
           );
         })}
@@ -122,7 +124,7 @@ export default function StoreOrdersPage({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by order number or recipient..."
+            placeholder={t('orders.searchPlaceholder', 'Search by order number or recipient...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -130,7 +132,7 @@ export default function StoreOrdersPage({
         </form>
 
         <div className="text-xs text-slate-500 font-medium">
-          Showing <span className="text-slate-900 font-semibold">{orders.length}</span> of {total} orders
+          {t('orders.showing', 'Showing')} <span className="text-slate-900 font-semibold">{orders.length}</span> {t('orders.of', 'of')} {total} {t('orders.ordersUnit', 'orders')}
         </div>
       </div>
 
@@ -147,18 +149,18 @@ export default function StoreOrdersPage({
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-500 space-y-2 animate-pulse">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto text-slate-400" />
-            <div>Loading orders...</div>
+            <div>{t('orders.loadingOrders', 'Loading orders...')}</div>
           </div>
         ) : orders.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
               <ShoppingBag className="w-6 h-6" />
             </div>
-            <div className="text-sm font-semibold text-slate-900">No orders found</div>
+            <div className="text-sm font-semibold text-slate-900">{t('orders.emptyTitle', 'No orders found')}</div>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               {selectedStatus === 'all'
-                ? 'No customer orders have been placed in this store yet.'
-                : `No orders match status "${selectedStatus}".`}
+                ? t('orders.emptyAllBody', 'No customer orders have been placed in this store yet.')
+                : t('orders.emptyStatusBody', `No orders match status "${selectedStatus}".`).replace('{status}', selectedStatus)}
             </p>
           </div>
         ) : (
@@ -166,13 +168,13 @@ export default function StoreOrdersPage({
             <table className="w-full text-start text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3 px-4 text-start">Order Number</th>
-                  <th className="py-3 px-4 text-start">Date</th>
-                  <th className="py-3 px-4 text-start">Customer</th>
-                  <th className="py-3 px-4 text-start">Items</th>
-                  <th className="py-3 px-4 text-start">Total</th>
-                  <th className="py-3 px-4 text-start">Status</th>
-                  <th className="py-3 px-4 text-end">Action</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colOrderNumber', 'Order Number')}</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colDate', 'Date')}</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colCustomer', 'Customer')}</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colItems', 'Items')}</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colTotal', 'Total')}</th>
+                  <th className="py-3 px-4 text-start">{t('orders.colStatus', 'Status')}</th>
+                  <th className="py-3 px-4 text-end">{t('orders.colAction', 'Action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -200,23 +202,23 @@ export default function StoreOrdersPage({
                         {formattedDate}
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-800">
-                        {order.recipient_name || 'Guest Customer'}
+                        {order.recipient_name || t('orders.guestCustomer', 'Guest Customer')}
                       </td>
                       <td className="py-3 px-4 text-slate-600">
-                        {order.item_count} {order.item_count === 1 ? 'item' : 'items'}
+                        {order.item_count} {order.item_count === 1 ? t('orders.itemSingular', 'item') : t('orders.itemPlural', 'items')}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">
                         {formattedPrice}
                       </td>
                       <td className="py-3 px-4">
-                        {getStatusBadge(order.status)}
+                        {getStatusBadge(order.status, t)}
                       </td>
                       <td className="py-3 px-4 text-end">
                         <Link
                           href={`/dashboard/stores/${store_id}/orders/${order.id}`}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
                         >
-                          Manage <ArrowRight className="w-3 h-3" />
+                          {t('orders.manage', 'Manage')} <ArrowRight className="w-3 h-3" />
                         </Link>
                       </td>
                     </tr>

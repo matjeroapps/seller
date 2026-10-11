@@ -5,9 +5,11 @@ import Link from 'next/link';
 
 import { merchantSupplyApi, type SupplyFulfillmentRequest } from '@/lib/api/merchant-console';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function SupplyFulfillmentPage({ params }: { params: Promise<{ merchant_id: string }> }) {
   const { merchant_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'empty' } | { status: 'ready'; data: SupplyFulfillmentRequest[] }
   >({ status: 'loading' });
@@ -31,13 +33,15 @@ export default function SupplyFulfillmentPage({ params }: { params: Promise<{ me
   return (
     <div className="space-y-6" data-testid="supply-fulfillment">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Fulfillment</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Outbound supplier fulfillment requests and their imported tracking state.</p>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{t('supply.fulfillment.title')}</h1>
+        <p className="text-xs text-slate-500 mt-0.5">{t('supply.fulfillment.subtitle')}</p>
       </div>
 
       {state.status === 'loading' && <SupplyLoading />}
       {state.status === 'error' && <SupplyError />}
-      {state.status === 'empty' && <SupplyEmpty title="No fulfillment requests" message="Fulfillment requests routed to suppliers will appear here." />}
+      {state.status === 'empty' && (
+        <SupplyEmpty title={t('supply.fulfillment.emptyTitle')} message={t('supply.fulfillment.emptyBody')} />
+      )}
       {state.status === 'ready' && (
         <ul className="space-y-3">
           {state.data.map((request) => (
@@ -50,7 +54,7 @@ export default function SupplyFulfillmentPage({ params }: { params: Promise<{ me
                   <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{request.provider}</span>
                   <span className="text-xs font-semibold uppercase rounded px-1.5 py-0.5 bg-slate-100 text-slate-600">{request.status}</span>
                   {request.external_fulfillment_id && (
-                    <span className="text-xs text-slate-500">external {request.external_fulfillment_id}</span>
+                    <span className="text-xs text-slate-500">{t('supply.state.externalLabel')} {request.external_fulfillment_id}</span>
                   )}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">{new Date(request.created_at).toLocaleString()}</div>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { merchantSupplyApi, type SupplyFulfillmentRequestDetail } from '@/lib/api/merchant-console';
 import { SupplyEmpty, SupplyError, SupplyLoading } from '@/components/supply/supply-state';
+import { useTranslation } from '@/lib/i18n/locale-context';
 
 export default function SupplyFulfillmentDetailPage({
   params
@@ -12,6 +13,7 @@ export default function SupplyFulfillmentDetailPage({
   params: Promise<{ merchant_id: string; request_id: string }>;
 }) {
   const { merchant_id, request_id } = use(params);
+  const { t } = useTranslation();
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'denied' } | { status: 'error' } | { status: 'empty' } | { status: 'ready'; data: SupplyFulfillmentRequestDetail }
   >({ status: 'loading' });
@@ -37,19 +39,21 @@ export default function SupplyFulfillmentDetailPage({
         href={`/dashboard/merchants/${merchant_id}/supply/fulfillment`}
         className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
       >
-        ← Fulfillment
+        ← {t('nav.fulfillment')}
       </Link>
 
       {state.status === 'loading' && <SupplyLoading />}
       {state.status === 'error' && <SupplyError />}
-      {state.status === 'empty' && <SupplyEmpty title="No tracking events" message="This fulfillment request has no imported tracking events yet." />}
+      {state.status === 'empty' && (
+        <SupplyEmpty title={t('supply.fulfillment.detailEmptyTitle')} message={t('supply.fulfillment.detailEmptyBody')} />
+      )}
       {state.status === 'ready' && (
         <>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">{state.data.request.provider}</h1>
             <p className="text-xs text-slate-500 mt-1">
-              Status <span className="font-semibold">{state.data.request.status}</span>
-              {state.data.request.external_fulfillment_id ? ` · external ${state.data.request.external_fulfillment_id}` : ''}
+              {t('supply.state.statusLabel')} <span className="font-semibold">{state.data.request.status}</span>
+              {state.data.request.external_fulfillment_id ? ` · ${t('supply.state.externalLabel')} ${state.data.request.external_fulfillment_id}` : ''}
             </p>
           </div>
           <ol className="space-y-3">
