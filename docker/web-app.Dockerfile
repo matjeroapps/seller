@@ -22,6 +22,8 @@ COPY web ./web
 COPY scripts ./scripts
 
 ARG WORKSPACE=@commerce/seller-web
+ARG NEXT_PUBLIC_STOREFRONT_LOCAL_MODE=false
+ENV NEXT_PUBLIC_STOREFRONT_LOCAL_MODE=${NEXT_PUBLIC_STOREFRONT_LOCAL_MODE}
 RUN npm run build --workspace ${WORKSPACE}
 
 # Seller portal runtime.

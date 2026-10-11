@@ -9,12 +9,14 @@ import { ThemeCatalogGrid } from '@/components/theme/ThemeCatalogGrid';
 import { ThemeSwitchConfirmModal } from '@/components/theme/ThemeSwitchConfirmModal';
 import { ThemeDraftEditor } from '@/components/theme/ThemeDraftEditor';
 import { StoreOperationalStatePanel } from '@/components/store/StoreOperationalStatePanel';
+import { storefrontUrlForHost } from '@/lib/storefront-url';
 
 export default function StorefrontSettingsPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
   const { t } = useTranslation();
 
   const [stores, setStores] = useState<Store[]>([]);
+  const [storefrontHost, setStorefrontHost] = useState('');
   const [themes, setThemes] = useState<Theme[]>([]);
   const [themeInstallation, setThemeInstallation] = useState<ThemeInstallationResponse | null>(null);
   const [operationalState, setOperationalState] = useState<StoreOperationalState | null>(null);
@@ -34,17 +36,19 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
   const fetchThemeData = useCallback(async () => {
     try {
       setErrorMessage(null);
-      const [storesRes, themesRes, installRes, operationalRes] = await Promise.all([
+      const [storesRes, themesRes, installRes, operationalRes, hostRes] = await Promise.all([
         sellerApi.getStores().catch(() => ({ items: [] })),
         sellerApi.listThemes().catch(() => ({ items: [] })),
         sellerApi.getThemeInstallation(store_id).catch(() => null),
-        sellerApi.getStoreOperationalState(store_id)
+        sellerApi.getStoreOperationalState(store_id),
+        sellerApi.getStorefrontHost(store_id).catch(() => ({ host: '' }))
       ]);
 
       setStores(storesRes.items || []);
       setThemes(themesRes.items || []);
       setThemeInstallation(installRes);
       setOperationalState(operationalRes);
+      setStorefrontHost(hostRes.host || '');
       if (operationalRes?.maintenance_message) {
         setMaintenanceMessage(operationalRes.maintenance_message);
       }
@@ -61,16 +65,24 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
   }, [fetchThemeData]);
 
   const currentStore = stores.find((s) => s.id === store_id);
+  const localPreviewMode = process.env.NEXT_PUBLIC_STOREFRONT_LOCAL_MODE === 'true';
 
-  // Canonical storefront base URL
-  const canonicalStorefrontUrl =
-    process.env.NEXT_PUBLIC_STOREFRONT_APP_URL || `http://${currentStore?.code || 'store-a'}.localhost:3000`;
+  // Keep Core's canonical host as the tenant identity in both modes. Local mode
+  // changes only the scheme/port so the browser reaches the local Compose service.
+  const canonicalStorefrontUrl = localPreviewMode
+    ? storefrontUrlForHost(storefrontHost)
+    : process.env.NEXT_PUBLIC_STOREFRONT_APP_URL ||
+      (currentStore?.code ? `http://${currentStore.code}.localhost:3000` : undefined);
 
   // Preview Handler
   const handlePreviewTheme = async (themeKey: string) => {
     try {
       setLoadingPreviewTheme(themeKey);
       setErrorMessage(null);
+
+      if (!canonicalStorefrontUrl) {
+        throw new Error(t('storefront.hostUnavailable', 'The storefront host is not available yet.'));
+      }
 
       // Request signed preview token from Core via Seller BFF
       const previewRes = await sellerApi.createThemePreview(store_id);
@@ -270,23 +282,25 @@ export default function StorefrontSettingsPage({ params }: { params: Promise<{ s
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900">{t('storefront.hostTitle', 'Canonical Storefront Host')}</h2>
-              <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+          <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                 <span>{t('storefront.resolvedVia', 'Resolved via Core domain host resolver:')}</span>
                 <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-slate-800">
-                  {canonicalStorefrontUrl}
+                  {canonicalStorefrontUrl || t('storefront.hostUnavailable', 'Storefront host unavailable')}
                 </code>
               </div>
             </div>
           </div>
 
-          <a
-            href={canonicalStorefrontUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-xs"
-          >
-            {t('storefront.openStorefront', 'Open Canonical Customer Storefront')} <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          {canonicalStorefrontUrl && (
+            <a
+              href={canonicalStorefrontUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-xs"
+            >
+              {t('storefront.openStorefront', 'Open Canonical Customer Storefront')} <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
 
         <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 flex items-center justify-between">

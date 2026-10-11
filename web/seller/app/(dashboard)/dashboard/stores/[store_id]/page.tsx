@@ -22,6 +22,7 @@ import {
 
 import { sellerApi } from '@/lib/api/client';
 import { useTranslation } from '@/lib/i18n/locale-context';
+import { storefrontUrlForHost } from '@/lib/storefront-url';
 import {
   buildDashboardModel,
   formatCompactNumber,
@@ -84,9 +85,7 @@ function formatStatusLabel(value?: string) {
 }
 
 function storefrontUrl(host?: string) {
-  if (!host) return undefined;
-
-  return host.startsWith('http') ? host : `https://${host}`;
+  return storefrontUrlForHost(host);
 }
 
 function formatTimestamp(value?: string) {
