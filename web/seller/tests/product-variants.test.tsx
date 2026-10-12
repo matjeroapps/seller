@@ -418,7 +418,7 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
       });
     });
 
-    it('guards above 100 combinations and blocks creation', () => {
+    it('guards above 100 combinations and blocks creation', async () => {
       const manyAttributes = [
         {
           id: 'attr_a',
@@ -442,11 +442,20 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
         />
       );
 
-      selectValues(['Use A', 'Use B']);
-      selectValues([
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Use A' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Use B' }));
+      // Resolve all value checkbox references up front: with the full matrix
+      // rendered, each re-query walks the entire table DOM (~180ms per lookup in
+      // jsdom), which alone pushes this test past the 5s timeout. Reusing the
+      // same checkboxes keeps the exact same selection and guard semantics.
+      const valueLabels = [
         ...Array.from({ length: 12 }, (_, i) => `A: A${i}`),
         ...Array.from({ length: 9 }, (_, i) => `B: B${i}`),
-      ]);
+      ];
+      const valueCheckboxes = valueLabels.map((label) => screen.getByRole('checkbox', { name: label }));
+      await act(async () => {
+        for (const checkbox of valueCheckboxes) fireEvent.click(checkbox);
+      });
 
       expect(screen.getByText(/Selection creates 108 combinations/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /create/i })).toBeDisabled();

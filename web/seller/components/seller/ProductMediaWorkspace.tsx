@@ -335,14 +335,15 @@ export function ProductMediaWorkspace({
     setReferences(response.items || []);
   };
 
-  const updateReference = async (reference: ProductMediaReference, patch: { alt_text?: string; sort_order?: number; is_primary?: boolean }) => {
+  const updateReference = async (reference: ProductMediaReference, patch: { alt_text?: string; sort_order?: number; is_primary?: boolean; is_visible?: boolean }) => {
     setReferenceWorkingId(reference.id);
     setActionError(null);
     try {
       await sellerApi.updateProductMediaReference(storeId, productId, reference.id, {
         alt_text: patch.alt_text ?? reference.alt_text,
         sort_order: patch.sort_order ?? reference.sort_order,
-        is_primary: patch.is_primary ?? reference.is_primary
+        is_primary: patch.is_primary ?? reference.is_primary,
+        is_visible: patch.is_visible ?? reference.is_visible
       });
       await reloadReferences();
       setNotice('Product media updated.');
@@ -636,6 +637,7 @@ export function ProductMediaWorkspace({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-slate-900">Image {index + 1}</span>
                     {reference.is_primary && <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"><Star className="h-3 w-3" /> Primary</span>}
+                    {reference.is_visible === false && <span className="inline-flex items-center gap-1 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700" data-testid="media-visibility-badge">Hidden from visitors</span>}
                   </div>
                   {editingAltId === reference.id ? (
                     <div className="mt-2 flex gap-2">
@@ -649,6 +651,8 @@ export function ProductMediaWorkspace({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
+                  {reference.is_visible === false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: true })} data-testid="media-show-to-visitors" className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50">Show to visitors</button>}
+                  {reference.is_visible !== false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: false })} data-testid="media-hide-from-visitors" className="rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-white">Hide from visitors</button>}
                   {!reference.is_primary && <button type="button" disabled={!canManage || referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_primary: true })} className="rounded border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-700 hover:bg-amber-50">Set primary</button>}
                   <button type="button" disabled={!canManage || index === 0 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, -1)} aria-label={`Move image ${index + 1} up`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronUp className="h-3.5 w-3.5" /></button>
                   <button type="button" disabled={!canManage || index === ordered.length - 1 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, 1)} aria-label={`Move image ${index + 1} down`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronDown className="h-3.5 w-3.5" /></button>

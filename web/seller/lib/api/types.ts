@@ -371,6 +371,7 @@ export interface StoreMediaAsset {
   byte_size: number;
   original_filename: string;
   status: 'ready' | 'deleting' | 'deleted';
+  origin?: 'merchant' | 'ai_generated' | string;
   url: string;
   created_at: string;
   updated_at?: string;
@@ -384,8 +385,66 @@ export interface ProductMediaReference {
   alt_text: string;
   sort_order: number;
   is_primary: boolean;
+  is_visible?: boolean;
+  origin?: 'merchant' | 'ai_generated' | string;
   url: string;
   created_at: string;
+}
+
+export interface AuthoringLimits {
+  effective_limit: number;
+  default_count: number;
+}
+
+export interface AuthoringFieldProposal {
+  id: string;
+  field_key: 'name' | 'description' | 'keywords' | 'category' | 'attribute' | string;
+  locale: 'ar' | 'en' | string;
+  value: string;
+  attribute_code: string;
+  category_id: string | null;
+  status: 'proposed' | 'accepted' | 'rejected' | 'failed' | string;
+  edited_by_subject: string;
+  failure_code: string;
+  updated_at: string;
+}
+
+export interface AuthoringImageCandidate {
+  id: string;
+  store_id: string;
+  source_asset_id: string;
+  scene_key: string;
+  url: string;
+  foreground_url: string;
+  content_type: string;
+  alt_text?: string;
+  byte_size: number;
+  visibility: 'hidden' | 'visible' | string;
+  status: 'proposed' | 'accepted' | 'rejected' | 'failed' | string;
+  asset_id: string | null;
+  failure_code: string;
+  retry_count: number;
+  updated_at: string;
+}
+
+export interface AuthoringJob {
+  id: string;
+  store_id: string;
+  status: 'pending' | 'processing' | 'partial' | 'succeeded' | 'failed' | string;
+  text_status: string;
+  image_status: string;
+  brief: string;
+  requested_image_count: number;
+  effective_image_limit: number;
+  attempts: number;
+  error_code: string;
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  fields: AuthoringFieldProposal[];
+  image_candidates: AuthoringImageCandidate[];
 }
 
 export interface MediaPresignResponse {

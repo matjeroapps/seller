@@ -39,6 +39,9 @@ const (
 	CodeOfferUnavailable         = "offer_unavailable"
 	CodeResourceInUse            = "resource_in_use"
 	CodeUnsafeMargin             = "unsafe_margin"
+	CodeAILimitExceeded          = "ai_limit_exceeded"
+	CodeAIJobConflict            = "ai_job_conflict"
+	CodeAIJobNotRetryable        = "ai_job_not_retryable"
 	CodeUnavailable              = "unavailable"
 	CodeInternalError            = "internal_error"
 )
@@ -90,13 +93,13 @@ func statusForCode(code string) int {
 	switch code {
 	case CodeNotFound, CodeStorefrontUnavailable:
 		return http.StatusNotFound
-	case CodeInvalidArgument, CodeValidationError, CodeSchemaMismatch, CodeUnsafeContent:
+	case CodeInvalidArgument, CodeValidationError, CodeSchemaMismatch, CodeUnsafeContent, CodeAILimitExceeded:
 		return http.StatusBadRequest
 	case CodeUnauthorized:
 		return http.StatusUnauthorized
 	case CodeForbidden:
 		return http.StatusForbidden
-	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory, CodeCheckoutExpired, CodeIdempotencyConflict, CodeInvalidOrderTransition, CodePriceChanged, CodeListingUnavailable, CodeStoreEntitlementExceeded, CodeUploadInProgress, CodeMediaInUse, CodeOfferUnavailable, CodeResourceInUse:
+	case CodeConflict, CodeMarketMismatch, CodeInsufficientInventory, CodeCheckoutExpired, CodeIdempotencyConflict, CodeInvalidOrderTransition, CodePriceChanged, CodeListingUnavailable, CodeStoreEntitlementExceeded, CodeUploadInProgress, CodeMediaInUse, CodeOfferUnavailable, CodeResourceInUse, CodeAIJobConflict, CodeAIJobNotRetryable:
 		return http.StatusConflict
 	case CodeChecksumMismatch, CodePublishNotReady:
 		return http.StatusUnprocessableEntity

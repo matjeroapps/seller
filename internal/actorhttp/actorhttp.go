@@ -143,6 +143,12 @@ func writeMappedCoreError(w http.ResponseWriter, coreErr *coreclient.Error) {
 		httpx.WriteError(w, http.StatusConflict, "market_mismatch", "market mismatch")
 	case coreclient.CodeInsufficientInventory:
 		httpx.WriteError(w, http.StatusConflict, "insufficient_inventory", "insufficient inventory")
+	case coreclient.CodeAILimitExceeded:
+		httpx.WriteError(w, http.StatusBadRequest, coreclient.CodeAILimitExceeded, "image generation limit exceeded")
+	case coreclient.CodeAIJobConflict:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeAIJobConflict, "authoring job is currently processing")
+	case coreclient.CodeAIJobNotRetryable:
+		httpx.WriteError(w, http.StatusConflict, coreclient.CodeAIJobNotRetryable, "authoring job is not retryable")
 	case coreclient.CodeConflict:
 		// Per-item variant batch conflicts carry the conflicting variant/SKU
 		// code and the actionable next step from Core; all other conflicts keep

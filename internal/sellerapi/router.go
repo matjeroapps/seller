@@ -231,6 +231,14 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Post("/seller/stores/{store_id}/media/uploads/{intent_id}/complete", deps.handleCompleteStoreMediaUploadIntent)
 			r.Delete("/seller/stores/{store_id}/media/{asset_id}", deps.handleDeleteStoreMediaAsset)
 
+			// AI authoring
+			r.Get("/seller/stores/{store_id}/ai-authoring/limits", deps.handleAuthoringLimits)
+			r.Post("/seller/stores/{store_id}/ai-authoring/jobs", deps.handleCreateAuthoringJob)
+			r.Get("/seller/stores/{store_id}/ai-authoring/jobs/{job_id}", deps.handleGetAuthoringJob)
+			r.Post("/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/retry", deps.handleRetryAuthoringJob)
+			r.Patch("/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/fields/{field_id}", deps.handleUpdateAuthoringField)
+			r.Post("/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/images/{candidate_id}/accept", deps.handleAcceptAuthoringImage)
+
 			// Product Media References
 			r.Get("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleListProductMediaReferences)
 			r.Post("/seller/stores/{store_id}/products/{product_id}/media-references", deps.handleAttachProductMediaReference)

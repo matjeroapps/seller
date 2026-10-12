@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { CategoryPicker } from '@/components/seller/CategoryPicker';
+import { AuthoringAssistantPanel } from '@/components/seller/AuthoringAssistantPanel';
 import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi } from '@/lib/api/client';
 import type { StoreCategory } from '@/lib/api/types';
@@ -15,6 +16,7 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
   const { t } = useTranslation();
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +59,7 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
       const product = await sellerApi.createStoreProduct(store_id, {
         name,
         slug,
+        description,
         store_category_ids: selectedCategoryIds
       });
       router.push(`/dashboard/stores/${store_id}/catalog/products/${product.id}`);
@@ -114,6 +117,18 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
           <p className="text-[11px] text-slate-500 mt-1">{t('products.slugHelp')}</p>
         </div>
 
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="product-create-description">{t('products.descriptionLabel')}</label>
+          <textarea
+            id="product-create-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            data-testid="product-create-description"
+            placeholder={t('products.descriptionPlaceholder')}
+            className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
         <div className="space-y-1.5">
           <span className="block text-xs font-semibold text-slate-700">{t('products.categoriesLabel')}</span>
           <CategoryPicker
@@ -142,6 +157,8 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
           </button>
         </div>
       </form>
+
+      <AuthoringAssistantPanel storeId={store_id} onApplyName={handleNameChange} onApplyDescription={setDescription} />
     </div>
   );
 }
