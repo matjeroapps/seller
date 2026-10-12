@@ -1,5 +1,9 @@
 import type {
   ApiKey,
+  AuthoringJob,
+  AuthoringLimits,
+  AuthoringFieldProposal,
+  AuthoringImageCandidate,
   CreateProductVariantPayload,
   CreateShipmentPayload,
   CreateStoreShipmentPayload,
@@ -382,15 +386,76 @@ export const sellerApi = {
     );
   },
 
+  async getAuthoringLimits(storeId: string): Promise<AuthoringLimits> {
+    return request<AuthoringLimits>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/limits`);
+  },
+
+  async createAuthoringJob(
+    storeId: string,
+    data: { brief: string; source_asset_ids: string[]; requested_image_count: number },
+    idempotencyKey: string
+  ): Promise<AuthoringJob> {
+    return request<AuthoringJob>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/jobs`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getAuthoringJob(storeId: string, jobId: string): Promise<AuthoringJob> {
+    return request<AuthoringJob>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/jobs/${encodeURIComponent(jobId)}`);
+  },
+
+  async retryAuthoringJob(
+    storeId: string,
+    jobId: string,
+    data: { parts?: string[]; candidate_ids?: string[] },
+    idempotencyKey?: string
+  ): Promise<AuthoringJob> {
+    return request<AuthoringJob>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/jobs/${encodeURIComponent(jobId)}/retry`, {
+      method: 'POST',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateAuthoringField(
+    storeId: string,
+    jobId: string,
+    fieldId: string,
+    data: { decision: 'accept' | 'reject'; value?: string },
+    idempotencyKey?: string
+  ): Promise<AuthoringFieldProposal> {
+    return request<AuthoringFieldProposal>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/jobs/${encodeURIComponent(jobId)}/fields/${encodeURIComponent(fieldId)}`, {
+      method: 'PATCH',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      body: JSON.stringify(data)
+    });
+  },
+
+  async acceptAuthoringImage(
+    storeId: string,
+    jobId: string,
+    candidateId: string,
+    data: { is_visible: boolean; alt_text?: string },
+    idempotencyKey?: string
+  ): Promise<AuthoringImageCandidate> {
+    return request<AuthoringImageCandidate>(`/v1/seller/stores/${encodeURIComponent(storeId)}/ai-authoring/jobs/${encodeURIComponent(jobId)}/images/${encodeURIComponent(candidateId)}/accept`, {
+      method: 'POST',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      body: JSON.stringify(data)
+    });
+  },
+
   async createStoreProduct(
     storeId: string,
-    data: { name: string; slug: string; category_id?: string; store_category_ids?: string[] }
+    data: { name: string; slug: string; description?: string; category_id?: string; store_category_ids?: string[] }
   ): Promise<Product> {
     const detail = await request<SellerProductDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
       method: 'POST',
       body: JSON.stringify({
         slug: data.slug,
-        translations: [{ locale: 'en', name: data.name, description: '' }],
+        translations: [{ locale: 'en', name: data.name, description: data.description ?? '' }],
         category_ids: data.category_id ? [data.category_id] : [],
         store_category_ids: data.store_category_ids ?? []
       })
@@ -679,7 +744,7 @@ export const sellerApi = {
     storeId: string,
     productId: string,
     referenceId: string,
-    data: { alt_text?: string; sort_order?: number; is_primary?: boolean }
+    data: { alt_text?: string; sort_order?: number; is_primary?: boolean; is_visible?: boolean }
   ): Promise<ProductMediaReference> {
     return request<ProductMediaReference>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/media-references/${encodeURIComponent(referenceId)}`,

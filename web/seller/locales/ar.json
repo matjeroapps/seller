@@ -1052,7 +1052,27 @@
     "confirmArchiveTitle": "أرشفة المنتج",
     "confirmArchiveDescription": "أرشفة هذا المنتج؟ ستتم إزالته من إدارة الكتالوج النشط. قد تكون القوائم المنشورة بحاجة إلى إلغاء النشر أولًا.",
     "confirmArchiveConfirm": "أرشفة المنتج",
-    "confirmArchiveCancel": "الاحتفاظ بالمنتج"
+    "confirmArchiveCancel": "الاحتفاظ بالمنتج",
+    "authoring": {
+      "title": "مساعد إعداد المنتج بالذكاء الاصطناعي",
+      "subtitle": "توليد مسودات النص ومرشحات صور المشهد للمراجعة قبل إنشاء المنتج.",
+      "briefPlaceholder": "وصف موجز للمنتج",
+      "uploadSources": "رفع صور المصدر",
+      "unsupportedType": "نوع الصورة غير مدعوم (مسموح: jpeg/png/webp).",
+      "uploadIncomplete": "تعليمات الرفع غير مكتملة من الخدمة.",
+      "uploadFailed": "فشل رفع الصورة إلى التخزين.",
+      "imageCount": "عدد الصور",
+      "generate": "توليد",
+      "pollFailed": "تعذر الاستطلاع.",
+      "createFailed": "تعذر إنشاء المهمة.",
+      "retryFailed": "تعذرت إعادة المحاولة.",
+      "acceptFailed": "تعذر اعتماد الصورة.",
+      "statusPrefix": "الحالة",
+      "textPrefix": "النصوص",
+      "imagePrefix": "الصور"
+    },
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "وصف المنتج (يمكن اعتماد مسودة المساعد)"
   },
   "supplierOffers": {
     "title": "كتالوج عروض الموردين",
