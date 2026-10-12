@@ -1052,7 +1052,27 @@
     "confirmArchiveTitle": "Archive Product",
     "confirmArchiveDescription": "Archive this product? It will be removed from active catalog management. Published listings may need to be unpublished first.",
     "confirmArchiveConfirm": "Archive Product",
-    "confirmArchiveCancel": "Keep Product"
+    "confirmArchiveCancel": "Keep Product",
+    "authoring": {
+      "title": "AI authoring assistant",
+      "subtitle": "Generate draft text and scene image candidates for review before creating the product.",
+      "briefPlaceholder": "Brief product description",
+      "uploadSources": "Upload source images",
+      "unsupportedType": "Unsupported image type (allowed: jpeg/png/webp).",
+      "uploadIncomplete": "The upload service returned incomplete instructions.",
+      "uploadFailed": "The image upload could not reach storage.",
+      "imageCount": "Image count",
+      "generate": "Generate",
+      "pollFailed": "Polling failed.",
+      "createFailed": "Authoring failed.",
+      "retryFailed": "Retry failed.",
+      "acceptFailed": "The image could not be accepted.",
+      "statusPrefix": "Status",
+      "textPrefix": "text",
+      "imagePrefix": "images"
+    },
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Product description (an accepted assistant draft can be applied here)"
   },
   "supplierOffers": {
     "title": "Supplier Offers Catalog",

@@ -272,6 +272,45 @@ func TestProductVariantLifecycleRoutesAreDeclared(t *testing.T) {
 	}
 }
 
+func TestAuthoringRoutesAreDeclared(t *testing.T) {
+	spec, err := BuildSellerSpec()
+	if err != nil {
+		t.Fatalf("build seller spec: %v", err)
+	}
+
+	// Every ai-authoring route the seller router registers must be declared
+	// in the document; nothing here recreates the media-library path gap.
+	registered := map[string]map[string]string{
+		"/v1/seller/stores/{store_id}/ai-authoring/limits":                          {"GET": "getAuthoringLimits"},
+		"/v1/seller/stores/{store_id}/ai-authoring/jobs":                            {"POST": "createAuthoringJob"},
+		"/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}":                   {"GET": "getAuthoringJob"},
+		"/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/retry":             {"POST": "retryAuthoringJob"},
+		"/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/fields/{field_id}": {"PATCH": "decideAuthoringField"},
+	}
+	registered["/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/images/{candidate_id}/accept"] = map[string]string{"POST": "acceptAuthoringImage"}
+	for path, methods := range registered {
+		entry := spec.Paths.Value(path)
+		if entry == nil {
+			t.Fatalf("seller spec missing ai-authoring path %s", path)
+		}
+		for method, operationID := range methods {
+			operation := entry.Operations()[method]
+			if operation == nil {
+				t.Fatalf("seller spec ai-authoring path %s missing declared method %s", path, method)
+			}
+			if operation.OperationID != operationID {
+				t.Fatalf("seller spec ai-authoring path %s method %s operation id = %q, want %q", path, method, operation.OperationID, operationID)
+			}
+			if !containsTag(operation.Tags, "Catalog") {
+				t.Fatalf("seller spec ai-authoring path %s method %s missing Catalog tag", path, method)
+			}
+			if operation.Security == nil || len(*operation.Security) == 0 {
+				t.Fatalf("seller spec ai-authoring path %s method %s must require auth", path, method)
+			}
+		}
+	}
+}
+
 func containsTag(tags []string, want string) bool {
 	for _, tag := range tags {
 		if tag == want {

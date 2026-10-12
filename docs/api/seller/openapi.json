@@ -3767,6 +3767,2079 @@
         ]
       }
     },
+    "/v1/seller/stores/{store_id}/ai-authoring/jobs": {
+      "post": {
+        "description": "Creates an asynchronous authoring job from a brief together with ready store media assets. Requires an Idempotency-Key header; job creation never requires a provider identifier, model identifier or API key in the request. Exceeding the effective image limit returns 400 ai_limit_exceeded.",
+        "operationId": "createAuthoringJob",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "brief": {
+                    "type": "string"
+                  },
+                  "requested_image_count": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "source_asset_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "brief",
+                  "requested_image_count",
+                  "source_asset_ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "attempts": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "brief": {
+                      "type": "string"
+                    },
+                    "completed_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "effective_image_limit": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "error_message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "items": {
+                        "properties": {
+                          "attribute_code": {
+                            "type": "string"
+                          },
+                          "category_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "edited_by_subject": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "field_key": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "attribute_code",
+                          "edited_by_subject",
+                          "failure_code",
+                          "field_key",
+                          "id",
+                          "locale",
+                          "status",
+                          "updated_at",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "image_candidates": {
+                      "items": {
+                        "properties": {
+                          "asset_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "byte_size": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "foreground_url": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "retry_count": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "source_asset_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "store_id": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "visibility": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "byte_size",
+                          "content_type",
+                          "failure_code",
+                          "foreground_url",
+                          "id",
+                          "retry_count",
+                          "scene_key",
+                          "source_asset_id",
+                          "status",
+                          "store_id",
+                          "updated_at",
+                          "url",
+                          "visibility"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "image_status": {
+                      "type": "string"
+                    },
+                    "requested_image_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "text_status": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "attempts",
+                    "brief",
+                    "created_at",
+                    "effective_image_limit",
+                    "error_code",
+                    "error_message",
+                    "fields",
+                    "id",
+                    "image_candidates",
+                    "image_status",
+                    "requested_image_count",
+                    "status",
+                    "store_id",
+                    "text_status",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Authoring job created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ai_limit_exceeded or validation_error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "conflict on duplicate idempotency submission"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create an AI authoring job",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}": {
+      "get": {
+        "description": "Returns status, text_status, image_status, field proposals written so far and image candidates written so far. Branch failure codes are provider states, not HTTP errors; raw provider responses, provider identifiers, model identifiers, API URLs, keys and storage keys are never returned.",
+        "operationId": "getAuthoringJob",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Authoring job identifier",
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "attempts": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "brief": {
+                      "type": "string"
+                    },
+                    "completed_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "effective_image_limit": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "error_message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "items": {
+                        "properties": {
+                          "attribute_code": {
+                            "type": "string"
+                          },
+                          "category_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "edited_by_subject": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "field_key": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "attribute_code",
+                          "edited_by_subject",
+                          "failure_code",
+                          "field_key",
+                          "id",
+                          "locale",
+                          "status",
+                          "updated_at",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "image_candidates": {
+                      "items": {
+                        "properties": {
+                          "asset_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "byte_size": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "foreground_url": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "retry_count": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "source_asset_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "store_id": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "visibility": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "byte_size",
+                          "content_type",
+                          "failure_code",
+                          "foreground_url",
+                          "id",
+                          "retry_count",
+                          "scene_key",
+                          "source_asset_id",
+                          "status",
+                          "store_id",
+                          "updated_at",
+                          "url",
+                          "visibility"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "image_status": {
+                      "type": "string"
+                    },
+                    "requested_image_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "text_status": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "attempts",
+                    "brief",
+                    "created_at",
+                    "effective_image_limit",
+                    "error_code",
+                    "error_message",
+                    "fields",
+                    "id",
+                    "image_candidates",
+                    "image_status",
+                    "requested_image_count",
+                    "status",
+                    "store_id",
+                    "text_status",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "AI authoring job"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get an AI authoring job with its partial results",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/fields/{field_id}": {
+      "patch": {
+        "description": "Applies a per-field accept/reject decision. Accept stores the merchant-edited value; reject never inserts anything. Only proposed fields can be decided; a repeated decision returns 409. No product data is written by this path.",
+        "operationId": "decideAuthoringField",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Authoring job identifier",
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Field proposal identifier",
+            "in": "path",
+            "name": "field_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "decision": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "value"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "attribute_code": {
+                      "type": "string"
+                    },
+                    "category_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "edited_by_subject": {
+                      "type": "string"
+                    },
+                    "failure_code": {
+                      "type": "string"
+                    },
+                    "field_key": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "attribute_code",
+                    "edited_by_subject",
+                    "failure_code",
+                    "field_key",
+                    "id",
+                    "locale",
+                    "status",
+                    "updated_at",
+                    "value"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Authoring field decided"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error: decision must be accept or reject"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "field already decided or not available to this store"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Accept or reject an AI authoring field proposal",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/images/{candidate_id}/accept": {
+      "post": {
+        "description": "Accepts one proposed image candidate (visibility defaults to hidden) and returns the candidate with the created media asset reference; linking the asset to a product happens through the existing media-reference flow after the product exists. Exceeding the accepted count returns 409.",
+        "operationId": "acceptAuthoringImage",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Authoring job identifier",
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Image candidate identifier",
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "alt_text": {
+                    "type": "string"
+                  },
+                  "is_visible": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "alt_text",
+                  "is_visible"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "asset_id": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "byte_size": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "content_type": {
+                      "type": "string"
+                    },
+                    "failure_code": {
+                      "type": "string"
+                    },
+                    "foreground_url": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "scene_key": {
+                      "type": "string"
+                    },
+                    "source_asset_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "visibility": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "byte_size",
+                    "content_type",
+                    "failure_code",
+                    "foreground_url",
+                    "id",
+                    "retry_count",
+                    "scene_key",
+                    "source_asset_id",
+                    "status",
+                    "store_id",
+                    "updated_at",
+                    "url",
+                    "visibility"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Authoring image candidate accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "accepted image count exceeded or candidate already decided"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Accept an AI authoring image candidate",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/ai-authoring/jobs/{job_id}/retry": {
+      "post": {
+        "description": "Re-runs only the failed parts or candidate identifiers supplied in the body; accepted and rejected results are never regenerated. Returns 409 ai_job_conflict while pending or processing and 409 ai_job_not_retryable once attempts are exhausted.",
+        "operationId": "retryAuthoringJob",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Authoring job identifier",
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "candidate_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "parts": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "candidate_ids",
+                  "parts"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "attempts": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "brief": {
+                      "type": "string"
+                    },
+                    "completed_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "effective_image_limit": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "error_message": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "items": {
+                        "properties": {
+                          "attribute_code": {
+                            "type": "string"
+                          },
+                          "category_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "edited_by_subject": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "field_key": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "attribute_code",
+                          "edited_by_subject",
+                          "failure_code",
+                          "field_key",
+                          "id",
+                          "locale",
+                          "status",
+                          "updated_at",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "image_candidates": {
+                      "items": {
+                        "properties": {
+                          "asset_id": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "byte_size": {
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "content_type": {
+                            "type": "string"
+                          },
+                          "failure_code": {
+                            "type": "string"
+                          },
+                          "foreground_url": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "retry_count": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "scene_key": {
+                            "type": "string"
+                          },
+                          "source_asset_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "store_id": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "visibility": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "byte_size",
+                          "content_type",
+                          "failure_code",
+                          "foreground_url",
+                          "id",
+                          "retry_count",
+                          "scene_key",
+                          "source_asset_id",
+                          "status",
+                          "store_id",
+                          "updated_at",
+                          "url",
+                          "visibility"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "image_status": {
+                      "type": "string"
+                    },
+                    "requested_image_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "store_id": {
+                      "type": "string"
+                    },
+                    "text_status": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "attempts",
+                    "brief",
+                    "created_at",
+                    "effective_image_limit",
+                    "error_code",
+                    "error_message",
+                    "fields",
+                    "id",
+                    "image_candidates",
+                    "image_status",
+                    "requested_image_count",
+                    "status",
+                    "store_id",
+                    "text_status",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Authoring job retried"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "validation_error: parts or candidate_ids required"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ai_job_conflict or ai_job_not_retryable"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retry the failed parts of an AI authoring job",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/v1/seller/stores/{store_id}/ai-authoring/limits": {
+      "get": {
+        "description": "Returns the effective image limit and default per-request count. Provider identifiers and models are configured server-side in Core and are never exposed here.",
+        "operationId": "getAuthoringLimits",
+        "parameters": [
+          {
+            "description": "Override locale resolution",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Store identifier",
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "default_count": {
+                      "format": "int32",
+                      "type": "integer"
+                    },
+                    "effective_limit": {
+                      "format": "int32",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "default_count",
+                    "effective_limit"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "AI authoring limits"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get AI authoring image limits for a store",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/v1/seller/stores/{store_id}/categories": {
       "get": {
         "description": "Returns the store's own categories as a flat tree of nodes (assemble the hierarchy via parent_category_id). Categories are store-scoped records owned by the store; visibility into other stores' categories is not possible.",
