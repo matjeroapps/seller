@@ -160,7 +160,7 @@ export interface ProductSku {
 
 export interface CreateProductVariantPayload {
   code: string;
-  status: VariantStatus | string;
+  status: 'active';
   sku_code?: string;
   barcode?: string;
   attribute_values?: Array<{
@@ -178,7 +178,7 @@ export interface CreateProductVariantPayload {
 
 export interface UpdateProductVariantPayload {
   code: string;
-  status: VariantStatus | string;
+  status: 'active';
   attribute_values?: Array<{
     attribute_id: string;
     attribute_value_id: string;
@@ -251,6 +251,7 @@ export interface SellerProductDetail {
   store_categories: StoreCategoryRef[];
   variants: ProductVariant[];
   skus: ProductSku[];
+  attributes?: ProductAttributeOption[];
   media: Array<{
     id: string;
     product_id: string;
@@ -272,6 +273,14 @@ export interface SellerProductDetail {
   publish_readiness: PublishReadiness;
   primary_media_id?: string;
   primary_media_uri?: string;
+}
+
+export interface ProductAttributeOption {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  values: Array<{ id: string; code: string; name: string; status: string }>;
 }
 
 export interface SellerListing {

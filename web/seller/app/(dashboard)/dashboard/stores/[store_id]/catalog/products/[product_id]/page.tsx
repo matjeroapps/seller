@@ -72,7 +72,6 @@ type SkuEdit = {
 };
 
 const productStatusOptions = ['draft', 'active', 'archived'];
-const catalogItemStatusOptions = ['active', 'inactive', 'archived'];
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -173,7 +172,7 @@ export default function StoreProductDetailPage({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [variantConfirm, setVariantConfirm] = useState<{
     variant: ProductVariant;
-    action: 'archive' | 'remove';
+    action: 'remove';
   } | null>(null);
   const [showVariantOptionsModal, setShowVariantOptionsModal] = useState(false);
   const [form, setForm] = useState<TranslationForm>({
@@ -381,7 +380,7 @@ export default function StoreProductDetailPage({
     try {
       await sellerApi.createProductVariant(store_id, product_id, {
         code: newVariant.code.trim(),
-        status: newVariant.status
+        status: 'active'
       });
       setNewVariant({ code: '', status: 'active' });
       await refreshAfterMutation(t('products.noticeVariantAdded'));
@@ -422,7 +421,7 @@ export default function StoreProductDetailPage({
     try {
       const payload: UpdateProductVariantPayload = {
         code: edit.code.trim(),
-        status: edit.status
+        status: 'active'
       };
       // Unreferenced saved variants can atomically replace their attribute
       // combination through the existing update route; referenced variants
@@ -445,33 +444,25 @@ export default function StoreProductDetailPage({
     }
   };
 
-  const openVariantConfirmation = (variant: ProductVariant, action: 'archive' | 'remove') => {
+  const openVariantConfirmation = (variant: ProductVariant) => {
     if (!canManageProduct) return;
-    setVariantConfirm({ variant, action });
+    setVariantConfirm({ variant, action: 'remove' });
   };
 
   const confirmVariantLifecycle = async () => {
     if (!canManageProduct || !variantConfirm) return;
-    const { variant, action } = variantConfirm;
+    const { variant } = variantConfirm;
     setWorking(true);
     setError(null);
     setNotice(null);
     try {
-      if (action === 'archive') {
-        await sellerApi.archiveProductVariant(store_id, product_id, variant.id);
-        await refreshAfterMutation('Variant archived and its active SKU was deactivated.');
-      } else {
-        await sellerApi.deleteProductVariant(store_id, product_id, variant.id);
-        await refreshAfterMutation('Variant removed.');
-      }
+      await sellerApi.deleteProductVariant(store_id, product_id, variant.id);
+      await refreshAfterMutation(t('products.noticeVariantRemoved'));
       setVariantConfirm(null);
     } catch (err: any) {
       setVariantConfirm(null);
       setError(
-        err.message ||
-          (action === 'remove'
-            ? 'Unable to remove variant. This variant is still referenced (SKUs or inventory history); archive it instead.'
-            : 'Unable to archive variant.')
+        err.message || t('products.errorRemoveVariant')
       );
     } finally {
       setWorking(false);
@@ -804,7 +795,7 @@ export default function StoreProductDetailPage({
           </div>
         </div>
 
-        <form onSubmit={handleCreateVariant} className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-[1fr_160px_auto]">
+        <form onSubmit={handleCreateVariant} className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-[1fr_auto]">
           <input
             value={newVariant.code}
             onChange={(event) => setNewVariant((prev) => ({ ...prev, code: event.target.value }))}
@@ -812,18 +803,6 @@ export default function StoreProductDetailPage({
             placeholder={t('products.variantPlaceholder')}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"
           />
-          <select
-            value={newVariant.status}
-            onChange={(event) => setNewVariant((prev) => ({ ...prev, status: event.target.value }))}
-            disabled={!canManageProduct}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100"
-          >
-            {catalogItemStatusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
           <button
             type="submit"
             disabled={!canManageProduct || working || !newVariant.code.trim()}
@@ -847,7 +826,7 @@ export default function StoreProductDetailPage({
 
               return (
                 <div key={variant.id} className="rounded-xl border border-slate-200 p-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto_auto_auto]">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
                     <input
                       value={edit.code}
                       onChange={(event) =>
@@ -859,23 +838,6 @@ export default function StoreProductDetailPage({
                       disabled={!canManageProduct}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
                     />
-                    <select
-                      value={edit.status}
-                      onChange={(event) =>
-                        setVariantEdits((prev) => ({
-                          ...prev,
-                          [variant.id]: { ...edit, status: event.target.value }
-                        }))
-                      }
-                      disabled={!canManageProduct}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
-                    >
-                      {catalogItemStatusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
                     <button
                       type="button"
                       onClick={() => handleSaveVariant(variant, variantHasSkus)}
@@ -886,30 +848,18 @@ export default function StoreProductDetailPage({
                     </button>
                     <button
                       type="button"
-                      onClick={() => openVariantConfirmation(variant, 'archive')}
-                      disabled={!canManageProduct || working || variant.status === 'archived'}
-                      aria-label={`Deactivate variant ${variant.code}`}
-                      className="rounded-lg border border-amber-200 px-4 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-                    >
-                      Archive
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openVariantConfirmation(variant, 'remove')}
-                      disabled={!canManageProduct || working || variantHasSkus}
+                      onClick={() => openVariantConfirmation(variant)}
+                      disabled={!canManageProduct || working}
                       aria-label={`Delete variant ${variant.code}`}
-                      title={variantHasSkus ? 'Variant is referenced by SKUs — archive it instead of removing it.' : undefined}
                       className="rounded-lg border border-red-200 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Remove
+                      {t('products.removeVariant')}
                     </button>
                   </div>
 
                   {variantHasSkus && canManageProduct && (
                     <p className="mt-2 text-xs text-amber-700" role="note" data-testid="variant-reference-guidance">
-                      This variant is referenced by {variantSkus.length} SKU{variantSkus.length > 1 ? 's' : ''}; permanent
-                      removal is blocked. Archive it instead to keep historical SKU records. Its attribute combination is
-                      locked while referenced — you can still edit the variant code and SKU details below.
+                      {t('products.variantReferencedHistory').replace('{count}', String(variantSkus.length))}
                     </p>
                   )}
 
@@ -1074,25 +1024,7 @@ export default function StoreProductDetailPage({
                                 ) : null}
                                 {!sku.weight_grams && !sku.length_mm && <span className="text-slate-400">-</span>}
                               </td>
-                              <td className="px-3 py-2">
-                                <select
-                                  value={skuEdit.status}
-                                  onChange={(event) =>
-                                    setSkuEdits((prev) => ({
-                                      ...prev,
-                                      [sku.id]: { ...skuEdit, status: event.target.value }
-                                    }))
-                                  }
-                                  disabled={!canManageProduct}
-                                  className="w-full rounded border border-slate-200 px-2 py-1 disabled:bg-slate-50"
-                                >
-                                  {catalogItemStatusOptions.map((status) => (
-                                    <option key={status} value={status}>
-                                      {status}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
+                              <td className="px-3 py-2 text-sm text-slate-600">{sku.status}</td>
                               <td className="px-3 py-2 text-right">
                                 <button
                                   type="button"
@@ -1142,23 +1074,6 @@ export default function StoreProductDetailPage({
                       placeholder={t('products.barcodePlaceholder')}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs disabled:bg-slate-50"
                     />
-                    <select
-                      value={skuDraft.status}
-                      onChange={(event) =>
-                        setNewSkuByVariant((prev) => ({
-                          ...prev,
-                          [variant.id]: { ...skuDraft, status: event.target.value }
-                        }))
-                      }
-                      disabled={!canManageProduct}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs disabled:bg-slate-50"
-                    >
-                      {catalogItemStatusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
                     <button
                       type="button"
                       onClick={() => handleCreateSku(variant.id)}
@@ -1257,16 +1172,14 @@ export default function StoreProductDetailPage({
       <ConfirmModal
         isOpen={variantConfirm !== null}
         title={
-          variantConfirm?.action === 'remove' ? 'Remove Variant' : 'Archive Variant'
+          t('products.removeVariant')
         }
         description={
-          variantConfirm?.action === 'remove'
-            ? `Permanently remove variant ${variantConfirm.variant.code}? This cannot be undone and fails if the variant is still referenced by SKUs or inventory history. Archive it if you need to keep records.`
-            : `Archive variant ${variantConfirm?.variant.code}? Its active SKUs will be deactivated and historical records are kept. Reload shows the variant with archived status.`
+          t('products.confirmVariantRemoval').replace('{code}', variantConfirm?.variant.code || '')
         }
-        confirmLabel={variantConfirm?.action === 'remove' ? 'Remove Variant' : 'Archive Variant'}
-        cancelLabel="Cancel"
-        variant={variantConfirm?.action === 'remove' ? 'danger' : 'warning'}
+        confirmLabel={t('products.removeVariant')}
+        cancelLabel={t('common.cancel')}
+        variant="danger"
         loading={working}
         onConfirm={confirmVariantLifecycle}
         onCancel={() => setVariantConfirm(null)}
@@ -1278,6 +1191,7 @@ export default function StoreProductDetailPage({
         onSubmit={handleCreateVariantWithOptions}
         loading={working}
         batch={variantBatchConfig}
+        productAttributes={detail?.attributes || []}
       />
     </div>
   );

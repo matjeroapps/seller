@@ -214,7 +214,6 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
 			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)
 			r.Delete("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleDeleteVariant)
-			r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive", deps.handleArchiveVariant)
 
 			r.Post("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus", deps.handleCreateSKU)
 			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus/{sku_id}", deps.handleUpdateSKU)

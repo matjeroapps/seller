@@ -13345,6 +13345,59 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "attributes": {
+                      "items": {
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "values": {
+                            "items": {
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "id",
+                          "name",
+                          "status",
+                          "values"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "category_ids": {
                       "items": {
                         "type": "string"
@@ -13807,6 +13860,7 @@
                     }
                   },
                   "required": [
+                    "attributes",
                     "category_ids",
                     "inventory_summary",
                     "listing",
@@ -14058,6 +14112,59 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "attributes": {
+                      "items": {
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "values": {
+                            "items": {
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "id",
+                          "name",
+                          "status",
+                          "values"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "category_ids": {
                       "items": {
                         "type": "string"
@@ -14520,6 +14627,7 @@
                     }
                   },
                   "required": [
+                    "attributes",
                     "category_ids",
                     "inventory_summary",
                     "listing",
@@ -14763,6 +14871,59 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "attributes": {
+                      "items": {
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "values": {
+                            "items": {
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "id",
+                          "name",
+                          "status",
+                          "values"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "category_ids": {
                       "items": {
                         "type": "string"
@@ -15225,6 +15386,7 @@
                     }
                   },
                   "required": [
+                    "attributes",
                     "category_ids",
                     "inventory_summary",
                     "listing",
@@ -17707,36 +17869,6 @@
             },
             "description": "Not found"
           },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "resource_in_use: the variant is referenced and cannot be deleted"
-          },
           "500": {
             "content": {
               "application/json": {
@@ -18067,280 +18199,6 @@
           }
         ],
         "summary": "Update a product variant",
-        "tags": [
-          "Variants"
-        ]
-      }
-    },
-    "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive": {
-      "post": {
-        "description": "Follows the existing product archive convention: marks the variant archived and non-sellable, deactivates its active SKUs, and preserves historical SKUs, junction rows and inventory snapshots. Repeated archive is idempotent as a lifecycle outcome.",
-        "operationId": "archiveProductVariant",
-        "parameters": [
-          {
-            "description": "Override locale resolution",
-            "in": "query",
-            "name": "locale",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Store identifier",
-            "in": "path",
-            "name": "store_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Product identifier",
-            "in": "path",
-            "name": "product_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Variant identifier",
-            "in": "path",
-            "name": "variant_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "type": "string"
-                    },
-                    "product_id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "format": "date-time",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "created_at",
-                    "id",
-                    "product_id",
-                    "status",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Variant archived"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Validation error"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Not found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
-                      "type": "object"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Internal error"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Archive a product variant",
         "tags": [
           "Variants"
         ]

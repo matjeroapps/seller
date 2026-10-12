@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useId, useMemo, useRef, FormEvent } from 'react';
 import { X, Plus, Trash2, Layers, Loader2, RotateCcw } from 'lucide-react';
-import type { CreateProductVariantPayload, ProductVariant, VariantBatchResult } from '@/lib/api/types';
+import type { CreateProductVariantPayload, ProductAttributeOption, ProductVariant, VariantBatchResult } from '@/lib/api/types';
 import type {
   VariantPreviewAttribute,
   VariantPreviewDimensionInput
 } from '@/lib/variants/preview';
 import { buildVariantPreview, deriveVariantAttributes } from '@/lib/variants/preview';
+import { useTranslation } from '@/lib/i18n/locale-context';
 import {
   createVariantBatch,
   retryFailedVariantBatch,
@@ -20,6 +21,7 @@ export interface VariantOptionsModalProps {
   onSubmit: (payload: CreateProductVariantPayload) => Promise<void>;
   loading?: boolean;
   batch?: VariantBatchConfig | null;
+  productAttributes?: ProductAttributeOption[];
 }
 
 export interface VariantBatchConfig {
@@ -49,11 +51,12 @@ export function VariantOptionsModal({
   onSubmit,
   loading = false,
   batch = null,
+  productAttributes = [],
 }: VariantOptionsModalProps) {
   if (batch) {
     return <VariantBatchModal {...batch} isOpen={isOpen} onClose={onClose} />;
   }
-  return <VariantOptionsFormModal isOpen={isOpen} onClose={onClose} onSubmit={onSubmit} loading={loading} />;
+  return <VariantOptionsFormModal isOpen={isOpen} onClose={onClose} onSubmit={onSubmit} loading={loading} productAttributes={productAttributes} />;
 }
 
 function VariantBatchModal({
@@ -469,12 +472,13 @@ function VariantOptionsFormModal({
   onClose,
   onSubmit,
   loading = false,
+  productAttributes = [],
 }: VariantOptionsModalProps) {
+  const { t, isRtl } = useTranslation();
   const titleId = useId();
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   const [code, setCode] = useState('');
-  const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [skuCode, setSkuCode] = useState('');
   const [barcode, setBarcode] = useState('');
   const [priceMinorUnits, setPriceMinorUnits] = useState('');
@@ -488,7 +492,6 @@ function VariantOptionsFormModal({
   useEffect(() => {
     if (isOpen) {
       setCode('');
-      setStatus('active');
       setSkuCode('');
       setBarcode('');
       setPriceMinorUnits('');
@@ -539,13 +542,13 @@ function VariantOptionsFormModal({
 
     const trimmedCode = code.trim();
     if (!trimmedCode) {
-      setValidationError('Variant code is required.');
+      setValidationError(t('variantSpecs.requiredVariantCode'));
       return;
     }
 
     const trimmedSkuCode = skuCode.trim();
     if (!trimmedSkuCode) {
-      setValidationError('SKU code is required for physical specifications.');
+      setValidationError(t('variantSpecs.requiredSkuCode'));
       return;
     }
 
@@ -559,7 +562,7 @@ function VariantOptionsFormModal({
 
     const payload: CreateProductVariantPayload = {
       code: trimmedCode,
-      status,
+      status: 'active',
       sku_code: trimmedSkuCode,
       barcode: barcode.trim() ? barcode.trim() : undefined,
       attribute_values: validAttributes.length > 0 ? validAttributes : undefined,
@@ -568,7 +571,7 @@ function VariantOptionsFormModal({
     if (weightGrams.trim()) {
       const parsedWeight = parseInt(weightGrams.trim(), 10);
       if (isNaN(parsedWeight) || parsedWeight < 0) {
-        setValidationError('Weight must be a non-negative integer in grams.');
+        setValidationError(t('variantSpecs.invalidWeight'));
         return;
       }
       payload.weight_grams = parsedWeight;
@@ -585,7 +588,7 @@ function VariantOptionsFormModal({
     if (priceMinorUnits.trim()) {
       const parsedPrice = parseInt(priceMinorUnits.trim(), 10);
       if (isNaN(parsedPrice) || parsedPrice < 0) {
-        setValidationError('Price must be a non-negative integer in minor units.');
+        setValidationError(t('variantSpecs.invalidPrice'));
         return;
       }
       payload.price_minor_units = parsedPrice;
@@ -594,7 +597,7 @@ function VariantOptionsFormModal({
     try {
       await onSubmit(payload);
     } catch (err: any) {
-      setValidationError(err.message || 'Failed to create variant with specifications.');
+      setValidationError(err.message || t('variantSpecs.createError'));
     }
   };
 
@@ -604,6 +607,7 @@ function VariantOptionsFormModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Backdrop */}
       <div
@@ -623,10 +627,10 @@ function VariantOptionsFormModal({
             </div>
             <div>
               <h2 id={titleId} className="text-lg font-bold text-slate-900">
-                New Variant & Physical SKU Specs
+                {t('variantSpecs.title')}
               </h2>
               <p className="text-xs text-slate-500">
-                Configure option dimensions, SKU barcode, weight, and dimensional packaging.
+                {t('variantSpecs.subtitle')}
               </p>
             </div>
           </div>
@@ -634,7 +638,7 @@ function VariantOptionsFormModal({
             type="button"
             onClick={onClose}
             disabled={loading}
-            aria-label="Close dialog"
+            aria-label={t('variantSpecs.close')}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
           >
             <X className="h-5 w-5" />
@@ -651,35 +655,23 @@ function VariantOptionsFormModal({
           {/* Section 1: Variant Basic Info */}
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              1. Variant Identity
+              {t('variantSpecs.identity')}
             </h3>
             <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-700">
-                  Variant Code <span className="text-rose-500">*</span>
+                  {t('variantSpecs.variantCode')} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   ref={firstInputRef}
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="e.g. red-xl"
+                  placeholder={t('variantSpecs.variantCodeExample')}
                   required
                   disabled={loading}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
-                  disabled={loading}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
-                >
-                  <option value="active">active</option>
-                  <option value="inactive">inactive</option>
-                </select>
               </div>
             </div>
           </div>
@@ -689,10 +681,10 @@ function VariantOptionsFormModal({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  2. Variant Attributes
+                  {t('variantSpecs.attributes')}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Link option attributes (e.g. color, size) to this variant.
+                  {t('variantSpecs.attributesHelp')}
                 </p>
               </div>
               <button
@@ -701,39 +693,50 @@ function VariantOptionsFormModal({
                 disabled={loading}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                <Plus className="h-3.5 w-3.5" /> Add Attribute
+                <Plus className="h-3.5 w-3.5" /> {t('variantSpecs.addAttribute')}
               </button>
             </div>
 
             {attributes.length === 0 ? (
               <p className="mt-3 text-xs italic text-slate-400">
-                No attribute values added yet. Click &quot;Add Attribute&quot; to specify options like Color or Size.
+                {t('variantSpecs.noAttributes')}
               </p>
             ) : (
               <div className="mt-3 space-y-2">
                 {attributes.map((attr, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Attribute ID (e.g. color)"
+                    <select
                       value={attr.attributeId}
-                      onChange={(e) => handleUpdateAttribute(idx, 'attributeId', e.target.value)}
+                      onChange={(e) => {
+                        setAttributes((prev) => prev.map((row, rowIndex) =>
+                          rowIndex === idx ? { attributeId: e.target.value, attributeValueId: '' } : row
+                        ));
+                      }}
                       disabled={loading}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Attribute Value ID (e.g. red)"
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                    >
+                      <option value="">{t('variantSpecs.selectAttribute')}</option>
+                      {productAttributes.filter((item) => item.status === 'active' && !attributes.some((row, rowIndex) => rowIndex !== idx && row.attributeId === item.id)).map((item) => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    </select>
+                    <select
                       value={attr.attributeValueId}
                       onChange={(e) => handleUpdateAttribute(idx, 'attributeValueId', e.target.value)}
-                      disabled={loading}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
+                      disabled={loading || !attr.attributeId}
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                    >
+                      <option value="">{t('variantSpecs.selectValue')}</option>
+                      {productAttributes.find((item) => item.id === attr.attributeId)?.values
+                        .filter((item) => item.status === 'active').map((item) => (
+                          <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => handleRemoveAttribute(idx)}
                       disabled={loading}
-                      aria-label="Remove attribute"
+                      aria-label={t('variantSpecs.removeAttribute')}
                       className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -747,54 +750,54 @@ function VariantOptionsFormModal({
           {/* Section 3: SKU & Physical Specifications */}
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              3. SKU & Physical Dimensions
+              {t('variantSpecs.skuDimensions')}
             </h3>
             <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-700">
-                  SKU Code <span className="text-rose-500">*</span>
+                  {t('variantSpecs.skuCode')} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={skuCode}
                   onChange={(e) => setSkuCode(e.target.value)}
-                  placeholder="e.g. SKU-RED-XL"
+                  placeholder={t('variantSpecs.skuCodeExample')}
                   required
                   disabled={loading}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Barcode (GTIN/EAN)</label>
+                <label className="block text-xs font-medium text-slate-700">{t('variantSpecs.barcode')}</label>
                 <input
                   type="text"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  placeholder="e.g. 6281000999911"
+                  placeholder={t('variantSpecs.barcodeExample')}
                   disabled={loading}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Weight (Grams)</label>
+                <label className="block text-xs font-medium text-slate-700">{t('variantSpecs.weight')}</label>
                 <input
                   type="number"
                   min="0"
                   value={weightGrams}
                   onChange={(e) => setWeightGrams(e.target.value)}
-                  placeholder="e.g. 450"
+                  placeholder={t('variantSpecs.weightExample')}
                   disabled={loading}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Price (Minor Units)</label>
+                <label className="block text-xs font-medium text-slate-700">{t('variantSpecs.price')}</label>
                 <input
                   type="number"
                   min="0"
                   value={priceMinorUnits}
                   onChange={(e) => setPriceMinorUnits(e.target.value)}
-                  placeholder="e.g. 15000 for 150.00"
+                  placeholder={t('variantSpecs.priceExample')}
                   disabled={loading}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
                 />
@@ -804,13 +807,13 @@ function VariantOptionsFormModal({
             {/* Packaging Dimensions */}
             <div className="mt-3">
               <label className="block text-xs font-medium text-slate-700">
-                Packaging Dimensions (Length × Width × Height in mm)
+                {t('variantSpecs.packagingDimensions')}
               </label>
               <div className="mt-1 grid grid-cols-3 gap-2">
                 <input
                   type="number"
                   min="0"
-                  placeholder="Length (mm)"
+                  placeholder={t('variantSpecs.length')}
                   value={lengthMm}
                   onChange={(e) => setLengthMm(e.target.value)}
                   disabled={loading}
@@ -819,7 +822,7 @@ function VariantOptionsFormModal({
                 <input
                   type="number"
                   min="0"
-                  placeholder="Width (mm)"
+                  placeholder={t('variantSpecs.width')}
                   value={widthMm}
                   onChange={(e) => setWidthMm(e.target.value)}
                   disabled={loading}
@@ -828,7 +831,7 @@ function VariantOptionsFormModal({
                 <input
                   type="number"
                   min="0"
-                  placeholder="Height (mm)"
+                  placeholder={t('variantSpecs.height')}
                   value={heightMm}
                   onChange={(e) => setHeightMm(e.target.value)}
                   disabled={loading}
@@ -846,7 +849,7 @@ function VariantOptionsFormModal({
               disabled={loading}
               className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -854,7 +857,7 @@ function VariantOptionsFormModal({
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create Variant with Specs
+              {t('variantSpecs.create')}
             </button>
           </div>
         </form>
