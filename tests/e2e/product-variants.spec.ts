@@ -288,7 +288,9 @@ async function installSellerApiMock(page: Page, state: MockState) {
 async function openProductPage(page: Page, state: MockState) {
   await installSellerApiMock(page, state);
   await page.goto(`${SELLER_APP_URL}/dashboard/stores/${STORE_ID}/catalog/products/${PRODUCT_ID}`);
-  await expect(page.getByRole('heading', { name: PRODUCT_NAME })).toBeVisible();
+  // The detail route now intentionally reuses the add-product editor, where
+  // the product name is an editable field rather than a page heading.
+  await expect(page.getByDisplayValue(PRODUCT_NAME)).toBeVisible();
 }
 
 function previewDialog(page: Page) {
