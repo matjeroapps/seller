@@ -1058,12 +1058,12 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.documentElement.lang).toBe('ar');
 
-    // Product data truth is preserved untouched (IDs, names, prices, status enums, URLs).
+    // Product data truth is preserved while UI status labels are localized.
     const page = screen.getByText('كتالوج منتجات المتجر').closest('div.space-y-6')!;
     expect(page.textContent).toContain('Premium Cotton T-Shirt');
     expect(page.textContent).toContain('premium-cotton-t-shirt');
     expect(page.textContent).toContain('prod_idx');
-    expect(page.textContent).toContain('active');
+    expect(page.textContent).toContain('نشط');
     expect(page.textContent).toContain('SAR');
   });
 

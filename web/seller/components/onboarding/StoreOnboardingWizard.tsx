@@ -9,28 +9,39 @@ import { sellerApi, ApiError } from '@/lib/api/client';
 import { fetchMerchantConsole, hasActiveCapability, isOperableWorkspace, type MerchantWorkspace } from '@/lib/api/merchant-console';
 import { useTranslation } from '@/lib/i18n/locale-context';
 
-const THEMES: ThemeOption[] = [
-  {
-    key: 'default',
-    name: 'Default',
-    badge: 'Recommended',
-    description: 'Clean, high-conversion layout optimized for high-volume retail, catalog browsing, and fast checkout.',
-    features: ['High-contrast product grid', 'Optimized mobile bottom bar', 'Instant Buy Now buttons'],
-    previewGradient: 'bg-gradient-to-br from-indigo-500/20 via-blue-500/20 to-slate-100'
-  },
-  {
-    key: 'boutique',
-    name: 'Boutique',
-    badge: 'Editorial',
-    description: 'Elegantly curated luxury showcase with generous photography, storytelling typography, and brand-first accents.',
-    features: ['Editorial story layout', 'Accent typography & badges', 'Refined brand showcase'],
-    previewGradient: 'bg-gradient-to-br from-amber-500/20 via-rose-500/20 to-stone-100'
-  }
-];
+function getThemes(t: (key: string, fallback?: string) => string): ThemeOption[] {
+  return [
+    {
+      key: 'default',
+      name: t('onboarding.themes.default.name', 'Default'),
+      badge: t('onboarding.themes.default.badge', 'Recommended'),
+      description: t('onboarding.themes.default.description', 'Clean, high-conversion layout optimized for high-volume retail, catalog browsing, and fast checkout.'),
+      features: [
+        t('onboarding.themes.default.feature1', 'High-contrast product grid'),
+        t('onboarding.themes.default.feature2', 'Optimized mobile bottom bar'),
+        t('onboarding.themes.default.feature3', 'Instant Buy Now buttons')
+      ],
+      previewGradient: 'bg-gradient-to-br from-indigo-500/20 via-blue-500/20 to-slate-100'
+    },
+    {
+      key: 'boutique',
+      name: t('onboarding.themes.boutique.name', 'Boutique'),
+      badge: t('onboarding.themes.boutique.badge', 'Editorial'),
+      description: t('onboarding.themes.boutique.description', 'Elegantly curated luxury showcase with generous photography, storytelling typography, and brand-first accents.'),
+      features: [
+        t('onboarding.themes.boutique.feature1', 'Editorial story layout'),
+        t('onboarding.themes.boutique.feature2', 'Accent typography & badges'),
+        t('onboarding.themes.boutique.feature3', 'Refined brand showcase')
+      ],
+      previewGradient: 'bg-gradient-to-br from-amber-500/20 via-rose-500/20 to-stone-100'
+    }
+  ];
+}
 
 export function StoreOnboardingWizard() {
   const router = useRouter();
   const { t } = useTranslation();
+  const themes = getThemes(t);
 
   // Wizard Step State (1: Store Basics, 2: Theme Selection, 3: Review & Submit)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -86,16 +97,16 @@ export function StoreOnboardingWizard() {
   // Validation
   const validateStep1 = () => {
     if (!storeName.trim()) {
-      setError('Please enter a store name.');
+      setError(t('onboarding.validation.storeNameRequired'));
       return false;
     }
     if (!storeSlug.trim()) {
-      setError('Please enter a unique store URL slug.');
+      setError(t('onboarding.validation.storeSlugRequired'));
       return false;
     }
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (!slugRegex.test(storeSlug)) {
-      setError('Store slug must contain only lowercase letters, numbers, and single hyphens.');
+      setError(t('onboarding.validation.storeSlugInvalid'));
       return false;
     }
     setError(null);
@@ -119,7 +130,7 @@ export function StoreOnboardingWizard() {
 
   const handleSubmit = async () => {
     if (merchantWorkspaceLoading) {
-      setError('Please wait while we verify your merchant workspace.');
+      setError(t('onboarding.validation.workspaceLoading'));
       return;
     }
 
@@ -167,13 +178,12 @@ export function StoreOnboardingWizard() {
       // message instead of the generic create-failure copy.
       if (err instanceof ApiError && err.code === 'store_entitlement_exceeded') {
         setError(
-          t(
-            'onboarding.additionalStoreRejected',
-            'Only one store can be created in this phase. Open your existing store from the store switcher to continue managing it.'
-          )
+          t('onboarding.additionalStoreRejected')
         );
       } else {
-        const message = err.message || 'Failed to create store. Please check the slug for uniqueness and try again.';
+        const message = err instanceof ApiError && err.status >= 500
+          ? t('onboarding.createStoreFailed')
+          : err.message || t('onboarding.createStoreFailed');
         setError(message);
       }
       setIsSubmitting(false);
@@ -185,8 +195,8 @@ export function StoreOnboardingWizard() {
       <Stack gap="lg" className="py-8">
         {/* Header */}
         <PageHeader
-          title="Welcome to MatjerHub"
-          subtitle="Set up your merchant store in just a few quick steps to begin importing products and launching your storefront."
+          title={t('onboarding.welcomeTitle')}
+          subtitle={t('onboarding.welcomeSubtitle')}
         />
 
         {/* Progress Stepper */}
@@ -201,8 +211,8 @@ export function StoreOnboardingWizard() {
                 1
               </div>
               <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-900">Store Profile</p>
-                <p className="text-[11px] text-slate-500">Name & Subdomain</p>
+                <p className="text-xs font-semibold text-slate-900">{t('onboarding.steps.storeProfile')}</p>
+                <p className="text-[11px] text-slate-500">{t('onboarding.steps.nameAndSubdomain')}</p>
               </div>
             </div>
 
@@ -217,8 +227,8 @@ export function StoreOnboardingWizard() {
                 2
               </div>
               <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-900">Storefront Theme</p>
-                <p className="text-[11px] text-slate-500">Look & Feel</p>
+                <p className="text-xs font-semibold text-slate-900">{t('onboarding.steps.storefrontTheme')}</p>
+                <p className="text-[11px] text-slate-500">{t('onboarding.steps.lookAndFeel')}</p>
               </div>
             </div>
 
@@ -233,8 +243,8 @@ export function StoreOnboardingWizard() {
                 3
               </div>
               <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-900">Review & Launch</p>
-                <p className="text-[11px] text-slate-500">Confirm setup</p>
+                <p className="text-xs font-semibold text-slate-900">{t('onboarding.steps.reviewLaunch')}</p>
+                <p className="text-[11px] text-slate-500">{t('onboarding.steps.confirmSetup')}</p>
               </div>
             </div>
           </div>
@@ -254,38 +264,38 @@ export function StoreOnboardingWizard() {
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Store className="w-5 h-5 text-indigo-600" />
-                Store Identity & Market
+                {t('onboarding.identity.title')}
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Configure the primary identity, unique web address, and operating currency for your digital store.
+                {t('onboarding.identity.description')}
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Store Name <span className="text-red-500">*</span>
+                  {t('onboarding.identity.storeName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={storeName}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Al-Nour Boutique"
+                  placeholder={t('onboarding.identity.storeNamePlaceholder')}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">This name will be displayed to shoppers on your storefront.</p>
+                <p className="text-[11px] text-slate-500 mt-1">{t('onboarding.identity.storeNameHint')}</p>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Store Subdomain Slug <span className="text-red-500">*</span>
+                  {t('onboarding.identity.subdomainSlug')} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center">
                   <input
                     type="text"
                     value={storeSlug}
                     onChange={(e) => setStoreSlug(slugify(e.target.value))}
-                    placeholder="al-nour-boutique"
+                    placeholder={t('onboarding.identity.subdomainPlaceholder')}
                     className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-l-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   />
                   <span className="px-3.5 py-2.5 bg-slate-100 border border-l-0 border-slate-200 text-xs font-medium text-slate-500 rounded-r-lg">
@@ -293,7 +303,7 @@ export function StoreOnboardingWizard() {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Unique subdomain URL for your store catalog. Lowercase letters, numbers, and hyphens only.
+                  {t('onboarding.identity.subdomainHint')}
                 </p>
               </div>
 
@@ -301,32 +311,32 @@ export function StoreOnboardingWizard() {
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-slate-500" />
-                    Target Operating Market
+                    {t('onboarding.identity.market')}
                   </label>
                   <select
                     value={marketCode}
                     onChange={(e) => setMarketCode(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    <option value="SA">Saudi Arabia (SA) — المملكة العربية السعودية</option>
-                    <option value="EG">Egypt (EG) — مصر</option>
-                    <option value="AE">United Arab Emirates (AE) — الإمارات</option>
+                    <option value="SA">{t('onboarding.identity.marketSaudi')}</option>
+                    <option value="EG">{t('onboarding.identity.marketEgypt')}</option>
+                    <option value="AE">{t('onboarding.identity.marketUAE')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1.5">
                     <Coins className="w-3.5 h-3.5 text-slate-500" />
-                    Primary Currency
+                    {t('onboarding.identity.currency')}
                   </label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    <option value="SAR">SAR — Saudi Riyal (ر.س)</option>
-                    <option value="EGP">EGP — Egyptian Pound (ج.م)</option>
-                    <option value="AED">AED — UAE Dirham (د.إ)</option>
+                    <option value="SAR">{t('onboarding.identity.currencySAR')}</option>
+                    <option value="EGP">{t('onboarding.identity.currencyEGP')}</option>
+                    <option value="AED">{t('onboarding.identity.currencyAED')}</option>
                   </select>
                 </div>
               </div>
@@ -334,7 +344,7 @@ export function StoreOnboardingWizard() {
 
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <Button variant="primary" onClick={handleNextStep} className="flex items-center gap-2">
-                Choose Theme
+                {t('onboarding.buttons.chooseTheme')}
                 <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Button>
             </div>
@@ -347,15 +357,13 @@ export function StoreOnboardingWizard() {
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Palette className="w-5 h-5 text-indigo-600" />
-                Select Initial Storefront Theme
+                {t('onboarding.theme.title')}
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Choose the visual layout for your digital storefront. You can preview, customize, and switch themes anytime.
-              </p>
+              <p className="text-xs text-slate-500 mt-1">{t('onboarding.theme.description')}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {THEMES.map((theme) => (
+              {themes.map((theme) => (
                 <ThemeSelectionCard
                   key={theme.key}
                   theme={theme}
@@ -368,10 +376,10 @@ export function StoreOnboardingWizard() {
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
               <Button variant="secondary" onClick={handlePrevStep} className="flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
-                Back
+                {t('onboarding.buttons.back')}
               </Button>
               <Button variant="primary" onClick={handleNextStep} className="flex items-center gap-2">
-                Review Setup
+                {t('onboarding.buttons.reviewSetup')}
                 <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Button>
             </div>
@@ -384,49 +392,47 @@ export function StoreOnboardingWizard() {
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Rocket className="w-5 h-5 text-indigo-600" />
-                Review & Confirm Store Setup
+                {t('onboarding.review.title')}
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Verify your store details. Once initialized, you can import products from suppliers and prepare for launch.
-              </p>
+              <p className="text-xs text-slate-500 mt-1">{t('onboarding.review.description')}</p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Store Name</span>
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('onboarding.identity.storeName')}</span>
                   <p className="text-sm font-bold text-slate-900 mt-0.5">{storeName}</p>
                 </div>
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Store Subdomain</span>
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('onboarding.review.subdomain')}</span>
                   <p className="text-sm font-bold text-indigo-600 mt-0.5">
                     {storeSlug}.matjerhub.local
                   </p>
                 </div>
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Target Market & Currency</span>
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('onboarding.review.marketCurrency')}</span>
                   <p className="text-sm font-bold text-slate-900 mt-0.5">
                     {marketCode} · {currency}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Selected Theme</span>
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('onboarding.review.selectedTheme')}</span>
                   <p className="text-sm font-bold text-slate-900 mt-0.5 capitalize">
-                    {THEMES.find((t) => t.key === selectedTheme)?.name || selectedTheme} Theme
+                    {themes.find((theme) => theme.key === selectedTheme)?.name || selectedTheme} {t('onboarding.review.themeSuffix')}
                   </p>
                 </div>
               </div>
 
               <div className="pt-3 border-t border-slate-200/60 flex items-center gap-2 text-xs text-slate-600">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Store will be initialized securely with authenticated tenant boundaries.</span>
+                <span>{t('onboarding.review.securityNotice')}</span>
               </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
               <Button variant="secondary" onClick={handlePrevStep} disabled={isSubmitting} className="flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
-                Back
+                {t('onboarding.buttons.back')}
               </Button>
               <Button
                 variant="primary"
@@ -435,11 +441,11 @@ export function StoreOnboardingWizard() {
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
               >
                 {isSubmitting ? (
-                  <>Initializing Store...</>
+                  <>{t('onboarding.buttons.initializingStore')}</>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Create Store & Launch Dashboard
+                    {t('onboarding.buttons.createStore')}
                   </>
                 )}
               </Button>

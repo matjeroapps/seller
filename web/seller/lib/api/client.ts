@@ -18,6 +18,7 @@ import type {
   Payment,
   Payout,
   Product,
+  ProductRemovalResponse,
   ProductMediaReference,
   ProductSku,
   ProductTranslation,
@@ -313,6 +314,20 @@ export const sellerApi = {
         publish_readiness: row.publish_readiness
       }))
     };
+  },
+
+  async removeStoreProduct(storeId: string, productId: string): Promise<ProductRemovalResponse> {
+    return request<ProductRemovalResponse>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  async bulkRemoveStoreProducts(storeId: string, productIds: string[]): Promise<ProductRemovalResponse> {
+    return request<ProductRemovalResponse>(
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/bulk-removal`,
+      { method: 'POST', body: JSON.stringify({ product_ids: productIds }) }
+    );
   },
 
   async listStoreCategories(

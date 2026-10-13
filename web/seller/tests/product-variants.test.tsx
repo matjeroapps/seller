@@ -86,6 +86,9 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
           isOpen={true}
           onClose={vi.fn()}
           onSubmit={onSubmit}
+          productAttributes={[
+            { id: 'color-attr', name: 'Color', code: 'color', status: 'active', values: [{ id: 'blue-val', name: 'Blue', code: 'blue', status: 'active' }] },
+          ]}
         />
       );
 
@@ -96,11 +99,9 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
 
       // Add attribute
       fireEvent.click(screen.getByRole('button', { name: /add attribute/i }));
-      const attrIdInput = screen.getByPlaceholderText(/Attribute ID/i);
-      const attrValInput = screen.getByPlaceholderText(/Attribute Value ID/i);
-
-      fireEvent.change(attrIdInput, { target: { value: 'color-attr' } });
-      fireEvent.change(attrValInput, { target: { value: 'blue-val' } });
+      const [attributeSelect, valueSelect] = screen.getAllByRole('combobox');
+      fireEvent.change(attributeSelect, { target: { value: 'color-attr' } });
+      fireEvent.change(valueSelect, { target: { value: 'blue-val' } });
 
       // Fill SKU & specs
       fireEvent.change(screen.getByPlaceholderText(/e\.g\. SKU-RED-XL/i), {
@@ -508,10 +509,9 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
       media: [],
     };
     const skulessDetail = { ...referencedBySkuDetail, skus: [] };
-    const archivedDetail = {
+    const removedDetail = {
       ...referencedBySkuDetail,
-      variants: [{ ...lifecycleVariant, status: 'archived' }],
-      skus: [{ ...referencedBySkuDetail.skus[0], status: 'inactive' }],
+      variants: [],
     };
 
     async function openLifecyclePage(detail: unknown = referencedBySkuDetail) {
@@ -567,26 +567,21 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
       });
     });
 
-    it('shows referenced-attribute guidance, keeps the attribute badge, and disables removal as fallback', async () => {
+    it('shows referenced-history guidance, keeps the attribute badge, and allows catalog removal', async () => {
       await openLifecyclePage();
 
       const guidance = screen.getByRole('note');
-      expect(guidance).toHaveTextContent(/referenced by 1 SKU; permanent removal is blocked/i);
-      expect(guidance).toHaveTextContent(/Archive it instead/i);
+      expect(guidance).toHaveTextContent(/linked to 1 SKU records; its history will be kept when removed/i);
       // The saved combination stays rendered as a badge for context.
       expect(screen.getByText(/Color: Red/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Delete variant var-red' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Deactivate variant var-red' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Delete variant var-red' })).toBeEnabled();
     });
 
-    it('renders an archived variant with its inactive historical SKU on reload', async () => {
-      await openLifecyclePage(archivedDetail);
+    it('does not surface removed variants as an archived catalog state', async () => {
+      await openLifecyclePage(removedDetail);
 
-      // Variant status stays archived and the historical SKU keeps its code but
-      // shows the inactive status: history is displayed, not discarded.
-      expect(screen.getByDisplayValue('archived')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('SKU-RED-1')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('inactive')).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('archived')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /archive variant/i })).not.toBeInTheDocument();
     });
 
     it('confirms before deleting and reports the refreshed state', async () => {
@@ -595,40 +590,31 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Delete variant var-red' }));
       await screen.findByRole('dialog');
-      expect(screen.getByRole('heading', { name: 'Remove Variant' })).toBeInTheDocument();
-      expect(screen.getByText(/Permanently remove variant var-red\?/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Delete Variant' })).toBeInTheDocument();
+      expect(screen.getByText(/Remove variant var-red from the catalog\?/)).toBeInTheDocument();
 
       // Queue the post-removal reload before confirming.
       mockApi.getStoreProductDetail.mockResolvedValue({ ...skulessDetail, variants: [] });
-      fireEvent.click(screen.getByRole('button', { name: 'Remove Variant' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Variant' }));
 
       await waitFor(() => {
         expect(mockApi.deleteProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByText('Variant removed.')).toBeInTheDocument();
+      expect(screen.getByText(/Variant removed from the catalog; historical records were retained/i)).toBeInTheDocument();
     });
 
-    it('offers the archive fallback for a referenced variant', async () => {
-      mockApi.archiveProductVariant.mockResolvedValue({});
+    it('removes a referenced variant from the catalog while keeping its history', async () => {
       await openLifecyclePage();
 
-      expect(screen.getByRole('button', { name: 'Delete variant var-red' })).toBeDisabled();
-      fireEvent.click(screen.getByRole('button', { name: 'Deactivate variant var-red' }));
-
+      expect(screen.getByRole('button', { name: 'Delete variant var-red' })).toBeEnabled();
+      expect(screen.getByRole('note')).toHaveTextContent(/history will be kept when removed/i);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete variant var-red' }));
       expect(await screen.findByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Archive Variant' })).toBeInTheDocument();
-      expect(screen.getByText(/Archive variant var-red\? Its active SKUs will be deactivated/)).toBeInTheDocument();
-
-      mockApi.getStoreProductDetail.mockResolvedValueOnce(archivedDetail);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Variant' }));
+      expect(screen.getByText(/Order and inventory records will remain in internal history/i)).toBeInTheDocument();
 
       await waitFor(() => {
-        expect(mockApi.archiveProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
-      });
-      expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('archived')).toBeInTheDocument();
+        expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
       });
     });
 
@@ -710,7 +696,7 @@ describe('Variant Options & SKU Physical Specs (T026-T028)', () => {
       // names the lock while code and SKU edits stay available.
       expect(screen.queryByTestId('variant-attribute-editor')).toBeNull();
       const guidance = screen.getByTestId('variant-reference-guidance');
-      expect(guidance).toHaveTextContent(/attribute combination is locked/i);
+      expect(guidance).toHaveTextContent(/history will be kept when removed/i);
       expect(screen.getByText(/Color: Red/i)).toBeInTheDocument();
 
       const variantCode = screen.getByDisplayValue('var-red');

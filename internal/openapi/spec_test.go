@@ -190,10 +190,8 @@ func TestStorefrontSpecOmitsPrivateVocabulary(t *testing.T) {
 	}
 }
 
-// The seller document must declare the variant lifecycle routes that the
-// seller API registers: DELETE of an unreferenced variant and the POST
-// .../archive lifecycle transition.
-func TestProductVariantLifecycleRoutesAreDeclared(t *testing.T) {
+// The seller document exposes removal; variants do not have an archive lifecycle.
+func TestProductVariantRemovalRouteIsDeclared(t *testing.T) {
 	spec, err := BuildSellerSpec()
 	if err != nil {
 		t.Fatalf("build seller spec: %v", err)
@@ -214,40 +212,21 @@ func TestProductVariantLifecycleRoutesAreDeclared(t *testing.T) {
 		t.Fatalf("DELETE variant route must require auth")
 	}
 	deleteResponses := item.Delete.Responses.Map()
-	for _, status := range []string{"204", "404", "409"} {
+	for _, status := range []string{"204", "404"} {
 		if deleteResponses[status] == nil || deleteResponses[status].Value == nil {
 			t.Fatalf("DELETE variant missing %s response (responses %v)", status, deleteResponses)
 		}
 	}
 
 	archivePath := "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/archive"
-	archive := spec.Paths.Value(archivePath)
-	if archive == nil || archive.Post == nil {
-		t.Fatalf("seller spec missing POST %s", archivePath)
-	}
-	if archive.Post.OperationID != "archiveProductVariant" {
-		t.Fatalf("archive variant operation id = %q, want archiveProductVariant", archive.Post.OperationID)
-	}
-	if !containsTag(archive.Post.Tags, "Variants") {
-		t.Fatalf("archive variant route missing Variants tag")
-	}
-	if archive.Post.Security == nil || len(*archive.Post.Security) == 0 {
-		t.Fatalf("archive variant route must require auth")
-	}
-	okResponse := archive.Post.Responses.Value("200")
-	if okResponse == nil || okResponse.Value == nil || okResponse.Value.Description == nil {
-		t.Fatalf("archive variant route should return 200 with an archived-variant description")
-	}
-	description := strings.ToLower(*okResponse.Value.Description)
-	if !strings.Contains(description, "archived") || !strings.Contains(description, "variant") {
-		t.Fatalf("archive variant route should return 200 with an archived-variant description")
+	if spec.Paths.Value(archivePath) != nil {
+		t.Fatalf("seller spec must not expose obsolete archive route %s", archivePath)
 	}
 
 	// The declared paths must line up with the routes the seller router
 	// registers, so the document cannot drift from the server surface.
 	registered := map[string]map[string]string{
 		variantPath: {"DELETE": "deleteProductVariant"},
-		archivePath: {"POST": "archiveProductVariant"},
 		"/v1/seller/stores/{store_id}/products/{product_id}/variants":                            {"POST": "createProductVariant"},
 		"/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}":               {"PUT": "updateProductVariant"},
 		"/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}/skus":          {"POST": "createProductSKU"},

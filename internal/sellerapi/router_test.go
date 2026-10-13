@@ -260,6 +260,9 @@ func (s *stubCore) TransitionProductStatus(ctx context.Context, subject, storeID
 func (s *stubCore) ArchiveProduct(ctx context.Context, subject, storeID, productID string) error {
 	return s.err
 }
+func (s *stubCore) RemoveStoreProducts(ctx context.Context, subject, storeID string, productIDs []string) (*coreclient.ProductRemovalResponse, error) {
+	return &coreclient.ProductRemovalResponse{}, s.err
+}
 func (s *stubCore) CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error) {
 	return &coreclient.Variant{}, s.err
 }

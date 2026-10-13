@@ -280,13 +280,13 @@ describe('SDS-1 — Seller Dashboard P0 Data Truth', () => {
       expect(document.documentElement.lang).toBe('ar');
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('e.g. Al-Nour Boutique')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('مثال: متجر النور')).toBeInTheDocument();
       });
 
-      fireEvent.change(screen.getByPlaceholderText('e.g. Al-Nour Boutique'), { target: { value: 'Dup Store' } });
-      fireEvent.click(screen.getByText('Choose Theme'));
-      fireEvent.click(screen.getByText('Review Setup'));
-      fireEvent.click(screen.getByText('Create Store & Launch Dashboard'));
+      fireEvent.change(screen.getByPlaceholderText('مثال: متجر النور'), { target: { value: 'Dup Store' } });
+      fireEvent.click(screen.getByText('اختيار المظهر'));
+      fireEvent.click(screen.getByText('مراجعة الإعداد'));
+      fireEvent.click(screen.getByText('إنشاء المتجر وفتح لوحة التحكم'));
 
       await waitFor(() => {
         expect(
@@ -310,13 +310,13 @@ describe('SDS-1 — Seller Dashboard P0 Data Truth', () => {
       render(<StoreOnboardingWizard />, { wrapper: arWrapper });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('e.g. Al-Nour Boutique')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('مثال: متجر النور')).toBeInTheDocument();
       });
 
-      fireEvent.change(screen.getByPlaceholderText('e.g. Al-Nour Boutique'), { target: { value: 'New Store' } });
-      fireEvent.click(screen.getByText('Choose Theme'));
-      fireEvent.click(screen.getByText('Review Setup'));
-      fireEvent.click(screen.getByText('Create Store & Launch Dashboard'));
+      fireEvent.change(screen.getByPlaceholderText('مثال: متجر النور'), { target: { value: 'New Store' } });
+      fireEvent.click(screen.getByText('اختيار المظهر'));
+      fireEvent.click(screen.getByText('مراجعة الإعداد'));
+      fireEvent.click(screen.getByText('إنشاء المتجر وفتح لوحة التحكم'));
 
       await waitFor(() => {
         // The first-store path is not blocked by the earlier rejection.

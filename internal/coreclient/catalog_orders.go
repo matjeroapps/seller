@@ -26,6 +26,17 @@ type SellerProductDraft struct {
 	StoreCategoryIDs []string                   `json:"store_category_ids,omitempty"`
 }
 
+type ProductRemovalResult struct {
+	ProductID          string `json:"product_id"`
+	Outcome            string `json:"outcome"`
+	Reason             string `json:"reason,omitempty"`
+	ProductDataDeleted bool   `json:"product_data_deleted"`
+}
+
+type ProductRemovalResponse struct {
+	Results []ProductRemovalResult `json:"results"`
+}
+
 type SellerProduct struct {
 	ID        string    `json:"id"`
 	Slug      string    `json:"slug"`
@@ -802,6 +813,15 @@ func (c *Client) TransitionProductStatus(ctx context.Context, subject, storeID, 
 func (c *Client) ArchiveProduct(ctx context.Context, subject, storeID, productID string) error {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/archive", url.PathEscape(storeID), url.PathEscape(productID))
 	return c.post(ctx, path, nil, requestOptions{Subject: subject}, nil)
+}
+
+func (c *Client) RemoveStoreProducts(ctx context.Context, subject, storeID string, productIDs []string) (*ProductRemovalResponse, error) {
+	var res ProductRemovalResponse
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/bulk-removal", url.PathEscape(storeID))
+	if err := c.post(ctx, path, map[string][]string{"product_ids": productIDs}, requestOptions{Subject: subject}, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 // StoreMediaAsset is an immutable store-owned binary media asset.

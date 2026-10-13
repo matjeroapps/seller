@@ -47,7 +47,6 @@ interface MockState {
   /** POST /variants payloads whose sku_code contains this fragment fail. */
   failSkuCodeFragment: string | null;
   createdVariantCodes: string[];
-  archivedVariantIds: string[];
   removedVariantIds: string[];
   updatedVariantCodes: string[];
 }
@@ -128,7 +127,6 @@ function initialState(variants: VariantFixture[]): MockState {
     skus: variants.flatMap((variant) => (variant.sku ? [variant.sku] : [])),
     failSkuCodeFragment: null,
     createdVariantCodes: [],
-    archivedVariantIds: [],
     removedVariantIds: [],
     updatedVariantCodes: []
   };
@@ -259,20 +257,6 @@ async function installSellerApiMock(page: Page, state: MockState) {
         201
       );
     }
-    if (method === 'POST' &&
-      /^\/api\/seller\/v1\/seller\/stores\/[^/]+\/products\/[^/]+\/variants\/[^/]+\/archive$/.test(path)) {
-      const variantId = path.split('/')[path.split('/').length - 2];
-      const variant = state.variants.find((candidate) => candidate.id === variantId);
-      expect(variant, `archived variant ${variantId} exists`).toBeDefined();
-      variant!.status = 'archived';
-      variant!.updated_at = NOW;
-      state.archivedVariantIds.push(variantId);
-      for (const sku of state.skus.filter((candidate) => candidate.variant_id === variantId)) {
-        sku.status = 'inactive';
-        sku.updated_at = NOW;
-      }
-      return json(variant);
-    }
     if (method === 'PUT' &&
       /^\/api\/seller\/v1\/seller\/stores\/[^/]+\/products\/[^/]+\/variants\/[^/]+$/.test(path)) {
       const variantId = path.split('/').pop()!;
@@ -292,7 +276,6 @@ async function installSellerApiMock(page: Page, state: MockState) {
       const variantId = path.split('/').pop()!;
       state.removedVariantIds.push(variantId);
       state.variants = state.variants.filter((candidate) => candidate.id !== variantId);
-      state.skus = state.skus.filter((candidate) => candidate.variant_id !== variantId);
       return route.fulfill({ status: 204 });
     }
     if (method === 'POST' && path === `${DETAIL_URL}/status`) {
@@ -330,15 +313,6 @@ function variantCard(page: Page, code: string) {
 function variantCodeInput(page: Page, code: string) {
   // Variant code is the first textbox inside the card (before SKU editors).
   return variantCard(page, code).getByRole('textbox').first();
-}
-
-function variantStatusSelect(page: Page, code: string) {
-  // Variant status select, then per-SKU selects, then the new-SKU draft select.
-  return variantCard(page, code).getByRole('combobox').first();
-}
-
-function skuStatusSelect(page: Page, code: string) {
-  return variantCard(page, code).getByRole('combobox').nth(1);
 }
 
 function skuCodeInput(page: Page, code: string) {
@@ -553,45 +527,41 @@ test.describe('Product Variant Management E2E', () => {
     await expect(page.getByRole('button', { name: 'Delete variant UNREFERENCED-VAR' })).toHaveCount(0);
   });
 
-  test('referenced variant cannot be removed and archive guidance is offered', async ({ page }) => {
+  test('referenced variant can be removed from the catalog while history is retained', async ({ page }) => {
     await openProductPage(page, initialState([referencedVariant()]));
 
     const removeButton = page.getByLabel('Delete variant REFERENCED-VAR');
-    await expect(removeButton).toBeDisabled();
+    await expect(removeButton).toBeEnabled();
 
-    const guidance = page.getByText(/referenced by \d+ SKU/);
+    const guidance = page.getByText(/linked to \d+ SKU records/);
     await expect(guidance).toHaveCount(1);
-    await expect(guidance).toContainText('permanent removal is blocked');
-    await expect(guidance).toContainText('Archive it instead');
+    await expect(guidance).toContainText('history will be kept when removed');
 
-    await page.getByLabel('Deactivate variant REFERENCED-VAR').click();
+    await removeButton.click();
     const confirmDialog = previewDialog(page);
     await expect(
-      confirmDialog.getByText(/Archive variant REFERENCED-VAR\? Its active SKUs will be deactivated/)
+      confirmDialog.getByText(/Remove variant REFERENCED-VAR from the catalog\? Order and inventory records will remain in internal history/)
     ).toBeVisible();
     await confirmDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(confirmDialog).toHaveCount(0);
   });
 
-  test('archive deactivates the active SKU while historical records remain', async ({ page }) => {
+  test('removal hides the variant while retaining its SKU history', async ({ page }) => {
     const state = initialState([referencedVariant()]);
     await openProductPage(page, state);
 
-    await page.getByLabel('Deactivate variant REFERENCED-VAR').click();
+    await page.getByLabel('Delete variant REFERENCED-VAR').click();
     const confirmDialog = previewDialog(page);
-    await confirmDialog.getByRole('button', { name: 'Archive Variant' }).click();
+    await confirmDialog.getByRole('button', { name: 'Delete Variant' }).click();
 
-    await expect(state.archivedVariantIds).toContain('var_ref');
-    await expect(page.getByText('Variant archived and its active SKU was deactivated.')).toBeVisible();
+    await expect(state.removedVariantIds).toContain('var_ref');
+    expect(state.skus.some((sku) => sku.variant_id === 'var_ref')).toBe(true);
+    await expect(page.getByText(/Variant removed from the catalog; historical records were retained/)).toBeVisible();
 
-    // Reload: the variant still exists (history preserved) in archived state,
-    // and its SKU row is inactive instead of deleted.
+    // Reload hides the catalog entry while historical rows remain behind it.
     await page.reload();
-    const archivedCard = variantCard(page, 'REFERENCED-VAR');
-    await expect(variantCodeInput(page, 'REFERENCED-VAR')).toHaveValue('REFERENCED-VAR');
-    await expect(variantStatusSelect(page, 'REFERENCED-VAR')).toHaveValue('archived');
-    await expect(skuStatusSelect(page, 'REFERENCED-VAR')).toHaveValue('inactive');
-    await expect(skuCodeInput(page, 'REFERENCED-VAR')).toHaveValue('SKU-REFERENCED-VAR');
+    await expect(page.getByLabel('Delete variant REFERENCED-VAR')).toHaveCount(0);
+    await expect(page.getByText('REFERENCED-VAR')).toHaveCount(0);
   });
 
   test('default-variant workflow remains available for products without configurable attributes', async ({ page }) => {
@@ -605,7 +575,7 @@ test.describe('Product Variant Management E2E', () => {
     const dialog = previewDialog(page);
     // With no variant attribute data the spec-based single-variant form opens
     // (not the batch preview).
-    await expect(dialog.getByText('Configure option dimensions, SKU barcode')).toBeVisible();
+    await expect(dialog.getByText('Enter the SKU code, barcode, weight, and package dimensions.')).toBeVisible();
     await expect(dialog.getByTestId('variant-attribute-picker')).toHaveCount(0);
 
     await dialog.getByPlaceholder('e.g. red-xl').fill('default-extra');
@@ -619,15 +589,14 @@ test.describe('Product Variant Management E2E', () => {
     const state = initialState([unreferencedVariant()]);
     await openProductPage(page, state);
 
-    // An unreferenced variant (no SKUs, no operational history) is the only
-    // removable kind; its Remove control must be enabled.
+    // Removal hides catalog state and confirms retained internal history.
     const removeButton = page.getByLabel('Delete variant UNREFERENCED-VAR');
     await expect(removeButton).toBeEnabled();
     await removeButton.click();
 
     const confirmDialog = previewDialog(page);
-    await expect(confirmDialog.getByText(/Permanently remove variant UNREFERENCED-VAR\?/)).toBeVisible();
-    await confirmDialog.getByRole('button', { name: 'Remove Variant' }).click();
+    await expect(confirmDialog.getByText(/Remove variant UNREFERENCED-VAR from the catalog\?/)).toBeVisible();
+    await confirmDialog.getByRole('button', { name: 'Delete Variant' }).click();
 
     // The removal reached the Seller API as a DELETE against the variant route.
     await expect.poll(() => state.removedVariantIds).toContain('var_unref');
@@ -636,7 +605,6 @@ test.describe('Product Variant Management E2E', () => {
     await page.reload();
     await expect(page.getByText('No variants yet.')).toBeVisible();
     await expect(page.getByLabel('Delete variant UNREFERENCED-VAR')).toHaveCount(0);
-    await expect(page.getByLabel('Deactivate variant UNREFERENCED-VAR')).toHaveCount(0);
     await expect(page.getByText('UNREFERENCED-VAR')).toHaveCount(0);
   });
 });

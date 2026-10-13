@@ -402,6 +402,79 @@
     }
   },
   "onboarding": {
+    "welcomeTitle": "Welcome to MatjerHub",
+    "welcomeSubtitle": "Set up your merchant store in just a few quick steps to begin importing products and launching your storefront.",
+    "steps": {
+      "storeProfile": "Store Profile",
+      "nameAndSubdomain": "Name & Subdomain",
+      "storefrontTheme": "Storefront Theme",
+      "lookAndFeel": "Look & Feel",
+      "reviewLaunch": "Review & Launch",
+      "confirmSetup": "Confirm setup"
+    },
+    "identity": {
+      "title": "Store Identity & Market",
+      "description": "Configure the primary identity, unique web address, and operating currency for your digital store.",
+      "storeName": "Store Name",
+      "storeNamePlaceholder": "e.g. Al-Nour Boutique",
+      "storeNameHint": "This name will be displayed to shoppers on your storefront.",
+      "subdomainSlug": "Store Subdomain Slug",
+      "subdomainPlaceholder": "al-nour-boutique",
+      "subdomainHint": "Unique subdomain URL for your store catalog. Lowercase letters, numbers, and hyphens only.",
+      "market": "Target Operating Market",
+      "marketSaudi": "Saudi Arabia (SA)",
+      "marketEgypt": "Egypt (EG)",
+      "marketUAE": "United Arab Emirates (AE)",
+      "currency": "Primary Currency",
+      "currencySAR": "SAR — Saudi Riyal",
+      "currencyEGP": "EGP — Egyptian Pound",
+      "currencyAED": "AED — UAE Dirham"
+    },
+    "theme": {
+      "title": "Select Initial Storefront Theme",
+      "description": "Choose the visual layout for your digital storefront. You can preview, customize, and switch themes anytime."
+    },
+    "themes": {
+      "default": {
+        "name": "Default",
+        "badge": "Recommended",
+        "description": "Clean, high-conversion layout optimized for high-volume retail, catalog browsing, and fast checkout.",
+        "feature1": "High-contrast product grid",
+        "feature2": "Optimized mobile bottom bar",
+        "feature3": "Instant Buy Now buttons"
+      },
+      "boutique": {
+        "name": "Boutique",
+        "badge": "Editorial",
+        "description": "Elegantly curated luxury showcase with generous photography, storytelling typography, and brand-first accents.",
+        "feature1": "Editorial story layout",
+        "feature2": "Accent typography & badges",
+        "feature3": "Refined brand showcase"
+      }
+    },
+    "review": {
+      "title": "Review & Confirm Store Setup",
+      "description": "Verify your store details. Once initialized, you can import products from suppliers and prepare for launch.",
+      "subdomain": "Store Subdomain",
+      "marketCurrency": "Target Market & Currency",
+      "selectedTheme": "Selected Theme",
+      "themeSuffix": "Theme",
+      "securityNotice": "Store will be initialized securely with authenticated tenant boundaries."
+    },
+    "buttons": {
+      "chooseTheme": "Choose Theme",
+      "back": "Back",
+      "reviewSetup": "Review Setup",
+      "initializingStore": "Initializing Store...",
+      "createStore": "Create Store & Launch Dashboard"
+    },
+    "validation": {
+      "storeNameRequired": "Please enter a store name.",
+      "storeSlugRequired": "Please enter a unique store URL slug.",
+      "storeSlugInvalid": "Store slug must contain only lowercase letters, numbers, and single hyphens.",
+      "workspaceLoading": "Please wait while we verify your merchant workspace."
+    },
+    "createStoreFailed": "We couldn't create your store. Please try again or contact support if the problem continues.",
     "additionalStoreRejected": "Only one store can be created in this phase. Open your existing store from the store switcher to continue managing it."
   },
   "finance": {
@@ -956,7 +1029,23 @@
     "sellerOwned": "Seller Owned",
     "supplierBacked": "Supplier Backed",
     "statusLabel": "Status:",
+    "statusPublished": "Published",
+    "statusUnpublished": "Unpublished",
     "allStatuses": "All Statuses",
+    "selectVisible": "Select visible",
+    "clearSelection": "Clear selection",
+    "selectedCount": "{count} selected",
+    "removeSelected": "Remove selected",
+    "selectProduct": "Select {name}",
+    "removeProduct": "Remove {name}",
+    "confirmRemovalTitle": "Remove products from this store?",
+    "confirmRemovalDescription": "Remove {count} selected product(s) from this store? Any product with orders here will be archived. Other stores and supplier catalogs will not be affected.",
+    "confirmRemoveProducts": "Remove from store",
+    "removingProducts": "Removing...",
+    "removalSummary": "Removed: {removed} · Archived: {archived} · Failed: {failed}",
+    "removalSomeFailed": "Some products could not be removed. Resolve the issue and retry the selected products.",
+    "errorRemoveProducts": "Failed to remove products from this store.",
+    "removeProductAction": "Remove from store",
     "showingPrefix": "Showing",
     "showingSuffix": "of {total} products",
     "viewGroupAria": "Product view",
@@ -1061,6 +1150,7 @@
     "noticeSaved": "Product details saved.",
     "statusChangedPrefix": "Product status changed to ",
     "noticeArchived": "Product archived.",
+    "noticeRemovalArchived": "This store's product listing was archived because it has order history.",
     "noticeVariantAdded": "Variant added.",
     "noticeVariantSpecsCreated": "Variant and SKU specifications created.",
     "noticeVariantUpdated": "Variant updated.",

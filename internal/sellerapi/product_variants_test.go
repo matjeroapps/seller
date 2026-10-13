@@ -223,17 +223,14 @@ func TestSellerAPI_VariantLifecycleRoutesKeepStatusesAndEnvelope(t *testing.T) {
 		}
 	})
 
-	t.Run("archive returns the archived lifecycle resource with 200", func(t *testing.T) {
+	t.Run("obsolete archive route is not registered", func(t *testing.T) {
 		mock := &variantMockCore{}
 		rec := serve(mock, http.MethodPost, base+"/"+variantID+"/archive", "")
-		if rec.Code != http.StatusOK {
-			t.Fatalf("archive status = %d, body %s", rec.Code, rec.Body.String())
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("archive status = %d, want 404", rec.Code)
 		}
-		if len(mock.archives) != 1 || mock.archives[0].variantID != variantID {
-			t.Fatalf("archive not routed to the same variant resource: %+v", mock.archives)
-		}
-		if !strings.Contains(rec.Body.String(), `"archived"`) {
-			t.Fatalf("archive response must carry the archived status, body %s", rec.Body.String())
+		if len(mock.archives) != 0 {
+			t.Fatalf("obsolete archive route reached Core: %+v", mock.archives)
 		}
 	})
 
@@ -261,7 +258,6 @@ func TestSellerAPI_VariantLifecycleRoutesKeepStatusesAndEnvelope(t *testing.T) {
 		for _, tt := range []struct{ method, path, body string }{
 			{http.MethodPut, base + "/" + variantID, `{"code":"renamed-s","status":"active"}`},
 			{http.MethodDelete, base + "/" + variantID, ""},
-			{http.MethodPost, base + "/" + variantID + "/archive", ""},
 		} {
 			rec := serve(mock, tt.method, tt.path, tt.body)
 			if rec.Code != http.StatusNotFound {
@@ -273,15 +269,12 @@ func TestSellerAPI_VariantLifecycleRoutesKeepStatusesAndEnvelope(t *testing.T) {
 		}
 	})
 
-	t.Run("resource_in_use keeps the dedicated 409 public code on delete and archive", func(t *testing.T) {
+	t.Run("resource_in_use keeps the dedicated 409 public code on delete", func(t *testing.T) {
 		mock := &variantMockCore{err: &coreclient.Error{
 			Status: http.StatusConflict, Code: coreclient.CodeResourceInUse,
 			Message: "variant is referenced by inventory or order history",
 		}}
-		for _, tt := range []struct{ method, path string }{
-			{http.MethodDelete, base + "/" + variantID},
-			{http.MethodPost, base + "/" + variantID + "/archive"},
-		} {
+		for _, tt := range []struct{ method, path string }{{http.MethodDelete, base + "/" + variantID}} {
 			rec := serve(mock, tt.method, tt.path, "")
 			if rec.Code != http.StatusConflict {
 				t.Fatalf("%s %s status = %d, want 409", tt.method, tt.path, rec.Code)

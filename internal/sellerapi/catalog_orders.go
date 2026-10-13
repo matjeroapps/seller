@@ -357,6 +357,44 @@ func (deps Dependencies) handleArchiveProduct(w http.ResponseWriter, r *http.Req
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "archived"})
 }
 
+func (deps Dependencies) handleRemoveStoreProduct(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	result, err := deps.Core.RemoveStoreProducts(r.Context(), subject, chi.URLParam(r, "store_id"), []string{chi.URLParam(r, "product_id")})
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, result)
+}
+
+func (deps Dependencies) handleBulkRemoveStoreProducts(w http.ResponseWriter, r *http.Request) {
+	if !requireRoles(w, r, roleOwner, roleManager) {
+		return
+	}
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		ProductIDs []string `json:"product_ids"`
+	}
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	result, err := deps.Core.RemoveStoreProducts(r.Context(), subject, chi.URLParam(r, "store_id"), body.ProductIDs)
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, result)
+}
+
 func (deps Dependencies) handleListStoreMedia(w http.ResponseWriter, r *http.Request) {
 	if !requireRoles(w, r, roleOwner, roleManager, roleStaff) {
 		return
