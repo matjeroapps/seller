@@ -31,10 +31,10 @@ describe('New seller product slug generation', () => {
   it('updates the complete slug while the product name is being entered', async () => {
     await renderPage();
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'إضافة منتج جديد' })).toBeInTheDocument());
     const textboxes = screen.getAllByRole('textbox');
-    const nameInput = textboxes[0];
-    const slugInput = textboxes[2];
+    const nameInput = screen.getByTestId('product-name-en');
+    const slugInput = screen.getByTestId('product-slug');
 
     for (const value of ['P', 'Pr', 'Pre', 'Premium', 'Premium Cotton', 'Premium Cotton T-Shirt']) {
       fireEvent.change(nameInput, { target: { value } });
@@ -46,10 +46,10 @@ describe('New seller product slug generation', () => {
   it('stops replacing a slug after the seller edits it manually', async () => {
     await renderPage();
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'إضافة منتج جديد' })).toBeInTheDocument());
     const textboxes = screen.getAllByRole('textbox');
-    const nameInput = textboxes[0];
-    const slugInput = textboxes[2];
+    const nameInput = screen.getByTestId('product-name-en');
+    const slugInput = screen.getByTestId('product-slug');
 
     fireEvent.change(nameInput, { target: { value: 'Premium Cotton T-Shirt' } });
     fireEvent.change(slugInput, { target: { value: 'custom-product-url' } });
@@ -62,17 +62,18 @@ describe('New seller product slug generation', () => {
     mockCreateStoreProduct.mockResolvedValueOnce({ id: 'product-1' });
     await renderPage();
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'إضافة منتج جديد' })).toBeInTheDocument());
     const textboxes = screen.getAllByRole('textbox');
-    const nameEn = textboxes[0];
-    const nameAr = textboxes[1];
-    const descriptionEn = textboxes[3];
-    const descriptionAr = textboxes[4];
+    const nameAr = screen.getByTestId('product-name-ar');
+    const nameEn = screen.getByTestId('product-name-en');
+    const descriptionAr = screen.getByTestId('product-description-ar');
+    const descriptionEn = screen.getByTestId('product-description-en');
     fireEvent.change(nameEn, { target: { value: 'Smart Air Fryer' } });
     fireEvent.change(nameAr, { target: { value: 'قلاية هوائية ذكية' } });
     fireEvent.change(descriptionEn, { target: { value: 'A smart kitchen appliance.' } });
     fireEvent.change(descriptionAr, { target: { value: 'جهاز مطبخ ذكي.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Draft Product' }));
+    fireEvent.change(screen.getByTestId('retail-price'), { target: { value: '200' } });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ كمسودة' }));
 
     await waitFor(() => expect(mockCreateStoreProduct).toHaveBeenCalledWith('store_123', {
       slug: 'smart-air-fryer',
