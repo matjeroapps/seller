@@ -303,12 +303,6 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
 
   describe('Variant lifecycle confirmation flow (034)', () => {
     const skulessDetail = { ...sampleDetail, skus: [] };
-    const archivedDetail = {
-      ...skulessDetail,
-      product: { ...sampleDetail.product, updated_at: '2026-10-07T00:00:00Z' },
-      variants: [{ ...sampleDetail.variants[0], status: 'archived' }],
-      skus: [{ ...sampleDetail.skus[0], status: 'inactive' }]
-    };
 
     beforeEach(() => {
       vi.clearAllMocks();
@@ -327,11 +321,11 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
       );
     }
 
-    it('requires confirmation before variant archive and remove (no immediate calls)', async () => {
+    it('requires confirmation before removing a variant from the catalog', async () => {
       await openPage();
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })).toBeInTheDocument();
       });
 
       // window.confirm must never be used for variant lifecycle actions
@@ -340,42 +334,34 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
 
       expect(confirmSpy).not.toHaveBeenCalled();
       expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
-      expect(mockApi.archiveProductVariant).not.toHaveBeenCalled();
 
       const dialog = await screen.findByRole('dialog');
       expect(dialog).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Remove Variant' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Delete Variant' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(mockApi.deleteProductVariant).not.toHaveBeenCalled();
     });
 
-    it('archives the variant only after confirmation and reloads with historical SKU shown', async () => {
-      mockApi.archiveProductVariant.mockResolvedValue({});
+    it('removes a SKU-referenced variant from the catalog and retains its history', async () => {
       await openPage();
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })).toBeEnabled();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' }));
-
+      mockApi.getStoreProductDetail.mockResolvedValueOnce({ ...sampleDetail, variants: [], skus: [] });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' }));
       expect(await screen.findByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Archive Variant' })).toBeInTheDocument();
-
-      // Queue the post-archive reload before confirming so loadDetail picks it up.
-      mockApi.getStoreProductDetail.mockResolvedValueOnce(archivedDetail);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Variant' }));
+      expect(screen.getByText(/Order and inventory records will remain in internal history/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Variant' }));
 
       await waitFor(() => {
-        expect(mockApi.archiveProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
+        expect(mockApi.deleteProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
       });
-
-      // Reload with archived variant detail: status reflects history, SKU code still displayed.
       await waitFor(() => {
-        expect(screen.getByDisplayValue('archived')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('SKU-WAL-BRN-01')).toBeInTheDocument();
+        expect(screen.queryByDisplayValue('COLOR-BROWN')).not.toBeInTheDocument();
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -396,31 +382,28 @@ describe('Product Detail Actions & In-App ConfirmModal (T004-T009)', () => {
 
       const dialog = await screen.findByRole('dialog');
       expect(dialog).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Remove Variant' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete Variant' })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove Variant' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Variant' }));
 
       await waitFor(() => {
         expect(mockApi.deleteProductVariant).toHaveBeenCalledWith('store_123', 'prod_456', 'var_1');
       });
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByText('Variant removed.')).toBeInTheDocument();
+      expect(screen.getByText(/Variant removed from the catalog; historical records were retained/i)).toBeInTheDocument();
     });
 
-    it('shows actionable archive guidance and disables removal for SKU-referenced variants', async () => {
+    it('shows history guidance and allows removal for SKU-referenced variants', async () => {
       mockApi.getStoreProductDetail.mockResolvedValueOnce(sampleDetail); // var_1 backed by sku_1
       await openPage();
       await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })).toBeEnabled();
         expect(
-          screen.getByRole('button', { name: 'Delete variant COLOR-BROWN' })
-        ).toBeDisabled();
-        expect(
-          screen.getByText(/referenced by 1 SKU; permanent removal is blocked/i)
+          screen.getByText(/history will be kept when removed/i)
         ).toBeInTheDocument();
       });
 
-      // The archive path remains available for referenced variants.
-      expect(screen.getByRole('button', { name: 'Deactivate variant COLOR-BROWN' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /archive variant/i })).not.toBeInTheDocument();
     });
   });
 });

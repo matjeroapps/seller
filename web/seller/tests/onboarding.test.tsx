@@ -20,7 +20,7 @@ describe('Onboarding Components', () => {
       const onSelect = vi.fn();
       render(<ThemeSelectionCard theme={mockTheme} isSelected={false} onSelect={onSelect} />);
 
-      expect(screen.getByText('Default')).toBeDefined();
+      expect(screen.getByRole('heading', { name: 'Default' })).toBeDefined();
       expect(screen.getByText('Clean high-conversion layout')).toBeDefined();
       expect(screen.getByText('Recommended')).toBeDefined();
 
