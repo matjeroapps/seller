@@ -464,13 +464,13 @@ export const sellerApi = {
 
   async createStoreProduct(
     storeId: string,
-    data: { name: string; slug: string; description?: string; category_id?: string; store_category_ids?: string[] }
+    data: { translations: ProductTranslation[]; slug: string; category_id?: string; store_category_ids?: string[] }
   ): Promise<Product> {
     const detail = await request<SellerProductDetail>(`/v1/seller/stores/${encodeURIComponent(storeId)}/products`, {
       method: 'POST',
       body: JSON.stringify({
         slug: data.slug,
-        translations: [{ locale: 'en', name: data.name, description: data.description ?? '' }],
+        translations: data.translations,
         category_ids: data.category_id ? [data.category_id] : [],
         store_category_ids: data.store_category_ids ?? []
       })

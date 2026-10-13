@@ -4,9 +4,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import StoreProductsPage from '../app/(dashboard)/dashboard/stores/[store_id]/catalog/products/page';
 
-const { mockListStoreProducts, mockGetStoreProductDetail } = vi.hoisted(() => ({
+const { mockListStoreProducts, mockListProductMediaReferences } = vi.hoisted(() => ({
   mockListStoreProducts: vi.fn(),
-  mockGetStoreProductDetail: vi.fn()
+  mockListProductMediaReferences: vi.fn()
 }));
 
 const searchParams = {
@@ -20,7 +20,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('../lib/api/client', () => ({
   sellerApi: {
     listStoreProducts: mockListStoreProducts,
-    getStoreProductDetail: mockGetStoreProductDetail
+    listProductMediaReferences: mockListProductMediaReferences
   }
 }));
 
@@ -50,20 +50,8 @@ describe('Store products catalog search', () => {
         }
       ]
     });
-    mockGetStoreProductDetail.mockImplementation(async (_storeId: string, productId: string) => ({
-      primary_media_uri: productId === 'product_head' ? 'https://cdn.example.test/head-phone.webp' : undefined,
-      media: [],
-      translations: [],
-      product: {},
-      source: 'seller_owned',
-      category_ids: [],
-      store_category_ids: [],
-      store_categories: [],
-      variants: [],
-      skus: [],
-      listing: {},
-      inventory_summary: {},
-      publish_readiness: {}
+    mockListProductMediaReferences.mockImplementation(async (_storeId: string, productId: string) => ({
+      items: productId === 'product_head' ? [{ is_primary: true, url: 'https://cdn.example.test/head-phone.webp' }] : []
     }));
 
     await act(async () => {
@@ -91,20 +79,8 @@ describe('Store products catalog search', () => {
         }
       ]
     });
-    mockGetStoreProductDetail.mockResolvedValue({
-      primary_media_uri: 'https://cdn.example.test/head-phone.webp',
-      media: [],
-      translations: [],
-      product: {},
-      source: 'seller_owned',
-      category_ids: [],
-      store_category_ids: [],
-      store_categories: [],
-      variants: [],
-      skus: [],
-      listing: {},
-      inventory_summary: {},
-      publish_readiness: {}
+    mockListProductMediaReferences.mockResolvedValue({
+      items: [{ is_primary: true, url: 'https://cdn.example.test/head-phone.webp' }]
     });
 
     await act(async () => {
@@ -120,6 +96,7 @@ describe('Store products catalog search', () => {
     expect(screen.getByText('Retail price')).toBeInTheDocument();
     expect(screen.getByText('Available')).toBeInTheDocument();
     expect(screen.getByAltText('Head Phone')).toHaveAttribute('src', 'https://cdn.example.test/head-phone.webp');
+    expect(screen.queryByText('head-phone')).not.toBeInTheDocument();
   });
 
   it('falls back to the default product image placeholder when a media URL fails to load', async () => {
@@ -136,20 +113,8 @@ describe('Store products catalog search', () => {
         }
       ]
     });
-    mockGetStoreProductDetail.mockResolvedValue({
-      primary_media_uri: 'https://cdn.example.test/missing-head-phone.webp',
-      media: [],
-      translations: [],
-      product: {},
-      source: 'seller_owned',
-      category_ids: [],
-      store_category_ids: [],
-      store_categories: [],
-      variants: [],
-      skus: [],
-      listing: {},
-      inventory_summary: {},
-      publish_readiness: {}
+    mockListProductMediaReferences.mockResolvedValue({
+      items: [{ is_primary: true, url: 'https://cdn.example.test/missing-head-phone.webp' }]
     });
 
     await act(async () => {
@@ -161,5 +126,28 @@ describe('Store products catalog search', () => {
 
     expect(screen.getByLabelText('No product image')).toBeInTheDocument();
     expect(screen.queryByAltText('')).not.toBeInTheDocument();
+  });
+
+  it('shows the available primary image in the table without rendering the product slug', async () => {
+    mockListStoreProducts.mockResolvedValue({
+      items: [{
+        id: 'product_head',
+        source: 'seller_owned',
+        slug: 'head-phone',
+        name: 'Head Phone',
+        status: 'active',
+        updated_at: '2026-10-07T00:00:00Z',
+        created_at: '2026-10-07T00:00:00Z'
+      }]
+    });
+    mockListProductMediaReferences.mockResolvedValue({
+      items: [{ is_primary: true, url: 'https://cdn.example.test/head-phone.webp' }]
+    });
+
+    await act(async () => {
+      render(<StoreProductsPage params={Promise.resolve({ store_id: 'store_123' })} />);
+    });
+    await waitFor(() => expect(screen.getByAltText('')).toHaveAttribute('src', 'https://cdn.example.test/head-phone.webp'));
+    expect(screen.queryByText('head-phone')).not.toBeInTheDocument();
   });
 });

@@ -32,7 +32,9 @@ describe('New seller product slug generation', () => {
     await renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
-    const [nameInput, slugInput] = screen.getAllByRole('textbox');
+    const textboxes = screen.getAllByRole('textbox');
+    const nameInput = textboxes[0];
+    const slugInput = textboxes[2];
 
     for (const value of ['P', 'Pr', 'Pre', 'Premium', 'Premium Cotton', 'Premium Cotton T-Shirt']) {
       fireEvent.change(nameInput, { target: { value } });
@@ -45,12 +47,40 @@ describe('New seller product slug generation', () => {
     await renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
-    const [nameInput, slugInput] = screen.getAllByRole('textbox');
+    const textboxes = screen.getAllByRole('textbox');
+    const nameInput = textboxes[0];
+    const slugInput = textboxes[2];
 
     fireEvent.change(nameInput, { target: { value: 'Premium Cotton T-Shirt' } });
     fireEvent.change(slugInput, { target: { value: 'custom-product-url' } });
     fireEvent.change(nameInput, { target: { value: 'Different Product Name' } });
 
     expect(slugInput).toHaveValue('custom-product-url');
+  });
+
+  it('creates the product with editable Arabic and English translations', async () => {
+    mockCreateStoreProduct.mockResolvedValueOnce({ id: 'product-1' });
+    await renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create Seller Product' })).toBeInTheDocument());
+    const textboxes = screen.getAllByRole('textbox');
+    const nameEn = textboxes[0];
+    const nameAr = textboxes[1];
+    const descriptionEn = textboxes[3];
+    const descriptionAr = textboxes[4];
+    fireEvent.change(nameEn, { target: { value: 'Smart Air Fryer' } });
+    fireEvent.change(nameAr, { target: { value: 'قلاية هوائية ذكية' } });
+    fireEvent.change(descriptionEn, { target: { value: 'A smart kitchen appliance.' } });
+    fireEvent.change(descriptionAr, { target: { value: 'جهاز مطبخ ذكي.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Draft Product' }));
+
+    await waitFor(() => expect(mockCreateStoreProduct).toHaveBeenCalledWith('store_123', {
+      slug: 'smart-air-fryer',
+      translations: [
+        { locale: 'en', name: 'Smart Air Fryer', description: 'A smart kitchen appliance.' },
+        { locale: 'ar', name: 'قلاية هوائية ذكية', description: 'جهاز مطبخ ذكي.' }
+      ],
+      store_category_ids: []
+    }));
   });
 });

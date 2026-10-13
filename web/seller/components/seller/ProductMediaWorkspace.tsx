@@ -40,7 +40,6 @@ type ProductMediaWorkspaceProps = {
   productId: string;
   productName: string;
   canManage: boolean;
-  initialAssets: StoreMediaAsset[];
   initialReferences: ProductMediaReference[];
 };
 
@@ -128,17 +127,17 @@ export function ProductMediaWorkspace({
   productId,
   productName,
   canManage,
-  initialAssets,
   initialReferences
 }: ProductMediaWorkspaceProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [assets, setAssets] = useState<StoreMediaAsset[]>(initialAssets);
+  const [assets, setAssets] = useState<StoreMediaAsset[]>([]);
   const [references, setReferences] = useState<ProductMediaReference[]>(initialReferences);
+  const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [assetSearch, setAssetSearch] = useState('');
   const [assetType, setAssetType] = useState('');
-  const [assetAttachment, setAssetAttachment] = useState<'all' | 'attached' | 'unattached'>('all');
+  const [assetAttachment, setAssetAttachment] = useState<'all' | 'attached' | 'unattached'>('unattached');
   const [assetPage, setAssetPage] = useState(0);
-  const [assetTotal, setAssetTotal] = useState(initialAssets.length);
+  const [assetTotal, setAssetTotal] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
@@ -153,11 +152,6 @@ export function ProductMediaWorkspace({
   const [altDraft, setAltDraft] = useState('');
   const [detachId, setDetachId] = useState<string | null>(null);
   const [detaching, setDetaching] = useState(false);
-
-  useEffect(() => {
-    setAssets(initialAssets);
-    setAssetTotal(initialAssets.length);
-  }, [initialAssets]);
 
   useEffect(() => {
     setReferences(initialReferences);
@@ -185,8 +179,8 @@ export function ProductMediaWorkspace({
   }, [assetPage, assetSearch, assetType, storeId]);
 
   useEffect(() => {
-    void loadAssets();
-  }, [loadAssets]);
+    if (isMediaDialogOpen) void loadAssets();
+  }, [isMediaDialogOpen, loadAssets]);
 
   const visibleAssets = useMemo(() => {
     if (assetAttachment === 'all') return assets;
@@ -311,23 +305,41 @@ export function ProductMediaWorkspace({
     setNotice(null);
     const added: ProductMediaReference[] = [];
     const failures: string[] = [];
+    let referenceReloadError: string | null = null;
+    const alreadyHasPrimary = references.some((reference) => reference.is_primary);
     for (const [index, assetId] of ids.entries()) {
       try {
         const reference = await sellerApi.attachProductMedia(storeId, productId, {
           asset_id: assetId,
           sort_order: references.length + index,
-          is_primary: references.length === 0 && index === 0
+          is_primary: !alreadyHasPrimary && added.length === 0
         });
         added.push(reference);
       } catch (error) {
         failures.push(errorMessage(error, `Could not attach ${assetId}.`));
       }
     }
-    setReferences((current) => [...current, ...added]);
-    setSelectedAssetIds([]);
+    if (added.length) {
+      setReferences((current) => [...current, ...added]);
+      try {
+        // The attach response may omit the resolved asset URL. Reload the
+        // references so the UI receives the same media URL as the detail page.
+        await reloadReferences();
+      } catch (error) {
+        referenceReloadError = errorMessage(error, 'Refresh the product page to load them.');
+      }
+    }
+    const attachedIds = new Set(added.map((reference) => reference.asset_id));
+    setSelectedAssetIds((current) => current.filter((assetId) => !attachedIds.has(assetId)));
     setAttaching(false);
-    if (failures.length) setActionError(`Some images were not attached. ${failures.join(' ')}`);
-    else setNotice(`${added.length} image${added.length === 1 ? '' : 's'} attached.`);
+    if (failures.length) {
+      setActionError(`Some images were not attached. ${failures.join(' ')}`);
+    } else if (referenceReloadError) {
+      setActionError(`Images were attached, but their previews could not be refreshed. ${referenceReloadError}`);
+    } else {
+      setNotice(`${added.length} image${added.length === 1 ? '' : 's'} attached.`);
+      setIsMediaDialogOpen(false);
+    }
   };
 
   const reloadReferences = async () => {
@@ -412,14 +424,12 @@ export function ProductMediaWorkspace({
           <h2 id="product-media-heading" className="text-base font-bold text-slate-950">
             Product media workspace
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Upload, search, select, and arrange the images used by {productName}.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Choose and arrange images used by {productName}.</p>
         </div>
         <span className="text-xs font-semibold text-slate-500">{references.length} attached</span>
       </div>
 
-      {(actionError || assetsError) && (
+      {(actionError || assetsError) && !isMediaDialogOpen && (
         <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{actionError || assetsError}</span>
@@ -432,186 +442,249 @@ export function ProductMediaWorkspace({
         </div>
       )}
 
-      <div
-        role="button"
-        tabIndex={canManage ? 0 : -1}
-        aria-disabled={!canManage}
-        aria-label="Upload product images"
-        className={`mt-5 rounded-xl border-2 border-dashed p-6 text-center transition ${
-          dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-slate-50'
-        } ${canManage ? 'cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/60' : 'cursor-not-allowed opacity-60'}`}
-        onClick={() => canManage && fileInputRef.current?.click()}
-        onKeyDown={(event) => {
-          if (canManage && (event.key === 'Enter' || event.key === ' ')) {
-            event.preventDefault();
-            fileInputRef.current?.click();
-          }
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (canManage) setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={async (event) => {
-          event.preventDefault();
-          setDragActive(false);
-          if (canManage) await queueFiles(event.dataTransfer.files);
-        }}
-      >
-        <UploadCloud className="mx-auto h-8 w-8 text-indigo-500" />
-        <p className="mt-2 text-sm font-semibold text-slate-900">Drop images here or choose files</p>
-        <p className="mt-1 text-xs text-slate-500">JPG, PNG, or WebP up to 10 MB each. Multiple files supported.</p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          className="sr-only"
-          onChange={handleFileInput}
-          disabled={!canManage || uploading}
-          aria-label="Choose product image files"
-        />
-      </div>
-
-      {uploadItems.length > 0 && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-live="polite">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900">Upload queue</h3>
-            {uploading && <LoaderCircle className="h-4 w-4 animate-spin text-indigo-600" />}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {uploadItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100">
-                  {item.preview ? <img src={item.preview} alt="" className="h-full w-full object-cover" /> : <FileImage className="m-3 h-6 w-6 text-slate-400" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-semibold text-slate-800">{item.file.name}</div>
-                  <div className="text-[10px] text-slate-500">{item.status === 'error' ? item.error : `${item.status} · ${item.progress}%`}</div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-200">
-                    <div className={`h-full ${item.status === 'error' ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${item.progress}%` }} />
-                  </div>
-                </div>
-                {item.status === 'error' && !uploading && (
-                  <button
-                    type="button"
-                    onClick={() => void retryUpload(item.id)}
-                    className="rounded border border-indigo-200 px-2 py-1 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-50"
-                  >
-                    Retry
-                  </button>
-                )}
-                {!uploading && (
-                  <button type="button" onClick={() => clearUploadItem(item.id)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`Remove ${item.file.name} from upload queue`}>
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+      <div className="mt-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Attached product media</h3>
+          <p className="mt-1 text-xs text-slate-500">Only images selected for this product appear here.</p>
         </div>
-      )}
-
-      <div className="mt-6 flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400 rtl:left-auto rtl:right-3" />
-          <input
-            value={assetSearch}
-            onChange={(event) => {
-              setAssetPage(0);
-              setAssetSearch(event.target.value);
-            }}
-            placeholder="Search uploaded images by filename..."
-            aria-label="Search store media"
-            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rtl:pl-3 rtl:pr-9"
-          />
-        </div>
-        <select
-          value={assetType}
-          onChange={(event) => {
-            setAssetPage(0);
-            setAssetType(event.target.value);
-          }}
-          aria-label="Filter media type"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
-        >
-          <option value="">All image types</option>
-          <option value="image/jpeg">JPEG</option>
-          <option value="image/png">PNG</option>
-          <option value="image/webp">WebP</option>
-        </select>
-        <select
-          value={assetAttachment}
-          onChange={(event) => setAssetAttachment(event.target.value as typeof assetAttachment)}
-          aria-label="Filter attachment status"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
-        >
-          <option value="all">All assets</option>
-          <option value="attached">Attached</option>
-          <option value="unattached">Unattached</option>
-        </select>
-        <button type="button" onClick={() => void loadAssets()} className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" aria-label="Refresh media library">
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900">Store media library</h3>
         <button
           type="button"
-          onClick={() => void handleAttachSelected()}
-          disabled={!canManage || attaching || selectedAssetIds.length === 0}
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => {
+            setActionError(null);
+            setAssetsError(null);
+            setIsMediaDialogOpen(true);
+          }}
+          disabled={!canManage}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {attaching ? 'Attaching...' : `Attach selected${selectedAssetIds.length ? ` (${selectedAssetIds.length})` : ''}`}
+          Choose from media library
         </button>
       </div>
 
-      {assetsLoading ? (
-        <div className="mt-4 rounded-xl bg-slate-50 p-8 text-center text-xs text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading media library...</div>
-      ) : visibleAssets.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">
-          <ImageIcon className="mx-auto mb-2 h-7 w-7 text-slate-300" />
-          {assets.length === 0 ? 'No uploaded images found yet.' : 'No images match the current search or filter.'}
-        </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {visibleAssets.map((asset) => {
-            const selected = selectedAssetIds.includes(asset.id);
-            const attached = attachedAssetIds.has(asset.id);
-            return (
+      {isMediaDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-media-picker-title"
+            className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 id="product-media-picker-title" className="text-base font-bold text-slate-950">Choose product images</h3>
+                <p className="mt-1 text-xs text-slate-500">Select images from this store or upload new ones for {productName}.</p>
+              </div>
               <button
-                key={asset.id}
                 type="button"
-                aria-pressed={selected}
-                onClick={() => canManage && toggleAsset(asset.id)}
-                className={`group text-left rounded-xl border p-2 transition ${selected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 bg-white hover:border-indigo-300'} ${!canManage ? 'cursor-not-allowed opacity-60' : ''}`}
+                aria-label="Close media library"
+                onClick={() => setIsMediaDialogOpen(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               >
-                <div className="relative flex h-32 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                  {asset.url ? <img src={asset.url} alt={mediaFilename(asset)} className="h-full w-full object-cover" /> : <ImageIcon className="h-8 w-8 text-slate-300" />}
-                  <span className={`absolute right-2 top-2 rounded-full p-1 ${selected ? 'bg-indigo-600 text-white' : 'bg-white/90 text-slate-400'}`} aria-hidden="true">
-                    {selected ? <Check className="h-3.5 w-3.5" /> : <PlusIcon />}
-                  </span>
-                  {attached && <span className="absolute bottom-2 left-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">Attached</span>}
-                </div>
-                <div className="mt-2 truncate text-xs font-semibold text-slate-800" title={mediaFilename(asset)}>{mediaFilename(asset)}</div>
-                <div className="mt-1 flex justify-between gap-2 text-[10px] text-slate-500">
-                  <span>{mediaType(asset).replace('image/', '').toUpperCase()}</span>
-                  <span>{formatBytes(mediaBytes(asset))}</span>
-                </div>
-                <div className="mt-1 text-[10px] text-slate-400">{formatDate(asset.created_at)}</div>
+                <X className="h-5 w-5" />
               </button>
-            );
-          })}
-        </div>
-      )}
+            </div>
 
-      {assetTotal > PAGE_SIZE && (
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-          <span>Showing {assetPage * PAGE_SIZE + 1}–{Math.min((assetPage + 1) * PAGE_SIZE, assetTotal)} of {assetTotal}</span>
-          <div className="flex gap-2">
-            <button type="button" disabled={assetPage === 0} onClick={() => setAssetPage((page) => page - 1)} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
-            <button type="button" disabled={(assetPage + 1) * PAGE_SIZE >= assetTotal} onClick={() => setAssetPage((page) => page + 1)} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+            {(actionError || assetsError) && (
+              <div role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{actionError || assetsError}</span>
+              </div>
+            )}
+
+            <div
+              role="button"
+              tabIndex={canManage ? 0 : -1}
+              aria-disabled={!canManage}
+              aria-label="Upload product images"
+              className={`mt-5 rounded-xl border-2 border-dashed p-6 text-center transition ${
+                dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-slate-50'
+              } ${canManage ? 'cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/60' : 'cursor-not-allowed opacity-60'}`}
+              onClick={() => canManage && fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (canManage && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (canManage) setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={async (event) => {
+                event.preventDefault();
+                setDragActive(false);
+                if (canManage) await queueFiles(event.dataTransfer.files);
+              }}
+            >
+              <UploadCloud className="mx-auto h-8 w-8 text-indigo-500" />
+              <p className="mt-2 text-sm font-semibold text-slate-900">Drop images here or choose files</p>
+              <p className="mt-1 text-xs text-slate-500">JPG, PNG, or WebP up to 10 MB each. Multiple files supported.</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="sr-only"
+                onChange={handleFileInput}
+                disabled={!canManage || uploading}
+                aria-label="Choose product image files"
+              />
+            </div>
+
+            {uploadItems.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-live="polite">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900">Upload queue</h3>
+                  {uploading && <LoaderCircle className="h-4 w-4 animate-spin text-indigo-600" />}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {uploadItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100">
+                        {item.preview ? <img src={item.preview} alt="" className="h-full w-full object-cover" /> : <FileImage className="m-3 h-6 w-6 text-slate-400" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-semibold text-slate-800">{item.file.name}</div>
+                        <div className="text-[10px] text-slate-500">{item.status === 'error' ? item.error : `${item.status} · ${item.progress}%`}</div>
+                        <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-200">
+                          <div className={`h-full ${item.status === 'error' ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${item.progress}%` }} />
+                        </div>
+                      </div>
+                      {item.status === 'error' && !uploading && (
+                        <button
+                          type="button"
+                          onClick={() => void retryUpload(item.id)}
+                          className="rounded border border-indigo-200 px-2 py-1 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                        >
+                          Retry
+                        </button>
+                      )}
+                      {!uploading && (
+                        <button type="button" onClick={() => clearUploadItem(item.id)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`Remove ${item.file.name} from upload queue`}>
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400 rtl:left-auto rtl:right-3" />
+                <input
+                  value={assetSearch}
+                  onChange={(event) => {
+                    setAssetPage(0);
+                    setAssetSearch(event.target.value);
+                  }}
+                  placeholder="Search uploaded images by filename..."
+                  aria-label="Search store media"
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rtl:pl-3 rtl:pr-9"
+                />
+              </div>
+              <select
+                value={assetType}
+                onChange={(event) => {
+                  setAssetPage(0);
+                  setAssetType(event.target.value);
+                }}
+                aria-label="Filter media type"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+              >
+                <option value="">All image types</option>
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/png">PNG</option>
+                <option value="image/webp">WebP</option>
+              </select>
+              <select
+                value={assetAttachment}
+                onChange={(event) => setAssetAttachment(event.target.value as typeof assetAttachment)}
+                aria-label="Filter attachment status"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-xs"
+              >
+                <option value="all">All assets</option>
+                <option value="attached">Attached</option>
+                <option value="unattached">Unattached</option>
+              </select>
+              <button type="button" onClick={() => void loadAssets()} className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50" aria-label="Refresh media library">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Store media library</h3>
+              <button
+                type="button"
+                onClick={() => void handleAttachSelected()}
+                disabled={!canManage || attaching || selectedAssetIds.length === 0}
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {attaching ? 'Attaching...' : `Attach selected${selectedAssetIds.length ? ` (${selectedAssetIds.length})` : ''}`}
+              </button>
+            </div>
+
+            {assetsLoading ? (
+              <div className="mt-4 rounded-xl bg-slate-50 p-8 text-center text-xs text-slate-500"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading media library...</div>
+            ) : visibleAssets.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">
+                <ImageIcon className="mx-auto mb-2 h-7 w-7 text-slate-300" />
+                {assets.length === 0 ? 'No uploaded images found yet.' : 'No images match the current search or filter.'}
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {visibleAssets.map((asset) => {
+                  const selected = selectedAssetIds.includes(asset.id);
+                  const attached = attachedAssetIds.has(asset.id);
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => canManage && toggleAsset(asset.id)}
+                      className={`group text-left rounded-xl border p-2 transition ${selected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 bg-white hover:border-indigo-300'} ${!canManage ? 'cursor-not-allowed opacity-60' : ''}`}
+                    >
+                      <div className="relative flex h-32 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                        {asset.url ? <img src={asset.url} alt={mediaFilename(asset)} className="h-full w-full object-cover" /> : <ImageIcon className="h-8 w-8 text-slate-300" />}
+                        <span className={`absolute right-2 top-2 rounded-full p-1 ${selected ? 'bg-indigo-600 text-white' : 'bg-white/90 text-slate-400'}`} aria-hidden="true">
+                          {selected ? <Check className="h-3.5 w-3.5" /> : <PlusIcon />}
+                        </span>
+                        {attached && <span className="absolute bottom-2 left-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">Attached</span>}
+                      </div>
+                      <div className="mt-2 truncate text-xs font-semibold text-slate-800" title={mediaFilename(asset)}>{mediaFilename(asset)}</div>
+                      <div className="mt-1 flex justify-between gap-2 text-[10px] text-slate-500">
+                        <span>{mediaType(asset).replace('image/', '').toUpperCase()}</span>
+                        <span>{formatBytes(mediaBytes(asset))}</span>
+                      </div>
+                      <div className="mt-1 text-[10px] text-slate-400">{formatDate(asset.created_at)}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {assetTotal > PAGE_SIZE && (
+              <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                <span>Showing {assetPage * PAGE_SIZE + 1}–{Math.min((assetPage + 1) * PAGE_SIZE, assetTotal)} of {assetTotal}</span>
+                <div className="flex gap-2">
+                  <button type="button" disabled={assetPage === 0} onClick={() => setAssetPage((page) => page - 1)} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
+                  <button type="button" disabled={(assetPage + 1) * PAGE_SIZE >= assetTotal} onClick={() => setAssetPage((page) => page + 1)} className="rounded border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setIsMediaDialogOpen(false)}
+                disabled={attaching}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -627,38 +700,42 @@ export function ProductMediaWorkspace({
         {references.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">No images are attached to this product yet.</div>
         ) : (
-          <div className="mt-4 space-y-3">
+          <div data-testid="attached-media-grid" className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[...references].sort((a, b) => a.sort_order - b.sort_order).map((reference, index, ordered) => (
-              <div key={reference.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-200">
-                  {reference.url ? <img src={reference.url} alt={reference.alt_text || productName} className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-slate-400" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-slate-900">Image {index + 1}</span>
-                    {reference.is_primary && <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"><Star className="h-3 w-3" /> Primary</span>}
-                    {reference.is_visible === false && <span className="inline-flex items-center gap-1 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700" data-testid="media-visibility-badge">Hidden from visitors</span>}
-                  </div>
-                  {editingAltId === reference.id ? (
-                    <div className="mt-2 flex gap-2">
-                      <input value={altDraft} onChange={(event) => setAltDraft(event.target.value)} aria-label={`Alt text for image ${index + 1}`} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-xs" />
-                      <button type="button" onClick={() => { void updateReference(reference, { alt_text: altDraft }); setEditingAltId(null); }} className="rounded bg-indigo-600 px-2 py-1 text-[10px] font-bold text-white">Save</button>
-                    </div>
+              <article key={reference.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-slate-100">
+                  {reference.url ? (
+                    <img src={reference.url} alt={reference.alt_text || productName} className="h-full w-full object-contain" />
                   ) : (
-                    <button type="button" disabled={!canManage} onClick={() => { setEditingAltId(reference.id); setAltDraft(reference.alt_text || ''); }} className="mt-1 block max-w-full truncate text-left text-xs text-slate-500 hover:text-indigo-600">
-                      Alt text: {reference.alt_text || 'Add descriptive alt text'}
-                    </button>
+                    <ImageIcon className="h-10 w-10 text-slate-400" />
                   )}
+                  {reference.is_primary && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800"><Star className="h-3 w-3" /> Primary</span>}
+                  {reference.is_visible === false && <span className="absolute right-2 top-2 rounded-full bg-slate-800/80 px-2 py-1 text-[10px] font-semibold text-white" data-testid="media-visibility-badge">Hidden</span>}
                 </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  {reference.is_visible === false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: true })} data-testid="media-show-to-visitors" className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50">Show to visitors</button>}
-                  {reference.is_visible !== false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: false })} data-testid="media-hide-from-visitors" className="rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-white">Hide from visitors</button>}
-                  {!reference.is_primary && <button type="button" disabled={!canManage || referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_primary: true })} className="rounded border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-700 hover:bg-amber-50">Set primary</button>}
-                  <button type="button" disabled={!canManage || index === 0 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, -1)} aria-label={`Move image ${index + 1} up`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronUp className="h-3.5 w-3.5" /></button>
-                  <button type="button" disabled={!canManage || index === ordered.length - 1 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, 1)} aria-label={`Move image ${index + 1} down`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronDown className="h-3.5 w-3.5" /></button>
-                  <button type="button" disabled={!canManage || referenceWorkingId === reference.id} onClick={() => setDetachId(reference.id)} aria-label={`Detach image ${index + 1}`} title="Detach reference" className="rounded border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+                <div className="p-3">
+                  <div className="mb-2 text-xs font-bold text-slate-900">Image {index + 1}</div>
+                  <div className="min-w-0">
+                    {editingAltId === reference.id ? (
+                      <div className="flex gap-2">
+                        <input value={altDraft} onChange={(event) => setAltDraft(event.target.value)} aria-label={`Alt text for image ${index + 1}`} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-xs" />
+                        <button type="button" onClick={() => { void updateReference(reference, { alt_text: altDraft }); setEditingAltId(null); }} className="rounded bg-indigo-600 px-2 py-1 text-[10px] font-bold text-white">Save</button>
+                      </div>
+                    ) : (
+                      <button type="button" disabled={!canManage} onClick={() => { setEditingAltId(reference.id); setAltDraft(reference.alt_text || ''); }} className="block w-full truncate text-left text-xs text-slate-500 hover:text-indigo-600">
+                        Alt text: {reference.alt_text || 'Add descriptive alt text'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+                    {reference.is_visible === false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: true })} data-testid="media-show-to-visitors" className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50">Show to visitors</button>}
+                    {reference.is_visible !== false && canManage && <button type="button" disabled={referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_visible: false })} data-testid="media-hide-from-visitors" className="rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-white">Hide from visitors</button>}
+                    {!reference.is_primary && <button type="button" disabled={!canManage || referenceWorkingId === reference.id} onClick={() => void updateReference(reference, { is_primary: true })} className="rounded border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-700 hover:bg-amber-50">Set primary</button>}
+                    <button type="button" disabled={!canManage || index === 0 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, -1)} aria-label={`Move image ${index + 1} up`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronUp className="h-3.5 w-3.5" /></button>
+                    <button type="button" disabled={!canManage || index === ordered.length - 1 || referenceWorkingId === reference.id} onClick={() => void moveReference(reference.id, 1)} aria-label={`Move image ${index + 1} down`} className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"><ChevronDown className="h-3.5 w-3.5" /></button>
+                    <button type="button" disabled={!canManage || referenceWorkingId === reference.id} onClick={() => setDetachId(reference.id)} aria-label={`Detach image ${index + 1}`} title="Detach reference" className="rounded border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}

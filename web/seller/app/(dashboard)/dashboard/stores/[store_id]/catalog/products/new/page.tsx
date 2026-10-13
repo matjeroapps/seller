@@ -8,7 +8,7 @@ import { CategoryPicker } from '@/components/seller/CategoryPicker';
 import { AuthoringAssistantPanel } from '@/components/seller/AuthoringAssistantPanel';
 import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi } from '@/lib/api/client';
-import type { StoreCategory } from '@/lib/api/types';
+import type { AuthoringFieldProposal, StoreCategory } from '@/lib/api/types';
 
 export default function NewStoreProductPage({ params }: { params: Promise<{ store_id: string }> }) {
   const { store_id } = use(params);
@@ -16,7 +16,9 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
   const { t } = useTranslation();
 
   const [name, setName] = useState('');
+  const [nameAr, setNameAr] = useState('');
   const [description, setDescription] = useState('');
+  const [descriptionAr, setDescriptionAr] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,9 +59,11 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
     setError(null);
     try {
       const product = await sellerApi.createStoreProduct(store_id, {
-        name,
         slug,
-        description,
+        translations: [
+          { locale: 'en', name, description },
+          ...(nameAr.trim() || descriptionAr.trim() ? [{ locale: 'ar', name: nameAr, description: descriptionAr }] : [])
+        ],
         store_category_ids: selectedCategoryIds
       });
       router.push(`/dashboard/stores/${store_id}/catalog/products/${product.id}`);
@@ -68,6 +72,13 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
       setSaving(false);
     }
   };
+
+  const authoringBrief = [
+    name.trim() ? `Product name: ${name.trim()}` : '',
+    nameAr.trim() ? `اسم المنتج: ${nameAr.trim()}` : '',
+    description.trim() ? `Product description: ${description.trim()}` : '',
+    descriptionAr.trim() ? `وصف المنتج: ${descriptionAr.trim()}` : ''
+  ].filter(Boolean).join('\n\n');
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -90,13 +101,25 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
 
       <form onSubmit={handleSubmit} className="p-6 bg-white border border-slate-200 rounded-lg shadow-sm space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">{t('products.nameRequiredLabel')}</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">{t('products.labelEnTitle')}</label>
           <input
             type="text"
             required
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             placeholder={t('products.namePlaceholder')}
+            className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">{t('products.labelArTitle')}</label>
+          <input
+            type="text"
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
+            placeholder={t('products.labelArTitle')}
+            dir="rtl"
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -118,7 +141,7 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="product-create-description">{t('products.descriptionLabel')}</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="product-create-description">{t('products.labelEnDescription')}</label>
           <textarea
             id="product-create-description"
             value={description}
@@ -128,6 +151,34 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="product-create-description-ar">{t('products.labelArDescription')}</label>
+          <textarea
+            id="product-create-description-ar"
+            value={descriptionAr}
+            onChange={(e) => setDescriptionAr(e.target.value)}
+            dir="rtl"
+            placeholder={t('products.labelArDescription')}
+            className="w-full px-3 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <AuthoringAssistantPanel
+          storeId={store_id}
+          brief={authoringBrief}
+          onApplyFields={(fields: AuthoringFieldProposal[]) => {
+            const get = (key: string, locale: string) => fields.find((field) => field.field_key === key && field.locale === locale)?.value;
+            const nameEn = get('name', 'en');
+            const nameArabic = get('name', 'ar');
+            const descriptionEn = get('description', 'en');
+            const descriptionArabic = get('description', 'ar');
+            if (nameEn) handleNameChange(nameEn);
+            if (nameArabic) setNameAr(nameArabic);
+            if (descriptionEn) setDescription(descriptionEn);
+            if (descriptionArabic) setDescriptionAr(descriptionArabic);
+          }}
+        />
 
         <div className="space-y-1.5">
           <span className="block text-xs font-semibold text-slate-700">{t('products.categoriesLabel')}</span>
@@ -158,7 +209,6 @@ export default function NewStoreProductPage({ params }: { params: Promise<{ stor
         </div>
       </form>
 
-      <AuthoringAssistantPanel storeId={store_id} onApplyName={handleNameChange} onApplyDescription={setDescription} />
     </div>
   );
 }

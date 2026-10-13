@@ -32,7 +32,6 @@ import type {
   ProductVariant,
   SellerProductDetail,
   StoreCategory,
-  StoreMediaAsset,
   UpdateProductVariantPayload
 } from '@/lib/api/types';
 
@@ -162,7 +161,6 @@ export default function StoreProductDetailPage({
   const router = useRouter();
 
   const [detail, setDetail] = useState<SellerProductDetail | null>(null);
-  const [mediaAssets, setMediaAssets] = useState<StoreMediaAsset[]>([]);
   const [references, setReferences] = useState<ProductMediaReference[]>([]);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [categoryLoadError, setCategoryLoadError] = useState<string | null>(null);
@@ -244,9 +242,8 @@ export default function StoreProductDetailPage({
 
   const loadDetail = useCallback(async () => {
     setError(null);
-    const [nextDetail, mediaRes, refsRes, categoriesRes] = await Promise.all([
+    const [nextDetail, refsRes, categoriesRes] = await Promise.all([
       sellerApi.getStoreProductDetail(store_id, product_id),
-      sellerApi.listStoreMedia(store_id).catch(() => ({ items: [] })),
       sellerApi.listProductMediaReferences(store_id, product_id).catch(() => ({ items: [] })),
       sellerApi.listStoreCategories(store_id).catch((err: any) => {
         setCategoryLoadError(err.message || t('products.errorLoadCategories'));
@@ -254,7 +251,6 @@ export default function StoreProductDetailPage({
       })
     ]);
     setDetail(nextDetail);
-    setMediaAssets(mediaRes.items || []);
     setReferences(refsRes.items || []);
     setCategories(categoriesRes);
     if (categoriesRes.length > 0) setCategoryLoadError(null);
@@ -1191,7 +1187,6 @@ export default function StoreProductDetailPage({
         productId={product_id}
         productName={product.name}
         canManage={canManageProduct}
-        initialAssets={mediaAssets}
         initialReferences={references}
       />
 

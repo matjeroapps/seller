@@ -1186,24 +1186,40 @@
     "confirmArchiveCancel": "الاحتفاظ بالمنتج",
     "authoring": {
       "title": "مساعد إعداد المنتج بالذكاء الاصطناعي",
-      "subtitle": "توليد مسودات النص ومرشحات صور المشهد للمراجعة قبل إنشاء المنتج.",
+      "subtitle": "استخدم الأوصاف أعلاه وصور المنتج لإكمال بيانات المنتج القابلة للتعديل.",
       "briefPlaceholder": "وصف موجز للمنتج",
       "uploadSources": "رفع صور المصدر",
+      "dropzoneTitle": "اسحب صور المنتج وأفلتها هنا",
+      "dropzoneActive": "أفلت الصور لإضافتها",
+      "dropzoneDescription": "أو اضغط لاختيار ملفات JPEG أو PNG أو WebP",
+      "selectedImages": "تم اختيار {count} صورة",
+      "uploadStatus": {
+        "hashing": "جارٍ تجهيز الصورة",
+        "creating": "جارٍ بدء الرفع",
+        "uploading": "جارٍ رفع الصورة",
+        "completing": "جارٍ حفظ الصورة",
+        "ready": "جاهزة",
+        "error": "فشل الرفع"
+      },
       "unsupportedType": "نوع الصورة غير مدعوم (مسموح: jpeg/png/webp).",
       "uploadIncomplete": "تعليمات الرفع غير مكتملة من الخدمة.",
       "uploadFailed": "فشل رفع الصورة إلى التخزين.",
       "imageCount": "عدد الصور",
-      "generate": "توليد",
+      "generate": "توليد بالذكاء الاصطناعي",
+      "generating": "جارٍ التوليد…",
+      "imageGenerating": "جارٍ توليد صور المنتج…",
       "pollFailed": "تعذر الاستطلاع.",
       "createFailed": "تعذر إنشاء المهمة.",
       "retryFailed": "تعذرت إعادة المحاولة.",
+      "retryText": "إعادة محاولة توليد النصوص.",
+      "retryImages": "إعادة محاولة توليد الصور الناقصة",
       "acceptFailed": "تعذر اعتماد الصورة.",
       "statusPrefix": "الحالة",
       "textPrefix": "النصوص",
       "imagePrefix": "الصور"
     },
     "descriptionLabel": "الوصف",
-    "descriptionPlaceholder": "وصف المنتج (يمكن اعتماد مسودة المساعد)"
+    "descriptionPlaceholder": "اكتب وصف المنتج؛ ستظهر اقتراحات الذكاء الاصطناعي هنا ويمكنك تعديلها."
   },
   "supplierOffers": {
     "title": "كتالوج عروض الموردين",
