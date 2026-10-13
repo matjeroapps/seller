@@ -1220,7 +1220,7 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
 
     // Form fixed copy and validation labels/placeholder are localized in Arabic.
     expect(screen.getByText('أضِف منتجًا مسودًا مملوكًا للبائع وقائمة متجر ابتدائية')).toBeInTheDocument();
-    expect(screen.getByText('اسم المنتج *')).toBeInTheDocument();
+    expect(screen.getByText('العنوان الإنجليزي *')).toBeInTheDocument();
     expect(screen.getByText('رابط المنتج *')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('مثال: تي-شيرت قطني فاخر')).toBeInTheDocument();
     expect(screen.getByText('معرّف URL فريد لكتالوج المنتجات')).toBeInTheDocument();
