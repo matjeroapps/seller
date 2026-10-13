@@ -290,7 +290,7 @@ async function openProductPage(page: Page, state: MockState) {
   await page.goto(`${SELLER_APP_URL}/dashboard/stores/${STORE_ID}/catalog/products/${PRODUCT_ID}`);
   // The detail route now intentionally reuses the add-product editor, where
   // the product name is an editable field rather than a page heading.
-  await expect(page.getByDisplayValue(PRODUCT_NAME)).toBeVisible();
+  await expect(page.getByTestId('product-name-en')).toHaveValue(PRODUCT_NAME);
 }
 
 function previewDialog(page: Page) {
