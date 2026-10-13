@@ -227,8 +227,8 @@ export const sellerApi = {
     return request<{ items: import('./types').ThemeVersion[] }>(`/v1/seller/themes/${encodeURIComponent(themeKey)}/versions`);
   },
 
-  async getThemeInstallation(storeId: string): Promise<ThemeInstallationResponse> {
-    return request<ThemeInstallationResponse>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme`);
+  async getThemeInstallation(storeId: string): Promise<ThemeInstallationResponse | null> {
+    return request<ThemeInstallationResponse | null>(`/v1/seller/stores/${encodeURIComponent(storeId)}/theme`);
   },
 
   async installTheme(storeId: string, data: { theme_key: string; version?: string }): Promise<ThemeInstallationResponse> {
@@ -926,8 +926,8 @@ export const sellerApi = {
   },
 
   // Finance & Ledger
-  async getStoreBalance(storeId: string): Promise<StoreBalance> {
-    return request<StoreBalance>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/balance`);
+  async getStoreBalance(storeId: string): Promise<StoreBalance | null> {
+    return request<StoreBalance | null>(`/v1/seller/stores/${encodeURIComponent(storeId)}/finance/balance`);
   },
 
   async listStoreLedgerEntries(storeId: string): Promise<{ items: LedgerEntry[] }> {

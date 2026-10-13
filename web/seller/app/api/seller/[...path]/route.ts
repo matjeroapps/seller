@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/auth';
+import { isOptionalStoreReadNotFound } from '@/lib/api/optional-dashboard-response';
 
 const SELLER_API_BASE_URL =
   process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
@@ -44,6 +45,10 @@ async function proxySellerRequest(request: NextRequest, context: RouteContext) {
     body,
     cache: 'no-store',
   });
+
+  if (isOptionalStoreReadNotFound(request.method, path, upstreamResponse.status)) {
+    return NextResponse.json(null, { status: 200 });
+  }
 
   const responseHeaders = new Headers();
   const upstreamContentType = upstreamResponse.headers.get('content-type');

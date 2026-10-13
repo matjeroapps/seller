@@ -48,9 +48,19 @@ describe('Theme API Client Contracts (T004)', () => {
     });
 
     const res = await sellerApi.getThemeInstallation('store-1');
-    expect(res.installation.theme_key).toBe('default');
-    expect(res.draft_revision).toBe(1);
-    expect(res.draft_config?.primary_color).toBe('#4f46e5');
+    expect(res?.installation.theme_key).toBe('default');
+    expect(res?.draft_revision).toBe(1);
+    expect(res?.draft_config?.primary_color).toBe('#4f46e5');
+  });
+
+  it('accepts a missing optional theme installation as an empty state', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => null
+    });
+
+    await expect(sellerApi.getThemeInstallation('store-1')).resolves.toBeNull();
   });
 
   it('installTheme triggers installation and returns new installation object', async () => {

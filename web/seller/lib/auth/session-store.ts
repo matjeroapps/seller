@@ -16,6 +16,8 @@ export interface ActorSessionData {
 const MEMORY_SESSION_STORE = new Map<string, ActorSessionData>();
 
 let redisClient: Redis | null = null;
+type RedisConnection = Pick<Redis, 'status' | 'connect'>;
+const redisConnections = new WeakMap<RedisConnection, Promise<boolean>>();
 
 function getRedisClient(): Redis | null {
   if (redisClient) {
@@ -39,17 +41,43 @@ function getRedisClient(): Redis | null {
   return redisClient;
 }
 
-export async function ensureRedisReady(redis: Pick<Redis, 'status' | 'connect'>): Promise<boolean> {
+export async function ensureRedisReady(redis: RedisConnection): Promise<boolean> {
   if (redis.status === 'ready') {
     return true;
   }
 
-  try {
-    await redis.connect();
-    return true;
-  } catch (err) {
-    console.error('Failed to connect to Redis:', err);
+  // Multiple dashboard/API requests can arrive together on the first page
+  // load. Share ioredis's lazy connection instead of calling connect() once
+  // per request while the client is already connecting.
+  const inFlight = redisConnections.get(redis);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  // `connect()` is valid only from ioredis's lazy `wait` state. During an
+  // automatic reconnect, let ioredis finish on its own and use the existing
+  // memory fallback for this request instead of triggering another connect.
+  if (redis.status !== 'wait') {
     return false;
+  }
+
+  const connection = (async () => {
+    try {
+      await redis.connect();
+      return true;
+    } catch (err) {
+      console.error('Failed to connect to Redis:', err);
+      return false;
+    }
+  })();
+  redisConnections.set(redis, connection);
+
+  try {
+    return await connection;
+  } finally {
+    if (redisConnections.get(redis) === connection) {
+      redisConnections.delete(redis);
+    }
   }
 }
 
