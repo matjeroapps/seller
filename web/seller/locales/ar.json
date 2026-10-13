@@ -402,6 +402,79 @@
     }
   },
   "onboarding": {
+    "welcomeTitle": "مرحباً بك في MatjerHub",
+    "welcomeSubtitle": "أكمل إعداد متجرك في خطوات بسيطة لبدء استيراد المنتجات وإطلاق واجهة متجرك.",
+    "steps": {
+      "storeProfile": "ملف المتجر",
+      "nameAndSubdomain": "الاسم والنطاق الفرعي",
+      "storefrontTheme": "مظهر المتجر",
+      "lookAndFeel": "الشكل والتصميم",
+      "reviewLaunch": "المراجعة والإطلاق",
+      "confirmSetup": "تأكيد الإعداد"
+    },
+    "identity": {
+      "title": "هوية المتجر والسوق",
+      "description": "أدخل بيانات المتجر الأساسية وعنوانه الفريد وعملة التشغيل.",
+      "storeName": "اسم المتجر",
+      "storeNamePlaceholder": "مثال: متجر النور",
+      "storeNameHint": "سيظهر هذا الاسم للمتسوقين في واجهة متجرك.",
+      "subdomainSlug": "الاسم المختصر للنطاق الفرعي",
+      "subdomainPlaceholder": "al-nour-boutique",
+      "subdomainHint": "عنوان فريد لكتالوج متجرك. استخدم الأحرف الإنجليزية الصغيرة والأرقام والواصلات فقط.",
+      "market": "سوق التشغيل المستهدف",
+      "marketSaudi": "المملكة العربية السعودية (SA)",
+      "marketEgypt": "مصر (EG)",
+      "marketUAE": "الإمارات العربية المتحدة (AE)",
+      "currency": "العملة الأساسية",
+      "currencySAR": "SAR — الريال السعودي",
+      "currencyEGP": "EGP — الجنيه المصري",
+      "currencyAED": "AED — الدرهم الإماراتي"
+    },
+    "theme": {
+      "title": "اختر مظهر واجهة متجرك",
+      "description": "اختر التصميم المرئي لمتجرك. يمكنك معاينة المظهر وتخصيصه وتغييره في أي وقت."
+    },
+    "themes": {
+      "default": {
+        "name": "الافتراضي",
+        "badge": "موصى به",
+        "description": "تصميم واضح يسهّل تصفح المنتجات والشراء، ومناسب لمتاجر التجزئة ذات حجم المبيعات الكبير.",
+        "feature1": "شبكة منتجات بتباين واضح",
+        "feature2": "شريط تنقل سفلي محسّن للهواتف",
+        "feature3": "أزرار شراء فوري"
+      },
+      "boutique": {
+        "name": "بوتيك",
+        "badge": "تحريري",
+        "description": "واجهة أنيقة لعرض المنتجات الفاخرة، مع صور بارزة ونصوص قصصية ولمسات تبرز العلامة التجارية.",
+        "feature1": "تخطيط قصصي تحريري",
+        "feature2": "خطوط وشارات مميزة",
+        "feature3": "عرض أنيق للعلامة التجارية"
+      }
+    },
+    "review": {
+      "title": "مراجعة إعداد المتجر وتأكيده",
+      "description": "راجع بيانات متجرك. بعد إنشائه، يمكنك استيراد المنتجات من الموردين والاستعداد للإطلاق.",
+      "subdomain": "النطاق الفرعي للمتجر",
+      "marketCurrency": "السوق المستهدف والعملة",
+      "selectedTheme": "المظهر المختار",
+      "themeSuffix": "",
+      "securityNotice": "سيُنشأ المتجر بأمان ضمن حدود مساحة العمل الموثّقة."
+    },
+    "buttons": {
+      "chooseTheme": "اختيار المظهر",
+      "back": "رجوع",
+      "reviewSetup": "مراجعة الإعداد",
+      "initializingStore": "جارٍ إنشاء المتجر...",
+      "createStore": "إنشاء المتجر وفتح لوحة التحكم"
+    },
+    "validation": {
+      "storeNameRequired": "يرجى إدخال اسم المتجر.",
+      "storeSlugRequired": "يرجى إدخال اسم فريد لرابط المتجر.",
+      "storeSlugInvalid": "يجب أن يتكوّن الاسم المختصر من أحرف إنجليزية صغيرة وأرقام وواصلات مفردة فقط.",
+      "workspaceLoading": "يرجى الانتظار ريثما نتحقق من مساحة عمل التاجر."
+    },
+    "createStoreFailed": "تعذر إنشاء المتجر. حاول مرة أخرى، أو تواصل مع الدعم إذا استمرت المشكلة.",
     "additionalStoreRejected": "لا يمكن إنشاء أكثر من متجر واحد في هذه المرحلة. افتح متجرك الحالي من مبدّل المتاجر لمتابعة إدارته."
   },
   "finance": {
@@ -956,7 +1029,23 @@
     "sellerOwned": "مملوك للبائع",
     "supplierBacked": "مدعوم من مورد",
     "statusLabel": "الحالة:",
+    "statusPublished": "منشور",
+    "statusUnpublished": "غير منشور",
     "allStatuses": "كل الحالات",
+    "selectVisible": "تحديد الظاهر",
+    "clearSelection": "مسح التحديد",
+    "selectedCount": "تم تحديد {count}",
+    "removeSelected": "إزالة المحدد",
+    "selectProduct": "تحديد {name}",
+    "removeProduct": "إزالة {name}",
+    "confirmRemovalTitle": "إزالة المنتجات من هذا المتجر؟",
+    "confirmRemovalDescription": "هل تريد إزالة {count} من المنتجات المحددة من هذا المتجر؟ ستتم أرشفة أي منتج له طلبات هنا. لن تتأثر المتاجر الأخرى أو كتالوجات الموردين.",
+    "confirmRemoveProducts": "إزالة من المتجر",
+    "removingProducts": "جارٍ الإزالة...",
+    "removalSummary": "تمت الإزالة: {removed} · تمت الأرشفة: {archived} · تعذرت العملية: {failed}",
+    "removalSomeFailed": "تعذرت إزالة بعض المنتجات. عالج السبب ثم أعد محاولة إزالة المنتجات المحددة.",
+    "errorRemoveProducts": "تعذرت إزالة المنتجات من هذا المتجر.",
+    "removeProductAction": "إزالة من المتجر",
     "showingPrefix": "عرض",
     "showingSuffix": "من إجمالي {total} منتجات",
     "viewGroupAria": "عرض المنتجات",
@@ -1061,6 +1150,7 @@
     "noticeSaved": "تم حفظ تفاصيل المنتج.",
     "statusChangedPrefix": "تم تغيير حالة المنتج إلى ",
     "noticeArchived": "تم أرشفة المنتج.",
+    "noticeRemovalArchived": "تمت أرشفة إدراج المنتج في هذا المتجر لوجود سجل طلبات.",
     "noticeVariantAdded": "تمت إضافة المتغير.",
     "noticeVariantSpecsCreated": "تم إنشاء المتغير ومواصفات SKU.",
     "noticeVariantUpdated": "تم تحديث المتغير.",

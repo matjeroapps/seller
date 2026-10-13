@@ -53,6 +53,17 @@ export interface Product {
   media_count?: number;
 }
 
+export interface ProductRemovalResult {
+  product_id: string;
+  outcome: 'removed' | 'archived' | 'not_found' | 'failed';
+  reason?: string;
+  product_data_deleted: boolean;
+}
+
+export interface ProductRemovalResponse {
+  results: ProductRemovalResult[];
+}
+
 export interface SellerCategory {
   id: string;
   slug: string;

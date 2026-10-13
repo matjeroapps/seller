@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, use, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   Archive,
@@ -158,6 +159,7 @@ export default function StoreProductDetailPage({
 }) {
   const { store_id, product_id } = use(params);
   const { t } = useTranslation();
+  const router = useRouter();
 
   const [detail, setDetail] = useState<SellerProductDetail | null>(null);
   const [mediaAssets, setMediaAssets] = useState<StoreMediaAsset[]>([]);
@@ -170,6 +172,7 @@ export default function StoreProductDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [variantConfirm, setVariantConfirm] = useState<{
     variant: ProductVariant;
     action: 'remove';
@@ -371,6 +374,30 @@ export default function StoreProductDetailPage({
     }
   };
 
+  const confirmProductRemoval = async () => {
+    if (!detail) return;
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await sellerApi.removeStoreProduct(store_id, product_id);
+      const result = response.results?.[0];
+      setShowRemoveModal(false);
+      if (result?.outcome === 'archived') {
+        await loadDetail();
+        setNotice(t('products.noticeRemovalArchived'));
+      } else if (result?.outcome === 'removed' || result?.outcome === 'not_found') {
+        router.push(`/dashboard/stores/${store_id}/catalog/products`);
+      } else {
+        setError(t('products.errorRemoveProducts'));
+      }
+    } catch (err: any) {
+      setError(err.message || t('products.errorRemoveProducts'));
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const handleCreateVariant = async (event: FormEvent) => {
     event.preventDefault();
     if (!canManageProduct || !newVariant.code.trim()) return;
@@ -564,6 +591,17 @@ export default function StoreProductDetailPage({
             >
               <ExternalLink className="h-3.5 w-3.5" /> {t('products.viewListing')}
             </Link>
+          )}
+
+          {listing?.id && (
+            <button
+              type="button"
+              disabled={working}
+              onClick={() => setShowRemoveModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t('products.removeProductAction')}
+            </button>
           )}
 
           {canManageProduct && (
@@ -1167,6 +1205,18 @@ export default function StoreProductDetailPage({
         loading={working}
         onConfirm={confirmArchive}
         onCancel={() => setShowArchiveModal(false)}
+      />
+
+      <ConfirmModal
+        isOpen={showRemoveModal}
+        title={t('products.confirmRemovalTitle')}
+        description={t('products.confirmRemovalDescription').replace('{count}', '1')}
+        confirmLabel={t('products.confirmRemoveProducts')}
+        cancelLabel={t('common.cancel')}
+        variant="danger"
+        loading={working}
+        onConfirm={confirmProductRemoval}
+        onCancel={() => setShowRemoveModal(false)}
       />
 
       <ConfirmModal

@@ -724,6 +724,34 @@ func sellerRoutes() []RouteSpec {
 			Responses: AuthOKResponses("Store product updated", coreclient.SellerProductDetail{}),
 		},
 		{
+			Method:      http.MethodDelete,
+			Path:        "/v1/seller/stores/{store_id}/products/{product_id}",
+			OperationID: "removeStoreProduct",
+			Summary:     "Remove a product from one store",
+			Description: "Removes only this store's listing. Products with order history in this store are archived; shared or supplier product data is preserved when referenced elsewhere.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters: []ParameterSpec{
+				PathStringParam("store_id", "Store identifier"),
+				PathStringParam("product_id", "Product identifier"),
+			},
+			Responses: AuthOKResponses("Store-scoped product removal result", coreclient.ProductRemovalResponse{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/products/bulk-removal",
+			OperationID: "bulkRemoveStoreProducts",
+			Summary:     "Remove products from one store independently",
+			Description: "Processes up to 100 distinct product IDs independently and returns one result per item.",
+			Tags:        []string{"Catalog"},
+			Auth:        true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			RequestBody: struct {
+				ProductIDs []string `json:"product_ids"`
+			}{},
+			Responses: AuthOKResponses("Per-product store-scoped removal results", coreclient.ProductRemovalResponse{}),
+		},
+		{
 			Method:      http.MethodPost,
 			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants",
 			OperationID: "createProductVariant",

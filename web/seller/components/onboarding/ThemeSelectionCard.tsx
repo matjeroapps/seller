@@ -47,7 +47,7 @@ export function ThemeSelectionCard({ theme, isSelected, onSelect }: ThemeSelecti
           ) : (
             <LayoutTemplate className="w-4 h-4 text-indigo-600" />
           )}
-          <span className="text-xs font-semibold text-slate-800 tracking-wide uppercase">{theme.name} Theme</span>
+          <span className="text-xs font-semibold text-slate-800 tracking-wide uppercase">{theme.name}</span>
         </div>
         {isSelected && (
           <div className="absolute top-2 right-2 rtl:right-auto rtl:left-2 bg-indigo-600 text-white rounded-full p-1 shadow-sm">

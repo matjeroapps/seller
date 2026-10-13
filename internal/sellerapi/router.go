@@ -59,6 +59,7 @@ type CoreCapabilities interface {
 	UpdateSellerProduct(ctx context.Context, subject, storeID, productID string, slug string, translations []coreclient.SellerProductTranslation, categoryIDs []string, storeCategoryIDs []string) (*coreclient.SellerProductDetail, error)
 	TransitionProductStatus(ctx context.Context, subject, storeID, productID, status string) (string, error)
 	ArchiveProduct(ctx context.Context, subject, storeID, productID string) error
+	RemoveStoreProducts(ctx context.Context, subject, storeID string, productIDs []string) (*coreclient.ProductRemovalResponse, error)
 	CreateVariant(ctx context.Context, subject, storeID, productID, code, status string) (*coreclient.Variant, error)
 	CreateVariantWithOptions(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey ...string) (*coreclient.VariantWithDetails, error)
 	// CreateVariantItem forwards one proposed item through the existing per-variant
@@ -210,6 +211,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Put("/seller/stores/{store_id}/products/{product_id}", deps.handleUpdateStoreProduct)
 			r.Post("/seller/stores/{store_id}/products/{product_id}/status", deps.handleTransitionProductStatus)
 			r.Post("/seller/stores/{store_id}/products/{product_id}/archive", deps.handleArchiveProduct)
+			r.Delete("/seller/stores/{store_id}/products/{product_id}", deps.handleRemoveStoreProduct)
+			r.Post("/seller/stores/{store_id}/products/bulk-removal", deps.handleBulkRemoveStoreProducts)
 
 			r.Post("/seller/stores/{store_id}/products/{product_id}/variants", deps.handleCreateVariant)
 			r.Put("/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}", deps.handleUpdateVariant)

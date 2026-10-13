@@ -31,6 +31,10 @@ async function proxySellerRequest(request: NextRequest, context: RouteContext) {
 
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
+  const idempotencyKey = request.headers.get('idempotency-key');
+  const legacyIdempotencyKey = request.headers.get('x-idempotency-key');
+  if (idempotencyKey) headers.set('idempotency-key', idempotencyKey);
+  if (legacyIdempotencyKey) headers.set('x-idempotency-key', legacyIdempotencyKey);
   headers.set('authorization', `Bearer ${bearerToken}`);
 
   const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer();

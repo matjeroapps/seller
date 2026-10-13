@@ -14,12 +14,14 @@ import {
   List,
   Package,
   Plus,
-  Tag
+  Tag,
+  Trash2
 } from 'lucide-react';
 import { sellerApi } from '@/lib/api/client';
 import type { Product } from '@/lib/api/types';
 import { useTranslation } from '@/lib/i18n/locale-context';
 import { formatMoney } from '@/lib/money';
+import { ConfirmModal } from '@/components/seller/ConfirmModal';
 
 type ProductView = 'list' | 'grid';
 
@@ -37,6 +39,17 @@ function readinessLabel(product: Product, readyText: string, notCheckedText: str
   if (product.publish_readiness?.is_ready) return readyText;
   if (product.publish_readiness?.reasons?.[0]) return product.publish_readiness.reasons[0];
   return notCheckedText;
+}
+
+function listingStatusLabel(status: string, t: (key: string) => string) {
+  const labels: Record<string, string> = {
+    active: t('common.active'),
+    draft: t('common.draft'),
+    published: t('products.statusPublished'),
+    unpublished: t('products.statusUnpublished'),
+    archived: t('common.archived')
+  };
+  return labels[status] || status;
 }
 
 function ProductImagePreview({
@@ -81,6 +94,11 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
   const [sourceFilter, setSourceFilter] = useState<'all' | 'seller_owned' | 'supplier_backed'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [view, setView] = useState<ProductView>('list');
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [pendingRemovalIds, setPendingRemovalIds] = useState<string[]>([]);
+  const [removingProducts, setRemovingProducts] = useState(false);
+  const [removalNotice, setRemovalNotice] = useState<string | null>(null);
+  const [removalError, setRemovalError] = useState<string | null>(null);
 
   useEffect(() => {
     setSearchQuery(searchParams.get('query') || '');
@@ -129,9 +147,66 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
       return false;
     }
     if (sourceFilter !== 'all' && p.source !== sourceFilter) return false;
-    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    if (statusFilter !== 'all' && (p.listing_status || p.status) !== statusFilter) return false;
     return true;
   });
+
+  const selectedVisibleCount = filteredProducts.filter((product) => selectedProductIds.has(product.id)).length;
+  const allVisibleSelected = filteredProducts.length > 0 && selectedVisibleCount === filteredProducts.length;
+
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+      if (next.has(productId)) next.delete(productId);
+      else if (next.size < 100) next.add(productId);
+      return next;
+    });
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) filteredProducts.forEach((product) => next.delete(product.id));
+      else {
+        for (const product of filteredProducts) {
+          if (next.size >= 100) break;
+          next.add(product.id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const confirmProductRemoval = async () => {
+    if (pendingRemovalIds.length === 0) return;
+    setRemovingProducts(true);
+    setRemovalNotice(null);
+    setRemovalError(null);
+    try {
+      const response = pendingRemovalIds.length === 1
+        ? await sellerApi.removeStoreProduct(store_id, pendingRemovalIds[0])
+        : await sellerApi.bulkRemoveStoreProducts(store_id, pendingRemovalIds);
+      const results = response.results || [];
+      const removedCount = results.filter((item) => item.outcome === 'removed' || item.outcome === 'not_found').length;
+      const archivedCount = results.filter((item) => item.outcome === 'archived').length;
+      const failedResults = results.filter((item) => item.outcome === 'failed');
+      setRemovalNotice(
+        t('products.removalSummary')
+          .replace('{removed}', String(removedCount))
+          .replace('{archived}', String(archivedCount))
+          .replace('{failed}', String(failedResults.length))
+      );
+      if (failedResults.length > 0) setRemovalError(t('products.removalSomeFailed'));
+      setSelectedProductIds(new Set(failedResults.map((item) => item.product_id)));
+      setPendingRemovalIds([]);
+      const refreshed = await sellerApi.listStoreProducts(store_id);
+      setProducts(refreshed.items || []);
+    } catch (error: any) {
+      setRemovalError(error.message || t('products.errorRemoveProducts'));
+    } finally {
+      setRemovingProducts(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -156,6 +231,13 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
           </Link>
         </div>
       </div>
+
+      {(removalNotice || removalError) && (
+        <div className="space-y-1" aria-live="polite">
+          {removalNotice && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{removalNotice}</p>}
+          {removalError && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{removalError}</p>}
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -193,8 +275,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
             >
               <option value="all">{t('products.allStatuses')}</option>
               <option value="draft">{t('statuses.draft')}</option>
-              <option value="active">{t('statuses.active')}</option>
-              <option value="archived">{t('statuses.archived')}</option>
+              <option value="published">{t('products.statusPublished')}</option>
+              <option value="unpublished">{t('products.statusUnpublished')}</option>
+              <option value="archived">{t('common.archived')}</option>
             </select>
           </div>
         </div>
@@ -202,6 +285,23 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
         <div className="text-xs text-slate-500">
           {t('products.showingPrefix')} <span className="font-semibold text-slate-800">{filteredProducts.length}</span>{' '}
           {t('products.showingSuffix').replace('{total}', String(products.length))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <button type="button" onClick={selectedProductIds.size ? () => setSelectedProductIds(new Set()) : toggleVisibleSelection} className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-700 hover:bg-slate-50">
+            {selectedProductIds.size ? t('products.clearSelection') : t('products.selectVisible')}
+          </button>
+          {selectedProductIds.size > 0 && (
+            <>
+              <span className="text-slate-500">{t('products.selectedCount').replace('{count}', String(selectedProductIds.size))}</span>
+              <button
+                type="button"
+                onClick={() => setPendingRemovalIds(Array.from(selectedProductIds))}
+                className="inline-flex items-center gap-1 rounded bg-rose-600 px-2.5 py-1.5 font-semibold text-white hover:bg-rose-700"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> {t('products.removeSelected')}
+              </button>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label={t('products.viewGroupAria')}>
           <button
@@ -242,6 +342,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
               return (
                 <article key={product.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                   <div className="relative flex h-44 items-center justify-center bg-slate-100">
+                    <label className="absolute right-3 top-3 z-10 rounded bg-white/95 p-1.5 shadow" aria-label={t('products.selectProduct').replace('{name}', product.name)}>
+                      <input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => toggleProductSelection(product.id)} disabled={!selectedProductIds.has(product.id) && selectedProductIds.size >= 100} />
+                    </label>
                     <ProductImagePreview
                       src={image}
                       alt={product.name}
@@ -250,7 +353,7 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                       iconClassName="h-12 w-12 text-slate-300"
                     />
                     <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold uppercase text-slate-700 shadow-sm">
-                      {product.status}
+                      {listingStatusLabel(product.listing_status || product.status, t)}
                     </span>
                   </div>
                   <div className="space-y-3 p-4">
@@ -283,9 +386,14 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                       <span className="text-[10px] text-slate-400">{t('products.updatedPrefix')} {formatDate(product.updated_at, t('products.dateUnavailable'))}</span>
-                      <Link href={`/dashboard/stores/${store_id}/catalog/products/${product.id}`} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-                        {t('products.editDetails')}
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setPendingRemovalIds([product.id])} aria-label={t('products.removeProduct').replace('{name}', product.name)} className="text-rose-600 hover:text-rose-800">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <Link href={`/dashboard/stores/${store_id}/catalog/products/${product.id}`} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                          {t('products.editDetails')}
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -297,6 +405,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 font-semibold">
                 <tr>
+                  <th className="px-3 py-3">
+                    <input type="checkbox" aria-label={allVisibleSelected ? t('products.clearSelection') : t('products.selectVisible')} checked={allVisibleSelected} onChange={toggleVisibleSelection} />
+                  </th>
                   <th className="px-4 py-3">{t('products.colPreview')}</th>
                   <th className="px-4 py-3">{t('products.colProductName')}</th>
                   <th className="px-4 py-3">{t('products.colSource')}</th>
@@ -311,8 +422,12 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
               <tbody className="divide-y divide-slate-100">
                 {filteredProducts.map((p) => {
                   const image = productImage(p, mediaByProductId);
+                  const displayedStatus = p.listing_status || p.status;
                   return (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-3 py-3">
+                      <input type="checkbox" aria-label={t('products.selectProduct').replace('{name}', p.name)} checked={selectedProductIds.has(p.id)} onChange={() => toggleProductSelection(p.id)} disabled={!selectedProductIds.has(p.id) && selectedProductIds.size >= 100} />
+                    </td>
                     <td className="px-4 py-2">
                       <ProductImagePreview
                         src={image}
@@ -347,17 +462,17 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                          p.status === 'active'
+                          displayedStatus === 'active'
                             ? 'bg-emerald-100 text-emerald-800'
-                            : p.status === 'draft'
+                            : displayedStatus === 'draft'
                             ? 'bg-amber-100 text-amber-800'
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {p.status === 'active' && <CheckCircle2 className="w-3 h-3" />}
-                        {p.status === 'draft' && <CircleAlert className="w-3 h-3" />}
-                        {p.status === 'archived' && <Archive className="w-3 h-3" />}
-                        {p.status}
+                        {displayedStatus === 'active' && <CheckCircle2 className="w-3 h-3" />}
+                        {displayedStatus === 'draft' && <CircleAlert className="w-3 h-3" />}
+                        {displayedStatus === 'archived' && <Archive className="w-3 h-3" />}
+                        {listingStatusLabel(displayedStatus, t)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -380,6 +495,9 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                       >
                         {t('products.editDetails')}
                       </Link>
+                      <button type="button" onClick={() => setPendingRemovalIds([p.id])} aria-label={t('products.removeProduct').replace('{name}', p.name)} className="ml-3 inline-flex align-middle text-rose-600 hover:text-rose-800">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                   );
@@ -389,6 +507,18 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={pendingRemovalIds.length > 0}
+        title={t('products.confirmRemovalTitle')}
+        description={t('products.confirmRemovalDescription').replace('{count}', String(pendingRemovalIds.length))}
+        confirmLabel={removingProducts ? t('products.removingProducts') : t('products.confirmRemoveProducts')}
+        cancelLabel={t('common.cancel')}
+        variant="danger"
+        loading={removingProducts}
+        onConfirm={confirmProductRemoval}
+        onCancel={() => setPendingRemovalIds([])}
+      />
     </div>
   );
 }
