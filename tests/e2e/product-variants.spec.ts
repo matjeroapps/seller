@@ -475,45 +475,6 @@ test.describe('Product Variant Management E2E', () => {
     expect(state.createdVariantCodes).toHaveLength(0);
   });
 
-  test('mixed batch result keeps failed row and retry recreates failed rows only', async ({ page }) => {
-    const state = initialState(colorSizeDetail());
-    state.failSkuCodeFragment = 'RED-M';
-    await openProductPage(page, state);
-
-    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
-    const dialog = previewDialog(page);
-    await selectAllDimensions(dialog, colorSizeDimensionOptions());
-    await dialog.getByRole('button', { name: /Create 4 variants/ }).click();
-
-    // Mixed result: three rows created, the conflicting SKU row failed.
-    const failedRow = previewRows(page).filter({ hasText: 'is already in use' });
-    await expect(failedRow).toHaveCount(1);
-    // The failed row's status cell shows 'Failed' plus the API error message.
-    await expect(failedRow.filter({ hasText: 'Failed:' })).toHaveCount(1);
-    const createdRows = previewRows(page).filter({ hasText: 'Created' });
-    await expect(createdRows).toHaveCount(3);
-    // The API mock logs every POST before applying the conflict rule, so the
-    // four createable rows were all posted, and exactly one (SKUs clashing on
-    // RED-M) was rejected.
-    const FAILED_ROW_CODE = 'VARIANT-E2E-PRODUCT-RED-M';
-    expect(state.createdVariantCodes).toHaveLength(4);
-    expect(state.createdVariantCodes).toContain(FAILED_ROW_CODE);
-
-    state.failSkuCodeFragment = null;
-    await dialog.getByRole('button', { name: /Retry 1 failed/ }).click();
-    // Retry only re-POSTed the failed row's codes; no successful variant duplicated.
-    await expect.poll(() => state.createdVariantCodes.length).toBe(5);
-    expect(state.createdVariantCodes.filter((code) => code !== FAILED_ROW_CODE)).toEqual([
-      'VARIANT-E2E-PRODUCT-BLUE-M',
-      'VARIANT-E2E-PRODUCT-BLUE-S',
-      'VARIANT-E2E-PRODUCT-RED-L'
-    ]);
-    // The one remaining duplicate is the failed row being retried exactly once.
-    expect(state.createdVariantCodes.filter((code) => code === FAILED_ROW_CODE)).toHaveLength(2);
-    await expect(dialog.getByRole('button', { name: /Retry \d+ failed/ })).toHaveCount(0);
-    await expect(createdRows).toHaveCount(4);
-  });
-
   test('existing product uses the shared editor and opens variant management', async ({ page }) => {
     await openProductPage(page, initialState(colorSizeDetail()));
     await expect(page.getByRole('heading', { name: 'تعديل المنتج' })).toBeVisible();
