@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { LoaderCircle, Sparkles, UploadCloud } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/locale-context';
 import { sellerApi, ApiError } from '@/lib/api/client';
-import type { AuthoringImageCandidate, AuthoringJob } from '@/lib/api/types';
+import type { AuthoringFieldProposal, AuthoringImageCandidate, AuthoringJob } from '@/lib/api/types';
 import { AuthoringReviewPanel } from './AuthoringReviewPanel';
 
 const finalStatuses = new Set(['succeeded', 'partial', 'failed']);
 
 type Props = {
   storeId: string;
-  onApplyName: (name: string) => void;
-  onApplyDescription?: (description: string) => void;
+  brief: string;
+  onApplyFields: (fields: AuthoringFieldProposal[]) => void;
 };
 
 type UploadItem = {
@@ -39,18 +40,31 @@ async function checksumForFile(file: File): Promise<string> {
     .join('');
 }
 
-export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescription }: Props) {
+export function AuthoringAssistantPanel({ storeId, brief, onApplyFields }: Props) {
   const { t } = useTranslation();
-  const [brief, setBrief] = useState('');
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [sourceAssetIds, setSourceAssetIds] = useState<string[]>([]);
   const [requestedImageCount, setRequestedImageCount] = useState(1);
   const [effectiveLimit, setEffectiveLimit] = useState(1);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const [creatingJob, setCreatingJob] = useState(false);
   const [job, setJob] = useState<AuthoringJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollStartedAt = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const appliedJobIds = useRef(new Set<string>());
+  const onApplyFieldsRef = useRef(onApplyFields);
+  onApplyFieldsRef.current = onApplyFields;
+
+  const setJobAndApplyFields = useCallback((next: AuthoringJob) => {
+    setJob(next);
+    const proposed = (next.fields || []).filter((field) => field.status === 'proposed');
+    if (proposed.length && !appliedJobIds.current.has(next.id)) {
+      appliedJobIds.current.add(next.id);
+      onApplyFieldsRef.current(proposed);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof sellerApi.getAuthoringLimits !== 'function') return;
@@ -69,7 +83,7 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
       timerRef.current = setTimeout(async () => {
         try {
           const fresh = await sellerApi.getAuthoringJob(storeId, job.id);
-          setJob(fresh);
+          setJobAndApplyFields(fresh);
         } catch (err) {
           setError(err instanceof Error ? err.message : t('products.authoring.pollFailed'));
         }
@@ -79,7 +93,7 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [job, storeId, t]);
+  }, [job, storeId, t, setJobAndApplyFields]);
 
   // uploadFiles runs the canonical three-step upload flow used across the
   // media library: createMediaUpload → storage PUT → completeMediaUpload.
@@ -106,6 +120,13 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
           size_bytes: file.size,
           checksum_sha256: checksum
         });
+        if (presign.mode === 'reuse' && presign.asset) {
+          setUploadState(item.id, 'ready');
+          setSourceAssetIds((current) =>
+            current.includes(presign.asset!.id) ? current : [...current, presign.asset!.id]
+          );
+          continue;
+        }
         if (!presign.upload_url || !presign.intent_id || !presign.upload_token) {
           throw new Error(t('products.authoring.uploadIncomplete'));
         }
@@ -135,6 +156,7 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
 
   const createJob = async () => {
     setError(null);
+    setCreatingJob(true);
     try {
       const created = await sellerApi.createAuthoringJob(storeId, {
         brief,
@@ -142,9 +164,11 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
         requested_image_count: requestedImageCount
       }, idempotencyKey());
       pollStartedAt.current = Date.now();
-      setJob(created);
+      setJobAndApplyFields(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('products.authoring.createFailed'));
+    } finally {
+      setCreatingJob(false);
     }
   };
 
@@ -153,7 +177,7 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
     try {
       const updated = await sellerApi.retryAuthoringJob(storeId, job.id, candidateId ? { candidate_ids: [candidateId] } : { parts: [part] }, idempotencyKey());
       pollStartedAt.current = Date.now();
-      setJob(updated);
+      setJobAndApplyFields(updated);
     } catch (err) {
       if (err instanceof ApiError && (err.code === 'ai_job_conflict' || err.code === 'ai_job_not_retryable')) setError(err.message);
       else setError(err instanceof Error ? err.message : t('products.authoring.retryFailed'));
@@ -173,19 +197,25 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
     }
   };
 
+  const isJobRunning = Boolean(job && !finalStatuses.has(job.status));
+  const isUploading = uploads.some((item) => !['ready', 'error'].includes(item.status));
+  const isGenerating = creatingJob || isJobRunning;
+  const completedImages = (job?.image_candidates || []).filter((candidate) =>
+    ['proposed', 'accepted', 'failed'].includes(candidate.status)
+  ).length;
+  const imageProgress = job?.image_status === 'processing'
+    ? Math.min(completedImages, job.requested_image_count)
+    : 0;
+  const imageProgressPercent = job && job.requested_image_count > 0
+    ? Math.round((imageProgress / job.requested_image_count) * 100)
+    : 0;
+
   return (
     <section className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 text-xs" data-testid="authoring-assistant">
       <h2 className="text-sm font-semibold text-slate-900">{t('products.authoring.title')}</h2>
       <p className="mt-1 text-slate-600">{t('products.authoring.subtitle')}</p>
       {error ? <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">{error}</div> : null}
       <div className="mt-3 space-y-2">
-        <textarea
-          value={brief}
-          onChange={(e) => setBrief(e.target.value)}
-          className="w-full rounded border border-slate-200 p-2"
-          placeholder={t('products.authoring.briefPlaceholder')}
-          data-testid="authoring-brief"
-        />
         <input
           type="file"
           multiple
@@ -196,19 +226,52 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
             e.target.value = '';
             void uploadFiles(files);
           }}
-          className="w-full rounded border border-slate-200 p-1"
+          className="sr-only"
           aria-label={t('products.authoring.uploadSources')}
           data-testid="authoring-file"
         />
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={t('products.authoring.dropzoneTitle')}
+          data-testid="authoring-dropzone"
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDraggingFiles(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setDraggingFiles(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDraggingFiles(false);
+            void uploadFiles(Array.from(event.dataTransfer.files));
+          }}
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-5 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 ${draggingFiles ? 'border-indigo-500 bg-indigo-100' : 'border-indigo-200 bg-white/70 hover:border-indigo-400 hover:bg-white'}`}
+        >
+          <UploadCloud className="mb-2 h-6 w-6 text-indigo-600" aria-hidden="true" />
+          <span className="font-medium text-slate-800">{draggingFiles ? t('products.authoring.dropzoneActive') : t('products.authoring.dropzoneTitle')}</span>
+          <span className="mt-1 text-[11px] text-slate-500">{t('products.authoring.dropzoneDescription')}</span>
+        </div>
         <ul className="text-[11px] text-slate-500">
           {uploads.map((item) => (
             <li key={item.id} data-testid="authoring-upload-item" data-upload-status={item.status}>
-              {item.name} — {item.status}
+              {item.name} — {t(`products.authoring.uploadStatus.${item.status}`)}
             </li>
           ))}
         </ul>
         {sourceAssetIds.length ? (
-          <p className="text-[11px] text-slate-500" data-testid="authoring-source-count">{sourceAssetIds.length}</p>
+          <p className="text-[11px] text-slate-500" data-testid="authoring-source-count">
+            {t('products.authoring.selectedImages', `${sourceAssetIds.length} images selected`).replace('{count}', String(sourceAssetIds.length))}
+          </p>
         ) : null}
         <label className="block text-slate-600">
           {t('products.authoring.imageCount')}
@@ -223,26 +286,56 @@ export function AuthoringAssistantPanel({ storeId, onApplyName, onApplyDescripti
           />
           <span className="ml-2">{effectiveLimit}</span>
         </label>
-        <button type="button" className="rounded bg-indigo-600 px-3 py-1.5 font-medium text-white" onClick={createJob} data-testid="authoring-generate">
-          {t('products.authoring.generate')}
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded bg-indigo-600 px-3 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={createJob}
+          disabled={isGenerating || isUploading || (!brief.trim() && sourceAssetIds.length === 0)}
+          data-testid="authoring-generate"
+        >
+          {isGenerating ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+          {isGenerating ? t('products.authoring.generating') : t('products.authoring.generate')}
         </button>
       </div>
       {job ? (
         <div className="mt-4 space-y-3">
           <div className="rounded bg-white p-2 text-slate-700" data-testid="authoring-status">{`${t('products.authoring.statusPrefix')}: ${job.status} · ${t('products.authoring.textPrefix')} ${job.text_status} · ${t('products.authoring.imagePrefix')} ${job.image_status}`}</div>
+          {job.image_status === 'processing' ? (
+            <div className="rounded-md border border-indigo-200 bg-white p-3" data-testid="authoring-image-progress" role="status" aria-live="polite">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 font-medium text-indigo-900">
+                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  {t('products.authoring.imageGenerating')}
+                </span>
+                <span className="text-slate-500">{imageProgress} / {job.requested_image_count}</span>
+              </div>
+              <div
+                className="h-2 overflow-hidden rounded-full bg-indigo-100"
+                role="progressbar"
+                aria-label={t('products.authoring.imageGenerating')}
+                aria-valuemin={0}
+                aria-valuemax={job.requested_image_count}
+                {...(imageProgress > 0 ? { 'aria-valuenow': imageProgress } : {})}
+              >
+                <div
+                  className={`h-full rounded-full bg-indigo-600 transition-all ${imageProgress === 0 ? 'w-1/3 animate-pulse' : ''}`}
+                  style={imageProgress > 0 ? { width: `${imageProgressPercent}%` } : undefined}
+                />
+              </div>
+            </div>
+          ) : null}
+          {job.text_status === 'failed' ? (
+            <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1" onClick={() => retryPart('text')} data-testid="authoring-retry-text">
+              {t('products.authoring.retryText')}
+            </button>
+          ) : null}
+          {job.image_status === 'failed' && !(job.image_candidates || []).some((candidate) => candidate.status === 'failed') ? (
+            <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1" onClick={() => retryPart('image')} data-testid="authoring-retry-image-branch">
+              {t('products.authoring.retryImages')}
+            </button>
+          ) : null}
           <AuthoringReviewPanel
-            fields={job.fields || []}
             images={job.image_candidates || []}
-            onAcceptField={async (field, value) => {
-              const updated = await sellerApi.updateAuthoringField(storeId, job.id, field.id, { decision: 'accept', value }, idempotencyKey());
-              if (updated.field_key === 'name' && updated.locale === 'en') onApplyName(updated.value);
-              if (updated.field_key === 'description' && updated.locale === 'en') onApplyDescription?.(updated.value);
-              setJob({ ...job, fields: job.fields.map((item) => (item.id === updated.id ? updated : item)) });
-            }}
-            onRejectField={async (field) => {
-              const updated = await sellerApi.updateAuthoringField(storeId, job.id, field.id, { decision: 'reject', value: field.value }, idempotencyKey());
-              setJob({ ...job, fields: job.fields.map((item) => (item.id === updated.id ? updated : item)) });
-            }}
             onRetryPart={retryPart}
             onAcceptImage={acceptImage}
           />

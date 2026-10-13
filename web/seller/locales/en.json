@@ -1186,24 +1186,40 @@
     "confirmArchiveCancel": "Keep Product",
     "authoring": {
       "title": "AI authoring assistant",
-      "subtitle": "Generate draft text and scene image candidates for review before creating the product.",
+      "subtitle": "Use the descriptions above and product photos to complete the editable product details.",
       "briefPlaceholder": "Brief product description",
       "uploadSources": "Upload source images",
+      "dropzoneTitle": "Drag and drop product images",
+      "dropzoneActive": "Drop images to add them",
+      "dropzoneDescription": "or click to choose JPEG, PNG, or WebP files",
+      "selectedImages": "{count} images selected",
+      "uploadStatus": {
+        "hashing": "Preparing image",
+        "creating": "Starting upload",
+        "uploading": "Uploading image",
+        "completing": "Saving image",
+        "ready": "Ready",
+        "error": "Upload failed"
+      },
       "unsupportedType": "Unsupported image type (allowed: jpeg/png/webp).",
       "uploadIncomplete": "The upload service returned incomplete instructions.",
       "uploadFailed": "The image upload could not reach storage.",
       "imageCount": "Image count",
-      "generate": "Generate",
+      "generate": "Generate with AI",
+      "generating": "Generating…",
+      "imageGenerating": "Generating product images…",
       "pollFailed": "Polling failed.",
       "createFailed": "Authoring failed.",
       "retryFailed": "Retry failed.",
+      "retryText": "Retry text generation.",
+      "retryImages": "Retry missing image generation",
       "acceptFailed": "The image could not be accepted.",
       "statusPrefix": "Status",
       "textPrefix": "text",
       "imagePrefix": "images"
     },
     "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Product description (an accepted assistant draft can be applied here)"
+    "descriptionPlaceholder": "Product description; AI suggestions appear here and remain editable."
   },
   "supplierOffers": {
     "title": "Supplier Offers Catalog",

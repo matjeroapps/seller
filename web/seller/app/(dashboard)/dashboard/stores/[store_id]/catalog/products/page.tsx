@@ -116,10 +116,19 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
 
         const mediaEntries = await Promise.all(
           items.map(async (product) => {
+            if (product.primary_media_uri) return [product.id, product.primary_media_uri] as const;
+            let referenceImage = '';
+            try {
+              const media = await sellerApi.listProductMediaReferences(store_id, product.id);
+              referenceImage = media.items.find((reference) => reference.is_primary)?.url || media.items[0]?.url || '';
+            } catch {
+              // Fall back to legacy product media below for older catalog records.
+            }
+            if (referenceImage) return [product.id, referenceImage] as const;
             try {
               const detail = await sellerApi.getStoreProductDetail(store_id, product.id);
-              const primary = detail.primary_media_uri || detail.media.find((media) => media.is_primary)?.uri || detail.media[0]?.uri;
-              return primary ? ([product.id, primary] as const) : null;
+              const legacyImage = detail.primary_media_uri || detail.media?.find((media) => media.is_primary)?.uri || detail.media?.[0]?.uri;
+              return legacyImage ? ([product.id, legacyImage] as const) : null;
             } catch {
               return null;
             }
@@ -361,7 +370,6 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                       <Link href={`/dashboard/stores/${store_id}/catalog/products/${product.id}`} className="text-sm font-bold text-slate-900 hover:text-indigo-700">
                         {product.name}
                       </Link>
-                      <p className="mt-1 truncate font-mono text-[11px] text-slate-500">{product.slug}</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
@@ -411,7 +419,6 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                   <th className="px-4 py-3">{t('products.colPreview')}</th>
                   <th className="px-4 py-3">{t('products.colProductName')}</th>
                   <th className="px-4 py-3">{t('products.colSource')}</th>
-                  <th className="px-4 py-3">{t('products.colSlug')}</th>
                   <th className="px-4 py-3">{t('products.colStatus')}</th>
                   <th className="px-4 py-3">{t('products.colInventory')}</th>
                   <th className="px-4 py-3">{t('products.colReadiness')}</th>
@@ -458,7 +465,6 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
                         {p.source === 'seller_owned' ? t('products.sellerOwned') : t('products.supplierBacked')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-500">{p.slug}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${

@@ -65,7 +65,6 @@ function renderWorkspace(overrides: Partial<React.ComponentProps<typeof ProductM
       productId="product-1"
       productName="Travel bag"
       canManage
-      initialAssets={assets}
       initialReferences={references}
       {...overrides}
     />
@@ -81,8 +80,10 @@ describe('ProductMediaWorkspace', () => {
       ...references[0],
       id: `ref-${payload.asset_id}`,
       asset_id: payload.asset_id,
-      is_primary: false,
-      sort_order: payload.sort_order
+      is_primary: payload.is_primary,
+      sort_order: payload.sort_order,
+      // The attach endpoint does not resolve the media asset URL.
+      url: ''
     }));
     mockApi.updateProductMediaReference.mockImplementation(async (_storeId, _productId, id, payload) => ({
       ...references[0],
@@ -92,18 +93,39 @@ describe('ProductMediaWorkspace', () => {
     mockApi.detachProductMedia.mockResolvedValue(undefined);
   });
 
-  it('renders an accessible dropzone, visual gallery, search, and multi-select attach flow', async () => {
+  it('shows only attached product media until the library dialog is opened, then attaches selected images', async () => {
     renderWorkspace();
 
+    expect(screen.getByRole('button', { name: 'Choose from media library' })).toBeInTheDocument();
+    expect(screen.getByText('Alt text: Front view')).toBeInTheDocument();
+    expect(screen.queryByText('side.jpg')).not.toBeInTheDocument();
+    expect(mockApi.listStoreMedia).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from media library' }));
+    expect(screen.getByRole('dialog', { name: 'Choose product images' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload product images' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Search store media' })).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText('front.png')).toBeInTheDocument();
       expect(screen.getByText('side.jpg')).toBeInTheDocument();
     });
+    expect(screen.queryByText('front.png')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /side\.jpg/i }));
+    mockApi.listProductMediaReferences.mockResolvedValue({
+      items: [
+        ...references,
+        {
+          ...references[0],
+          id: 'ref-asset-2',
+          asset_id: 'asset-2',
+          sort_order: 1,
+          is_primary: false,
+          alt_text: 'Side view',
+          url: assets[1].url
+        }
+      ]
+    });
     fireEvent.click(screen.getByRole('button', { name: /Attach selected \(1\)/i }));
 
     await waitFor(() => {
@@ -113,11 +135,44 @@ describe('ProductMediaWorkspace', () => {
         is_primary: false
       });
       expect(screen.getByText('1 image attached.')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByText('side.jpg')).not.toBeInTheDocument();
+      expect(mockApi.listProductMediaReferences).toHaveBeenCalledWith('store-1', 'product-1');
+      expect(screen.getByTestId('attached-media-grid')).toHaveClass('sm:grid-cols-2');
+      expect(screen.getByAltText('Side view')).toHaveAttribute('src', 'https://cdn.test/side.jpg');
+    });
+  });
+
+  it('makes the first attached image primary when the product has no media yet', async () => {
+    renderWorkspace({ initialReferences: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from media library' }));
+    await waitFor(() => expect(screen.getByText('front.png')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /front\.png/i }));
+    mockApi.listProductMediaReferences.mockResolvedValue({
+      items: [{
+        ...references[0],
+        id: 'ref-asset-1',
+        is_primary: true,
+        url: assets[0].url
+      }]
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Attach selected \(1\)/i }));
+
+    await waitFor(() => {
+      expect(mockApi.attachProductMedia).toHaveBeenCalledWith('store-1', 'product-1', {
+        asset_id: 'asset-1',
+        sort_order: 0,
+        is_primary: true
+      });
+      expect(screen.getByText('Primary')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
   it('filters the gallery by filename and attachment state', async () => {
     renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from media library' }));
 
     await waitFor(() => expect(screen.getByText('side.jpg')).toBeInTheDocument());
     fireEvent.change(screen.getByRole('textbox', { name: 'Search store media' }), {
@@ -136,6 +191,7 @@ describe('ProductMediaWorkspace', () => {
 
   it('rejects unsupported and oversized files with inline messages', async () => {
     renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from media library' }));
     const dropzone = screen.getByRole('button', { name: 'Upload product images' });
     const unsupported = new File(['text'], 'notes.txt', { type: 'text/plain' });
     fireEvent.drop(dropzone, { dataTransfer: { files: [unsupported] } });

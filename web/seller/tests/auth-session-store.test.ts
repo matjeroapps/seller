@@ -106,4 +106,23 @@ describe('Auth Session Store & Cookie Security (T005)', () => {
     await expect(ensureRedisReady(redis)).resolves.toBe(true);
     expect(redis.connect).toHaveBeenCalledTimes(1);
   });
+
+  it('shares one in-flight Redis connection across concurrent session requests', async () => {
+    let status: 'wait' | 'connecting' | 'ready' = 'wait';
+    const redis = {
+      get status() {
+        return status;
+      },
+      connect: vi.fn(async () => {
+        status = 'connecting';
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        status = 'ready';
+      }),
+    };
+
+    const results = await Promise.all(Array.from({ length: 8 }, () => ensureRedisReady(redis)));
+
+    expect(results).toEqual(Array(8).fill(true));
+    expect(redis.connect).toHaveBeenCalledTimes(1);
+  });
 });

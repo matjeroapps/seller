@@ -1030,6 +1030,9 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     sellerApiMock.getStoreProductDetail.mockResolvedValue({
       media: [{ id: 'md_link_1', uri: 'https://cdn.example.com/p1.png', is_primary: true, alt_text: 'p', product_id: 'prod_idx_ar_1', media_type: 'image/png', storage_key: '', sort_order: 0, metadata: {}, created_at: '2026-10-01T10:00:00Z', updated_at: '2026-10-01T10:00:00Z' }]
     });
+    sellerApiMock.listProductMediaReferences.mockResolvedValue({
+      items: [{ is_primary: true, url: 'https://cdn.example.com/p1.png' }]
+    });
 
     let utils!: ReturnType<typeof render>;
     await act(async () => {
@@ -1061,7 +1064,10 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     // Product data truth is preserved while UI status labels are localized.
     const page = screen.getByText('كتالوج منتجات المتجر').closest('div.space-y-6')!;
     expect(page.textContent).toContain('Premium Cotton T-Shirt');
-    expect(page.textContent).toContain('premium-cotton-t-shirt');
+    expect(page.textContent).not.toContain('premium-cotton-t-shirt');
+    await waitFor(() => {
+      expect(screen.getByAltText('')).toHaveAttribute('src', 'https://cdn.example.com/p1.png');
+    });
     expect(page.textContent).toContain('prod_idx');
     expect(page.textContent).toContain('نشط');
     expect(page.textContent).toContain('SAR');
@@ -1214,7 +1220,7 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
 
     // Form fixed copy and validation labels/placeholder are localized in Arabic.
     expect(screen.getByText('أضِف منتجًا مسودًا مملوكًا للبائع وقائمة متجر ابتدائية')).toBeInTheDocument();
-    expect(screen.getByText('اسم المنتج *')).toBeInTheDocument();
+    expect(screen.getByText('العنوان الإنجليزي *')).toBeInTheDocument();
     expect(screen.getByText('رابط المنتج *')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('مثال: تي-شيرت قطني فاخر')).toBeInTheDocument();
     expect(screen.getByText('معرّف URL فريد لكتالوج المنتجات')).toBeInTheDocument();
