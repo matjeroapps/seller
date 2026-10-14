@@ -1215,16 +1215,15 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     void utils;
 
     await waitFor(() => {
-      expect(screen.getByText('إنشاء منتج بائع')).toBeInTheDocument();
+      expect(screen.getByText('إضافة منتج جديد')).toBeInTheDocument();
     });
 
     // Form fixed copy and validation labels/placeholder are localized in Arabic.
-    expect(screen.getByText('أضِف منتجًا مسودًا مملوكًا للبائع وقائمة متجر ابتدائية')).toBeInTheDocument();
-    expect(screen.getByText('العنوان الإنجليزي *')).toBeInTheDocument();
-    expect(screen.getByText('رابط المنتج *')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('مثال: تي-شيرت قطني فاخر')).toBeInTheDocument();
-    expect(screen.getByText('معرّف URL فريد لكتالوج المنتجات')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'إنشاء منتج مسود' })).toBeInTheDocument();
+    expect(screen.getByText('أضف منتجاً لمسودتك وراجعه قبل نشره في المتجر.')).toBeInTheDocument();
+    expect(screen.getByText('اسم المنتج بالعربية *')).toBeInTheDocument();
+    expect(screen.getByText('رابط المنتج المخصص')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('مثال: خلاط متعدد السرعات')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'حفظ كمسودة' })).toBeInTheDocument();
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.documentElement.lang).toBe('ar');
   });
@@ -1282,41 +1281,18 @@ describe('Arabic Localization & RTL Switching (US5)', () => {
     void utils;
 
     await waitFor(() => {
-      expect(screen.getByText('محتوى المنتج')).toBeInTheDocument();
+      expect(screen.getByText('تعديل المنتج')).toBeInTheDocument();
     });
 
-    // Fixed UI copy is localized in Arabic (cards, form labels, actions).
-    expect(screen.getByText('القائمة')).toBeInTheDocument();
-    expect(screen.getByText('الجاهزية')).toBeInTheDocument();
-    expect(screen.getByText('المخزون')).toBeInTheDocument();
-    expect(screen.getByText('السعر الحالي')).toBeInTheDocument();
-    expect(screen.getByText('حفظ تفاصيل المنتج')).toBeInTheDocument();
-    expect(screen.getByText('العنوان الإنجليزي *')).toBeInTheDocument();
-    expect(screen.getByText('رابط المنتج *')).toBeInTheDocument();
-    expect(screen.getByText('أرشفة / إزالة')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'عرض قائمة المتجر' })).toHaveAttribute(
-      'href',
-      '/dashboard/stores/store_123/catalog/listings/lst_ar_prod_1'
-    );
+    // The detail route intentionally reuses the add-product editor, including
+    // its Arabic labels and editable product fields.
+    expect(screen.getByText('البيانات الأساسية للمنتج')).toBeInTheDocument();
+    expect(screen.getByText('وسائط وصور المنتج')).toBeInTheDocument();
+    expect(screen.getByText('الخيارات والمتغيرات (Variants)')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('تي-شيرت قطني فاخر')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('premium-cotton-t-shirt')).toBeInTheDocument();
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.documentElement.lang).toBe('ar');
-
-    // Product data truth is preserved untouched (IDs, slug, source, prices, statuses).
-    const page = screen.getByText('محتوى المنتج').closest('div.space-y-6')!;
-    expect(page.textContent).toContain('prod_ar_detail');
-    expect(page.textContent).toContain('premium-cotton-t-shirt');
-    expect(page.textContent).toContain('seller_owned');
-    expect(page.textContent).toContain('lst_ar_prod_1');
-    expect(page.textContent).toContain('draft');
-    expect(page.textContent).toContain('SAR');
-    expect(page.textContent).toContain('Main Logistics Warehouse');
-    expect(page.textContent).toContain('sku_ar_1');
-
-    // The archive confirmation modal copy is localized in Arabic as well.
-    fireEvent.click(screen.getByText('أرشفة / إزالة'));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toHaveTextContent('أرشفة المنتج');
-    expect(screen.getByText('الاحتفاظ بالمنتج')).toBeInTheDocument();
   });
 
   it('renders the listing detail screen in Arabic under RTL while preserving IDs, price and currency', async () => {

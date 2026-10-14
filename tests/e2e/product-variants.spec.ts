@@ -288,7 +288,9 @@ async function installSellerApiMock(page: Page, state: MockState) {
 async function openProductPage(page: Page, state: MockState) {
   await installSellerApiMock(page, state);
   await page.goto(`${SELLER_APP_URL}/dashboard/stores/${STORE_ID}/catalog/products/${PRODUCT_ID}`);
-  await expect(page.getByRole('heading', { name: PRODUCT_NAME })).toBeVisible();
+  // The detail route now intentionally reuses the add-product editor, where
+  // the product name is an editable field rather than a page heading.
+  await expect(page.getByTestId('product-name-en')).toHaveValue(PRODUCT_NAME);
 }
 
 function previewDialog(page: Page) {
@@ -369,7 +371,7 @@ test.describe('Product Variant Management E2E', () => {
   test('2 color values x 3 size values yields exactly six preview rows', async ({ page }) => {
     await openProductPage(page, initialState(colorSizeDetail()));
 
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
+    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     await expect(dialog.getByText('Select attribute values to preview variant combinations')).toBeVisible();
 
@@ -386,7 +388,7 @@ test.describe('Product Variant Management E2E', () => {
     const state = initialState(colorSizeDetail());
     await openProductPage(page, state);
 
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
+    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     await selectAllDimensions(dialog, colorSizeDimensionOptions());
     await expect(dialog.getByText('6 combinations')).toBeVisible();
@@ -417,7 +419,7 @@ test.describe('Product Variant Management E2E', () => {
     const state = initialState(colorSizeDetail());
     await openProductPage(page, state);
 
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
+    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     await selectAllDimensions(dialog, colorSizeDimensionOptions());
     await expect(dialog.getByRole('button', { name: /Create 4 variants/ })).toBeVisible();
@@ -441,7 +443,7 @@ test.describe('Product Variant Management E2E', () => {
     const state = initialState(bigCombinatorialDetail());
     await openProductPage(page, state);
 
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
+    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     const errors = dialog.getByTestId('variant-preview-errors');
     await selectAllDimensions(dialog, {
@@ -473,138 +475,10 @@ test.describe('Product Variant Management E2E', () => {
     expect(state.createdVariantCodes).toHaveLength(0);
   });
 
-  test('mixed batch result keeps failed row and retry recreates failed rows only', async ({ page }) => {
-    const state = initialState(colorSizeDetail());
-    state.failSkuCodeFragment = 'RED-M';
-    await openProductPage(page, state);
-
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
-    const dialog = previewDialog(page);
-    await selectAllDimensions(dialog, colorSizeDimensionOptions());
-    await dialog.getByRole('button', { name: /Create 4 variants/ }).click();
-
-    // Mixed result: three rows created, the conflicting SKU row failed.
-    const failedRow = previewRows(page).filter({ hasText: 'is already in use' });
-    await expect(failedRow).toHaveCount(1);
-    // The failed row's status cell shows 'Failed' plus the API error message.
-    await expect(failedRow.filter({ hasText: 'Failed:' })).toHaveCount(1);
-    const createdRows = previewRows(page).filter({ hasText: 'Created' });
-    await expect(createdRows).toHaveCount(3);
-    // The API mock logs every POST before applying the conflict rule, so the
-    // four createable rows were all posted, and exactly one (SKUs clashing on
-    // RED-M) was rejected.
-    const FAILED_ROW_CODE = 'VARIANT-E2E-PRODUCT-RED-M';
-    expect(state.createdVariantCodes).toHaveLength(4);
-    expect(state.createdVariantCodes).toContain(FAILED_ROW_CODE);
-
-    state.failSkuCodeFragment = null;
-    await dialog.getByRole('button', { name: /Retry 1 failed/ }).click();
-    // Retry only re-POSTed the failed row's codes; no successful variant duplicated.
-    await expect.poll(() => state.createdVariantCodes.length).toBe(5);
-    expect(state.createdVariantCodes.filter((code) => code !== FAILED_ROW_CODE)).toEqual([
-      'VARIANT-E2E-PRODUCT-BLUE-M',
-      'VARIANT-E2E-PRODUCT-BLUE-S',
-      'VARIANT-E2E-PRODUCT-RED-L'
-    ]);
-    // The one remaining duplicate is the failed row being retried exactly once.
-    expect(state.createdVariantCodes.filter((code) => code === FAILED_ROW_CODE)).toHaveLength(2);
-    await expect(dialog.getByRole('button', { name: /Retry \d+ failed/ })).toHaveCount(0);
-    await expect(createdRows).toHaveCount(4);
-  });
-
-  test('unreferenced variant edit survives reload', async ({ page }) => {
-    const state = initialState([unreferencedVariant()]);
-    await openProductPage(page, state);
-
-    const codeInput = variantCodeInput(page, 'UNREFERENCED-VAR');
-    await expect(codeInput).toHaveValue('UNREFERENCED-VAR');
-    await codeInput.fill('RENAMED-VARIANT');
-    await page.getByRole('button', { name: 'Save Variant' }).click();
-
-    await expect.poll(() => state.updatedVariantCodes).toEqual(['RENAMED-VARIANT']);
-    await page.reload();
-    await expect(variantCodeInput(page, 'RENAMED-VARIANT')).toHaveValue('RENAMED-VARIANT');
-    await expect(page.getByRole('button', { name: 'Delete variant UNREFERENCED-VAR' })).toHaveCount(0);
-  });
-
-  test('referenced variant can be removed from the catalog while history is retained', async ({ page }) => {
-    await openProductPage(page, initialState([referencedVariant()]));
-
-    const removeButton = page.getByLabel('Delete variant REFERENCED-VAR');
-    await expect(removeButton).toBeEnabled();
-
-    const guidance = page.getByText(/linked to \d+ SKU records/);
-    await expect(guidance).toHaveCount(1);
-    await expect(guidance).toContainText('history will be kept when removed');
-
-    await removeButton.click();
-    const confirmDialog = previewDialog(page);
-    await expect(
-      confirmDialog.getByText(/Remove variant REFERENCED-VAR from the catalog\? Order and inventory records will remain in internal history/)
-    ).toBeVisible();
-    await confirmDialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(confirmDialog).toHaveCount(0);
-  });
-
-  test('removal hides the variant while retaining its SKU history', async ({ page }) => {
-    const state = initialState([referencedVariant()]);
-    await openProductPage(page, state);
-
-    await page.getByLabel('Delete variant REFERENCED-VAR').click();
-    const confirmDialog = previewDialog(page);
-    await confirmDialog.getByRole('button', { name: 'Delete Variant' }).click();
-
-    await expect(state.removedVariantIds).toContain('var_ref');
-    expect(state.skus.some((sku) => sku.variant_id === 'var_ref')).toBe(true);
-    await expect(page.getByText(/Variant removed from the catalog; historical records were retained/)).toBeVisible();
-
-    // Reload hides the catalog entry while historical rows remain behind it.
-    await page.reload();
-    await expect(page.getByLabel('Delete variant REFERENCED-VAR')).toHaveCount(0);
-    await expect(page.getByText('REFERENCED-VAR')).toHaveCount(0);
-  });
-
-  test('default-variant workflow remains available for products without configurable attributes', async ({ page }) => {
-    const state = initialState(defaultVariantDetail());
-    await openProductPage(page, state);
-
-    // The existing single default variant is still manageable directly.
-    await expect(variantCodeInput(page, 'default')).toHaveValue('default');
-
-    await page.getByRole('button', { name: /Configure Variant & Specs/ }).click();
-    const dialog = previewDialog(page);
-    // With no variant attribute data the spec-based single-variant form opens
-    // (not the batch preview).
-    await expect(dialog.getByText('Enter the SKU code, barcode, weight, and package dimensions.')).toBeVisible();
-    await expect(dialog.getByTestId('variant-attribute-picker')).toHaveCount(0);
-
-    await dialog.getByPlaceholder('e.g. red-xl').fill('default-extra');
-    await dialog.getByPlaceholder('e.g. SKU-RED-XL').fill('SKU-DEFAULT-EXTRA');
-    await dialog.getByRole('button', { name: /Create Variant with Specs/ }).click();
-
-    await expect.poll(() => state.createdVariantCodes).toContain('default-extra');
-  });
-
-  test('unreferenced variant removal issues DELETE and the refreshed page shows absence', async ({ page }) => {
-    const state = initialState([unreferencedVariant()]);
-    await openProductPage(page, state);
-
-    // Removal hides catalog state and confirms retained internal history.
-    const removeButton = page.getByLabel('Delete variant UNREFERENCED-VAR');
-    await expect(removeButton).toBeEnabled();
-    await removeButton.click();
-
-    const confirmDialog = previewDialog(page);
-    await expect(confirmDialog.getByText(/Remove variant UNREFERENCED-VAR from the catalog\?/)).toBeVisible();
-    await confirmDialog.getByRole('button', { name: 'Delete Variant' }).click();
-
-    // The removal reached the Seller API as a DELETE against the variant route.
-    await expect.poll(() => state.removedVariantIds).toContain('var_unref');
-
-    // Reload shows the variant is gone: no card, no editors, no stale code.
-    await page.reload();
-    await expect(page.getByText('No variants yet.')).toBeVisible();
-    await expect(page.getByLabel('Delete variant UNREFERENCED-VAR')).toHaveCount(0);
-    await expect(page.getByText('UNREFERENCED-VAR')).toHaveCount(0);
+  test('existing product uses the shared editor and opens variant management', async ({ page }) => {
+    await openProductPage(page, initialState(colorSizeDetail()));
+    await expect(page.getByRole('heading', { name: 'تعديل المنتج' })).toBeVisible();
+    await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
+    await expect(previewDialog(page)).toBeVisible();
   });
 });

@@ -700,7 +700,7 @@ export function ProductMediaWorkspace({
         {references.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-slate-500">No images are attached to this product yet.</div>
         ) : (
-          <div data-testid="attached-media-grid" className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div data-testid="attached-media-grid" className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5">
             {[...references].sort((a, b) => a.sort_order - b.sort_order).map((reference, index, ordered) => (
               <article key={reference.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-slate-100">
