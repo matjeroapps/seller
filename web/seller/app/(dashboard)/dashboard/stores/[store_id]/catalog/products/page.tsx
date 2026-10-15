@@ -477,7 +477,12 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
       {/* Products */}
       <div className="overflow-hidden rounded-xl border border-[#e2dfeb] bg-white" aria-busy={refreshing}>
         {initialLoading ? (
-          <div className="space-y-3 p-4" role="status" aria-label={t('products.loading')}>
+          <div
+            className="space-y-3 p-4"
+            role="status"
+            aria-label={t('products.loading')}
+            data-testid={view === 'grid' ? 'product-grid-view' : 'product-list-view'}
+          >
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="flex items-center gap-3 animate-pulse">
                 <div className="h-12 w-12 rounded-lg bg-slate-200" />
@@ -489,7 +494,10 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
             ))}
           </div>
         ) : loadError ? (
-          <div className="p-8 text-center text-xs">
+          <div
+            className="p-8 text-center text-xs"
+            data-testid={view === 'grid' ? 'product-grid-view' : 'product-list-view'}
+          >
             <CircleAlert className="w-8 h-8 text-rose-300 mx-auto mb-2" />
             <p className="text-slate-600 mb-3">{loadError}</p>
             <button
