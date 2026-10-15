@@ -501,7 +501,10 @@ export default function StoreProductsPage({ params }: { params: Promise<{ store_
             </button>
           </div>
         ) : products.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs">
+          <div
+            className="p-8 text-center text-slate-500 text-xs"
+            data-testid={view === 'grid' ? 'product-grid-view' : 'product-list-view'}
+          >
             <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             {t('products.emptyFilters')}
           </div>
