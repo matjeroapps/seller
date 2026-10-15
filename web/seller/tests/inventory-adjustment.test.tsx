@@ -38,7 +38,7 @@ describe('StoreInventoryPage - Dual Mode Adjustments & Selectors', () => {
     vi.clearAllMocks();
     vi.mocked(sellerApi.listStoreInventory).mockResolvedValue({ items: [mockSnapshot] });
     vi.mocked(sellerApi.listStoreLocations).mockResolvedValue({ items: [mockLocation] });
-    vi.mocked(sellerApi.listStoreProducts).mockResolvedValue({ items: [] });
+    vi.mocked(sellerApi.listStoreProducts).mockResolvedValue({ items: [], total: 0, limit: 0, offset: 0 });
   });
 
   it('renders SKU and Location dropdown selectors instead of raw text inputs', async () => {

@@ -98,7 +98,10 @@ describe('Seller API Client Contracts & Envelope Integrity (T013)', () => {
           name: 'Coffee',
           status: 'active'
         })
-      ]
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0
     });
   });
 

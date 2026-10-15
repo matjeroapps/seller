@@ -1074,6 +1074,10 @@
     "colActions": "Actions",
     "availableCount": "available",
     "priceNotSet": "Price not set",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "pageStatus": "Page {page} of {pages}",
+    "errorLoadProducts": "Could not load the product catalog.",
     "moneyNotSet": "Not set",
     "dateUnavailable": "Not available",
     "supplierPrefix": "Supplier: ",
@@ -1220,6 +1224,49 @@
     },
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Product description; AI suggestions appear here and remain editable."
+    ,"exportImport": "Export / Import"
+    ,"kpiTotal": "Total registered products"
+    ,"kpiUnique": "unique items"
+    ,"kpiActive": "active"
+    ,"kpiDrafts": "drafts"
+    ,"kpiArchived": "archived"
+    ,"kpiStockAlerts": "Critical stock alerts"
+    ,"kpiNeedRestock": "items need restocking"
+    ,"kpiOutOfStock": "out of stock"
+    ,"kpiRestockAction": "Request restock"
+    ,"kpiSupplierOffers": "Connected supplier offers"
+    ,"kpiSynced": "auto-synced products"
+    ,"kpiSyncActive": "Price and quantity sync active"
+    ,"kpiMarginWarnings": "Margin warnings"
+    ,"kpiMarginNote": "products below 15% margin"
+    ,"kpiMarginPending": "Margin data unavailable"
+    ,"kpiUnavailable": "—"
+    ,"tabAll": "All"
+    ,"tabActive": "Active and listed"
+    ,"tabDrafts": "Unlisted drafts"
+    ,"tabArchived": "Archived"
+    ,"tabLowStock": "Low / out of stock"
+    ,"tabMargin": "Margin alerts"
+    ,"channelFilterAria": "Filter by sales channel"
+    ,"allChannels": "Channel: all channels"
+    ,"columnsAria": "Customize displayed columns"
+    ,"bulkPrice": "Bulk edit prices"
+    ,"bulkStatus": "Change status"
+    ,"bulkArchive": "Move to archive"
+    ,"syncActive": "Automatic inventory sync: active"
+    ,"bulkSelected": "Selected ({count} products)"
+    ,"rangeStatus": "Showing {start} to {end} · {total} registered products"
+    ,"rowsPerPage": "Rows per page"
+    ,"syncBannerTitle": "Fast fulfillment warehouse integration in Riyadh and Dubai"
+    ,"syncBannerDescription": "Shipping prices and inventory levels were matched with local distribution centers successfully today at 08:30 AM."
+    ,"syncBannerAction": "View sync history"
+    ,"colSkuBarcode": "SKU / barcode"
+    ,"colCostMargin": "Cost, sale and margin"
+    ,"colChannels": "Sales channels"
+    ,"barcodeUnavailable": "Barcode unavailable"
+    ,"costUnavailable": "Cost unavailable"
+    ,"marginUnavailable": "Margin unavailable"
+    ,"channelDirect": "Direct store"
   },
   "supplierOffers": {
     "title": "Supplier Offers Catalog",
