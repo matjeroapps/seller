@@ -506,6 +506,14 @@ export const sellerApi = {
     );
   },
 
+  async createStoreAttribute(storeId: string, data: { code: string; status: string; names: Record<string, string> }): Promise<{ id: string; code: string; status: string }> {
+    return request(`/v1/seller/stores/${encodeURIComponent(storeId)}/attributes`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async createStoreAttributeValue(storeId: string, attributeId: string, data: { code: string; status: string; names: Record<string, string> }): Promise<{ id: string; attribute_id: string; code: string; status: string }> {
+    return request(`/v1/seller/stores/${encodeURIComponent(storeId)}/attributes/${encodeURIComponent(attributeId)}/values`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
   async updateStoreProduct(
     storeId: string,
     productId: string,
@@ -580,13 +588,6 @@ export const sellerApi = {
     );
   },
 
-  async archiveProductVariant(storeId: string, productId: string, variantId: string): Promise<ProductVariant> {
-    return request<ProductVariant>(
-      `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/archive`,
-      { method: 'POST' }
-    );
-  },
-
   async createProductSku(
     storeId: string,
     productId: string,
@@ -611,7 +612,7 @@ export const sellerApi = {
     productId: string,
     variantId: string,
     skuId: string,
-    data: { code: string; barcode?: string; status: string }
+    data: { code: string; barcode?: string; status: string; weight_grams?: number; length_mm?: number; width_mm?: number; height_mm?: number; price_minor_units?: number }
   ): Promise<ProductSku> {
     return request<ProductSku>(
       `/v1/seller/stores/${encodeURIComponent(storeId)}/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/skus/${encodeURIComponent(skuId)}`,
@@ -620,7 +621,12 @@ export const sellerApi = {
         body: JSON.stringify({
           code: data.code,
           barcode: data.barcode || null,
-          status: data.status
+          status: data.status,
+          weight_grams: data.weight_grams,
+          length_mm: data.length_mm,
+          width_mm: data.width_mm,
+          height_mm: data.height_mm,
+          price_minor_units: data.price_minor_units
         })
       }
     );

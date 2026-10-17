@@ -27,7 +27,7 @@ import {
 } from "@/components/seller/ProductEditorLayout";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { sellerApi } from "@/lib/api/client";
-import type { AuthoringFieldProposal, CreateProductVariantPayload, ProductMediaReference, SellerProductDetail, StoreCategory } from "@/lib/api/types";
+import type { AuthoringFieldProposal, CreateProductVariantPayload, ProductMediaReference, ProductVariant, SellerProductDetail, StoreCategory, UpdateProductVariantPayload } from "@/lib/api/types";
 import { deriveVariantAttributes } from "@/lib/variants/preview";
 
 const inputClass = productEditorInputClass;
@@ -79,8 +79,14 @@ export function ProductEditorPage({
   const [mediaReferences, setMediaReferences] = useState<ProductMediaReference[]>([]);
   const [productDetail, setProductDetail] = useState<SellerProductDetail | null>(null);
   const [showVariantModal, setShowVariantModal] = useState(false);
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
   const [variantWorking, setVariantWorking] = useState(false);
   const [initializing, setInitializing] = useState(isEdit);
+  const refreshProductDetail = async () => {
+    if (!product_id) return;
+    const detail = await sellerApi.getStoreProductDetail(store_id, product_id);
+    setProductDetail(detail);
+  };
   const loadCategories = () => {
     setCategoryLoadError(null);
     sellerApi
@@ -123,7 +129,19 @@ export function ProductEditorPage({
   }, [product_id, store_id, t]);
   const variantBatch = useMemo<VariantBatchConfig | null>(() => {
     if (!isEdit || !productDetail || !product_id) return null;
-    const attributes = deriveVariantAttributes(productDetail.variants || []);
+    const attributes = productDetail.attributes?.length
+      ? productDetail.attributes.map((attribute) => ({
+          id: attribute.id,
+          code: attribute.code,
+          name: attribute.name,
+          values: attribute.values.map((value) => ({
+            id: value.id,
+            code: value.code,
+            name: value.name,
+            status: value.status,
+          })),
+        }))
+      : deriveVariantAttributes(productDetail.variants || []);
     return attributes.length ? {
       storeId: store_id,
       productId: product_id,
@@ -138,11 +156,65 @@ export function ProductEditorPage({
     setVariantWorking(true);
     try {
       await sellerApi.createProductVariant(store_id, product_id, payload);
+      await refreshProductDetail();
       setShowVariantModal(false);
       setNotice("تم إنشاء المتغير بنجاح.");
     } finally {
       setVariantWorking(false);
     }
+  };
+  const updateVariant = async (variantId: string, payload: UpdateProductVariantPayload) => {
+    if (!product_id) return;
+    setVariantWorking(true);
+    try {
+      await sellerApi.updateProductVariant(store_id, product_id, variantId, payload);
+      const currentSku = editingVariant?.id === variantId ? editingVariant.sku : undefined;
+      if (currentSku) {
+        await sellerApi.updateProductSku(store_id, product_id, variantId, currentSku.id, {
+          code: payload.sku_code || currentSku.code,
+          barcode: payload.barcode,
+          status: "active",
+          weight_grams: payload.weight_grams,
+          length_mm: payload.dimensions?.length_mm,
+          width_mm: payload.dimensions?.width_mm,
+          height_mm: payload.dimensions?.height_mm,
+          price_minor_units: payload.price_minor_units,
+        });
+      }
+      await refreshProductDetail();
+      setEditingVariant(null);
+      setShowVariantModal(false);
+      setNotice("تم حفظ تعديلات المتغير بنجاح.");
+    } finally {
+      setVariantWorking(false);
+    }
+  };
+  const removeVariant = async (variant: ProductVariant) => {
+    if (!product_id || !window.confirm("سيتم إزالة المتغير من الكتالوج مع الاحتفاظ بسجله التشغيلي والتاريخي. هل تريد المتابعة؟")) return;
+    setVariantWorking(true);
+    try {
+      await sellerApi.deleteProductVariant(store_id, product_id, variant.id);
+      await refreshProductDetail();
+      setNotice("تمت إزالة المتغير من الكتالوج مع الاحتفاظ بسجله.");
+    } finally {
+      setVariantWorking(false);
+    }
+  };
+  const createProperty = async (draft: { code: string; nameAr: string; nameEn: string }) => {
+    await sellerApi.createStoreAttribute(store_id, {
+      code: draft.code,
+      status: "active",
+      names: { ar: draft.nameAr, en: draft.nameEn },
+    });
+    await refreshProductDetail();
+  };
+  const createPropertyValue = async (draft: { attributeId: string; code: string; nameAr: string; nameEn: string }) => {
+    await sellerApi.createStoreAttributeValue(store_id, draft.attributeId, {
+      code: draft.code,
+      status: "active",
+      names: { ar: draft.nameAr, en: draft.nameEn },
+    });
+    await refreshProductDetail();
   };
   const triggerAuthoring = () => {
     const button = document.querySelector<HTMLButtonElement>('[data-testid="authoring-generate"]');
@@ -557,6 +629,7 @@ export function ProductEditorPage({
                     setNotice("احفظ المنتج أولاً ثم افتح إدارة الخيارات والمتغيرات.");
                     return;
                   }
+                  setEditingVariant(null);
                   setShowVariantModal(true);
                 }}
                 disabled={variantWorking}
@@ -564,9 +637,50 @@ export function ProductEditorPage({
               >
                 إدارة الخيارات والمتغيرات
               </button>
-              <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">
-                ستظهر قائمة المتغيرات بعد حفظ المسودة.
-              </div>
+              {productDetail?.variants?.length ? (
+                <div className="mt-4 space-y-2" data-testid="product-variant-list">
+                  {productDetail.variants.map((variant) => (
+                    <div key={variant.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-slate-900">{variant.code}</span>
+                          {variant.attribute_values?.map((value) => (
+                            <span key={`${variant.id}-${value.value_id}`} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                              {value.attribute_name}: {value.value_name}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          SKU: <span className="font-mono">{variant.sku?.code || "—"}</span>
+                          {variant.sku?.price_minor_units != null ? ` · ${(variant.sku.price_minor_units / 100).toFixed(2)} ج.م` : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setEditingVariant(variant); setShowVariantModal(true); }}
+                          disabled={variantWorking}
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          تعديل
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(variant)}
+                          disabled={variantWorking}
+                          className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          إزالة من الكتالوج
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">
+                  لا توجد متغيرات محفوظة بعد. اختر الخصائص والقيم لتوليدها دفعة واحدة.
+                </div>
+              )}
             </section>
             <AuthoringAssistantPanel
               storeId={store_id}
@@ -720,9 +834,13 @@ export function ProductEditorPage({
           isOpen={showVariantModal}
           onClose={() => setShowVariantModal(false)}
           onSubmit={createVariant}
+          onUpdate={updateVariant}
+          editingVariant={editingVariant}
           loading={variantWorking}
-          batch={variantBatch}
+          batch={editingVariant ? null : variantBatch}
           productAttributes={productDetail?.attributes || []}
+          onCreateProperty={createProperty}
+          onCreatePropertyValue={createPropertyValue}
         />
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:px-8">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">

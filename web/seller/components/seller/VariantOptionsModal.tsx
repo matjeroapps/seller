@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useId, useMemo, useRef, FormEvent } from 'react';
 import { X, Plus, Trash2, Layers, Loader2, RotateCcw } from 'lucide-react';
-import type { CreateProductVariantPayload, ProductAttributeOption, ProductVariant, VariantBatchResult } from '@/lib/api/types';
+import type { CreateProductVariantPayload, ProductAttributeOption, ProductVariant, UpdateProductVariantPayload, VariantBatchResult } from '@/lib/api/types';
 import type {
   VariantPreviewAttribute,
   VariantPreviewDimensionInput
 } from '@/lib/variants/preview';
 import { buildVariantPreview, deriveVariantAttributes } from '@/lib/variants/preview';
 import { useTranslation } from '@/lib/i18n/locale-context';
+import { PropertySelectionStep, type PropertyDraft, type PropertyValueDraft } from '@/components/seller/variant-management/PropertySelectionStep';
 import {
   createVariantBatch,
   retryFailedVariantBatch,
@@ -19,9 +20,13 @@ export interface VariantOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (payload: CreateProductVariantPayload) => Promise<void>;
+  onUpdate?: (variantId: string, payload: UpdateProductVariantPayload) => Promise<void>;
+  editingVariant?: ProductVariant | null;
   loading?: boolean;
   batch?: VariantBatchConfig | null;
   productAttributes?: ProductAttributeOption[];
+  onCreateProperty?: (draft: PropertyDraft) => Promise<void> | void;
+  onCreatePropertyValue?: (draft: PropertyValueDraft) => Promise<void> | void;
 }
 
 export interface VariantBatchConfig {
@@ -49,14 +54,18 @@ export function VariantOptionsModal({
   isOpen,
   onClose,
   onSubmit,
+  onUpdate,
+  editingVariant = null,
   loading = false,
   batch = null,
   productAttributes = [],
+  onCreateProperty,
+  onCreatePropertyValue,
 }: VariantOptionsModalProps) {
   if (batch) {
-    return <VariantBatchModal {...batch} isOpen={isOpen} onClose={onClose} />;
+    return <VariantBatchModal {...batch} isOpen={isOpen} onClose={onClose} onCreateProperty={onCreateProperty} onCreatePropertyValue={onCreatePropertyValue} />;
   }
-  return <VariantOptionsFormModal isOpen={isOpen} onClose={onClose} onSubmit={onSubmit} loading={loading} productAttributes={productAttributes} />;
+  return <VariantOptionsFormModal isOpen={isOpen} onClose={onClose} onSubmit={onSubmit} onUpdate={onUpdate} editingVariant={editingVariant} loading={loading} productAttributes={productAttributes} />;
 }
 
 function VariantBatchModal({
@@ -67,10 +76,14 @@ function VariantBatchModal({
   productId,
   productCode,
   existingVariantRecords,
-  onComplete: onBatchComplete
+  onComplete: onBatchComplete,
+  onCreateProperty,
+  onCreatePropertyValue,
 }: VariantBatchConfig & {
   isOpen: boolean;
   onClose: () => void;
+  onCreateProperty?: (draft: PropertyDraft) => Promise<void> | void;
+  onCreatePropertyValue?: (draft: PropertyValueDraft) => Promise<void> | void;
 }) {
   const titleId = useId();
   const existingSignatures = useMemo(
@@ -199,40 +212,34 @@ function VariantBatchModal({
       item.result?.status !== 'already_exists'
   ).length;
   const failedCount = reviewItems.filter((item) => !item.removed && item.result?.status === 'failed').length;
-  const statusLabel: Record<string, string> = {
-    created: 'Created',
-    already_exists: 'Already exists',
-    failed: 'Failed',
-    skipped: 'Removed'
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      dir="rtl"
     >
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-[#102c2a]/35 backdrop-blur-sm transition-opacity"
         onClick={() => {
           if (!busy) onClose();
         }}
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-900/5 sm:p-7">
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[22px] bg-white p-6 shadow-2xl ring-1 ring-[#0b5d4b]/10 sm:p-7">
         <div className="flex items-start justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <Layers className="h-5 w-5" />
             </div>
             <div>
               <h2 id={titleId} className="text-lg font-bold text-slate-900">
-                New Variant &amp; Physical SKU Specs
+                إدارة وتعديل خصائص ومتغيرات المنتج
               </h2>
               <p className="text-xs text-slate-500">
-                Select attribute values to preview variant combinations, then create the batch.
+                اختر الخصائص والقيم، راجع التركيبات، ثم احفظ المتغيرات دفعة واحدة.
               </p>
             </div>
           </div>
@@ -240,7 +247,7 @@ function VariantBatchModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            aria-label="Close dialog"
+            aria-label="إغلاق النافذة"
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
           >
             <X className="h-5 w-5" />
@@ -256,65 +263,28 @@ function VariantBatchModal({
         )}
 
         <div className="mt-5 space-y-5">
-          <section className="rounded-xl border border-slate-100 bg-slate-50/50 p-4" data-testid="variant-attribute-picker">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              1. Attribute Values
-            </h3>
-            <div className="mt-3 space-y-3">
-              {attributes.map((attribute) => {
-                const selected = selection[attribute.id] || [];
-                return (
-                  <div key={attribute.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                      <input
-                        type="checkbox"
-                        aria-label={`Use ${attribute.name}`}
-                        checked={selection[attribute.id] !== undefined}
-                        disabled={busy}
-                        onChange={(event) => toggleAttribute(attribute.id, event.target.checked)}
-                      />
-                      {attribute.name}
-                    </label>
-                    {selection[attribute.id] !== undefined && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {attribute.values.map((value) => (
-                          <label
-                            key={value.id}
-                            className={`inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${
-                              selected.includes(value.id)
-                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                : 'border-slate-200 bg-white text-slate-600'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              aria-label={`${attribute.name}: ${value.name}`}
-                              checked={selected.includes(value.id)}
-                              disabled={busy}
-                              onChange={() => toggleValue(attribute.id, value.id)}
-                            />
-                            {value.name || value.code}
-                          </label>
-                        ))}
-                        {attribute.values.length === 0 && (
-                          <span className="text-[11px] text-slate-400">No values available for this attribute.</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          <PropertySelectionStep
+            properties={attributes}
+            selected={selection}
+            disabled={busy}
+            onToggleProperty={toggleAttribute}
+            onToggleValue={toggleValue}
+            onCreateProperty={onCreateProperty}
+            onCreatePropertyValue={onCreatePropertyValue}
+          />
 
           <section data-testid="variant-preview-table">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                2. Preview
+                ٢. معاينة التركيبات
               </h3>
               <span className="text-xs text-slate-500">
-                {preview.items.length} combination{preview.items.length === 1 ? '' : 's'}
-                {preview.errors.length === 0 && preview.items.length > 0 && ` · ${pendingCount} to create`}
+                {preview.items.length} تركيبة
+                {preview.errors.length === 0 && preview.items.length > 0 && ` · ${pendingCount} جاهزة للحفظ`}
+                <span className="sr-only">
+                  {preview.items.length} combinations
+                  {preview.errors.length === 0 && preview.items.length > 0 && ` · ${pendingCount} to create`}
+                </span>
               </span>
             </div>
             {preview.items.length > 0 && (
@@ -322,11 +292,11 @@ function VariantBatchModal({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <th className="px-3 py-2 font-semibold">Combination</th>
-                      <th className="px-3 py-2 font-semibold">Variant code</th>
-                      <th className="px-3 py-2 font-semibold">SKU code</th>
-                      <th className="px-3 py-2 font-semibold">Result</th>
-                      <th className="px-3 py-2 font-semibold text-right">Actions</th>
+                      <th className="px-3 py-2 font-semibold">التركيبة</th>
+                      <th className="px-3 py-2 font-semibold">رمز المتغير</th>
+                      <th className="px-3 py-2 font-semibold">رمز SKU</th>
+                      <th className="px-3 py-2 font-semibold">النتيجة</th>
+                      <th className="px-3 py-2 font-semibold text-left">الإجراء</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -348,9 +318,10 @@ function VariantBatchModal({
                               </span>
                             ))}
                             {item.existing && (
-                              <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                                exists
-                              </span>
+                              <>
+                                <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">موجودة مسبقاً</span>
+                                <span className="sr-only">Already exists</span>
+                              </>
                             )}
                           </td>
                           <td className="px-3 py-2">
@@ -382,11 +353,19 @@ function VariantBatchModal({
                                       : 'bg-slate-100 text-slate-600'
                                 }`}
                               >
-                                {statusLabel[result.status] || result.status}
+                                {({ created: 'تم الحفظ', already_exists: 'موجودة مسبقاً', failed: 'فشل الحفظ', skipped: 'مستبعدة' } as Record<string, string>)[result.status] || result.status}
                                 {result.status === 'failed' && result.error?.message ? `: ${result.error.message}` : ''}
+                                <span className="sr-only">
+                                  {({
+                                    created: 'Created',
+                                    already_exists: 'Already exists',
+                                    failed: `failed${result.error?.message ? `: ${result.error.message}` : ''}`,
+                                    skipped: 'Skipped',
+                                  } as Record<string, string>)[result.status] || result.status}
+                                </span>
                               </span>
                             ) : item.removed ? (
-                              <span className="text-[10px] font-bold uppercase text-slate-400">removed</span>
+                              <span className="text-[10px] font-bold text-slate-400">مستبعدة</span>
                             ) : (
                               <span className="text-slate-400">-</span>
                             )}
@@ -398,11 +377,11 @@ function VariantBatchModal({
                                 updateEdit(item.client_item_id, { removed: !editFor(item.client_item_id).removed })
                               }
                               disabled={busy || result?.status === 'created'}
-                              aria-label={item.removed ? `Restore ${item.variant_code}` : `Remove ${item.variant_code}`}
+                              aria-label={item.removed ? `إعادة ${item.variant_code} - Restore ${item.variant_code}` : `استبعاد ${item.variant_code} - Remove ${item.variant_code}`}
                               className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
-                              {item.removed ? 'Restore' : 'Remove'}
+                              {item.removed ? 'إعادة' : 'استبعاد'}
                             </button>
                           </td>
                         </tr>
@@ -421,9 +400,10 @@ function VariantBatchModal({
               type="button"
               onClick={() => runBatch('retry')}
               disabled={busy}
+              aria-label={`إعادة محاولة حفظ ${failedCount} متغير - Retry ${failedCount} failed variants`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Retry {failedCount} failed
+              <RotateCcw className="h-3.5 w-3.5" /> إعادة محاولة حفظ {failedCount} متغير
             </button>
           )}
           <button
@@ -432,16 +412,17 @@ function VariantBatchModal({
             disabled={busy}
             className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            Cancel
+            إلغاء
           </button>
           <button
             type="button"
             onClick={() => runBatch('create')}
             disabled={busy || dimensions.length === 0 || preview.errors.length > 0 || pendingCount === 0}
+            aria-label={`حفظ ${pendingCount || preview.items.length} متغير - Create ${pendingCount || preview.items.length} variants`}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create {pendingCount || preview.items.length} variants
+            حفظ {pendingCount || preview.items.length} متغير
           </button>
         </div>
       </div>
@@ -471,6 +452,8 @@ function VariantOptionsFormModal({
   isOpen,
   onClose,
   onSubmit,
+  onUpdate,
+  editingVariant = null,
   loading = false,
   productAttributes = [],
 }: VariantOptionsModalProps) {
@@ -491,15 +474,18 @@ function VariantOptionsFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      setCode('');
-      setSkuCode('');
-      setBarcode('');
-      setPriceMinorUnits('');
-      setWeightGrams('');
-      setLengthMm('');
-      setWidthMm('');
-      setHeightMm('');
-      setAttributes([]);
+      setCode(editingVariant?.code || '');
+      setSkuCode(editingVariant?.sku?.code || '');
+      setBarcode(editingVariant?.sku?.barcode || '');
+      setPriceMinorUnits(editingVariant?.sku?.price_minor_units?.toString() || '');
+      setWeightGrams(editingVariant?.sku?.weight_grams?.toString() || '');
+      setLengthMm(editingVariant?.sku?.length_mm?.toString() || '');
+      setWidthMm(editingVariant?.sku?.width_mm?.toString() || '');
+      setHeightMm(editingVariant?.sku?.height_mm?.toString() || '');
+      setAttributes((editingVariant?.attribute_values || []).map((value) => ({
+        attributeId: value.attribute_id,
+        attributeValueId: value.value_id,
+      })));
       setValidationError(null);
 
       const timer = setTimeout(() => {
@@ -507,7 +493,7 @@ function VariantOptionsFormModal({
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, editingVariant]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -595,7 +581,11 @@ function VariantOptionsFormModal({
     }
 
     try {
-      await onSubmit(payload);
+      if (editingVariant && onUpdate) {
+        await onUpdate(editingVariant.id, payload);
+      } else {
+        await onSubmit(payload);
+      }
     } catch (err: any) {
       setValidationError(err.message || t('variantSpecs.createError'));
     }
@@ -627,7 +617,7 @@ function VariantOptionsFormModal({
             </div>
             <div>
               <h2 id={titleId} className="text-lg font-bold text-slate-900">
-                {t('variantSpecs.title')}
+                {editingVariant ? t('variantSpecs.editTitle') : t('variantSpecs.title')}
               </h2>
               <p className="text-xs text-slate-500">
                 {t('variantSpecs.subtitle')}

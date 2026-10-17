@@ -205,10 +205,19 @@ export interface CreateProductVariantPayload {
 export interface UpdateProductVariantPayload {
   code: string;
   status: 'active';
+  sku_code?: string;
+  barcode?: string;
   attribute_values?: Array<{
     attribute_id: string;
     attribute_value_id: string;
   }>;
+  weight_grams?: number;
+  dimensions?: {
+    length_mm?: number;
+    width_mm?: number;
+    height_mm?: number;
+  };
+  price_minor_units?: number;
 }
 
 export type VariantBatchItemStatus = 'created' | 'already_exists' | 'failed' | 'skipped';

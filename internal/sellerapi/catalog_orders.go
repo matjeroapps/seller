@@ -659,6 +659,56 @@ func (deps Dependencies) handleUpdateStoreProduct(w http.ResponseWriter, r *http
 	httpx.WriteJSON(w, http.StatusOK, detail)
 }
 
+type storeAttributeRequest struct {
+	Code   string            `json:"code"`
+	Status string            `json:"status"`
+	Names  map[string]string `json:"names"`
+}
+
+func (deps Dependencies) handleCreateStoreAttribute(w http.ResponseWriter, r *http.Request) {
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	var body storeAttributeRequest
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	capabilities, ok := deps.Core.(StoreAttributeCapabilities)
+	if !ok {
+		actorhttp.WriteCoreError(w, coreclient.ErrUnavailable)
+		return
+	}
+	attribute, err := capabilities.CreateStoreAttribute(r.Context(), subject, chi.URLParam(r, "store_id"), coreclient.StoreAttributeDraft{Code: body.Code, Status: body.Status, Names: body.Names})
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, attribute)
+}
+
+func (deps Dependencies) handleCreateStoreAttributeValue(w http.ResponseWriter, r *http.Request) {
+	subject, _, ok := deps.sellerID(w, r)
+	if !ok {
+		return
+	}
+	var body storeAttributeRequest
+	if !actorhttp.DecodeJSON(w, r, &body) {
+		return
+	}
+	capabilities, ok := deps.Core.(StoreAttributeCapabilities)
+	if !ok {
+		actorhttp.WriteCoreError(w, coreclient.ErrUnavailable)
+		return
+	}
+	value, err := capabilities.CreateStoreAttributeValue(r.Context(), subject, chi.URLParam(r, "store_id"), chi.URLParam(r, "attribute_id"), coreclient.StoreAttributeValueDraft{Code: body.Code, Status: body.Status, Names: body.Names})
+	if err != nil {
+		actorhttp.WriteCoreError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, value)
+}
+
 type variantRequest struct {
 	Code            string                             `json:"code"`
 	Status          string                             `json:"status"`
@@ -734,7 +784,18 @@ func (deps Dependencies) handleUpdateVariant(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	v, err := deps.Core.UpdateVariant(r.Context(), subject, storeID, productID, variantID, body.Code, body.Status)
+	var v any
+	var err error
+	if len(body.AttributeValues) > 0 {
+		capabilities, ok := deps.Core.(VariantOptionCapabilities)
+		if !ok {
+			actorhttp.WriteCoreError(w, coreclient.ErrUnavailable)
+			return
+		}
+		v, err = capabilities.UpdateVariantWithOptions(r.Context(), subject, storeID, productID, variantID, coreclient.CreateVariantParams{Code: body.Code, Status: body.Status, AttributeValues: body.AttributeValues})
+	} else {
+		v, err = deps.Core.UpdateVariant(r.Context(), subject, storeID, productID, variantID, body.Code, body.Status)
+	}
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
 		return
@@ -754,23 +815,15 @@ func (deps Dependencies) handleDeleteVariant(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (deps Dependencies) handleArchiveVariant(w http.ResponseWriter, r *http.Request) {
-	subject, _, ok := deps.sellerID(w, r)
-	if !ok {
-		return
-	}
-	variant, err := deps.Core.ArchiveVariant(r.Context(), subject, chi.URLParam(r, "store_id"), chi.URLParam(r, "product_id"), chi.URLParam(r, "variant_id"))
-	if err != nil {
-		actorhttp.WriteCoreError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, variant)
-}
-
 type skuRequest struct {
-	Code    string  `json:"code"`
-	Barcode *string `json:"barcode"`
-	Status  string  `json:"status"`
+	Code            string  `json:"code"`
+	Barcode         *string `json:"barcode"`
+	Status          string  `json:"status"`
+	WeightGrams     *int    `json:"weight_grams,omitempty"`
+	LengthMM        *int    `json:"length_mm,omitempty"`
+	WidthMM         *int    `json:"width_mm,omitempty"`
+	HeightMM        *int    `json:"height_mm,omitempty"`
+	PriceMinorUnits *int64  `json:"price_minor_units,omitempty"`
 }
 
 func (deps Dependencies) handleCreateSKU(w http.ResponseWriter, r *http.Request) {
@@ -810,7 +863,10 @@ func (deps Dependencies) handleUpdateSKU(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sk, err := deps.Core.UpdateSKU(r.Context(), subject, storeID, productID, variantID, skuID, body.Code, body.Barcode, body.Status)
+	sk, err := deps.Core.UpdateSKUWithSpecs(r.Context(), subject, storeID, productID, variantID, skuID, coreclient.CreateSKUParams{
+		Code: body.Code, Barcode: body.Barcode, Status: body.Status, WeightGrams: body.WeightGrams,
+		LengthMM: body.LengthMM, WidthMM: body.WidthMM, HeightMM: body.HeightMM, PriceMinorUnits: body.PriceMinorUnits,
+	})
 	if err != nil {
 		actorhttp.WriteCoreError(w, err)
 		return
