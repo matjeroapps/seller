@@ -145,15 +145,15 @@ func (m *variantMockCore) ArchiveVariant(ctx context.Context, subject, storeID, 
 	return &coreclient.Variant{ID: variantID, ProductID: productID, Code: "red-s", Status: "archived", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, nil
 }
 
-func (m *variantMockCore) UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+func (m *variantMockCore) UpdateSKUWithSpecs(ctx context.Context, subject, storeID, productID, variantID, skuID string, params coreclient.CreateSKUParams) (*coreclient.SKU, error) {
 	m.updates = append(m.updates, variantLifecycleCall{
 		storeID: storeID, productID: productID, variantID: variantID, skuID: skuID,
-		code: code, status: status, barcode: barcode, subject: subject,
+		code: params.Code, status: params.Status, barcode: params.Barcode, subject: subject,
 	})
 	if m.err != nil {
 		return nil, m.err
 	}
-	return &coreclient.SKU{ID: skuID, VariantID: variantID, Code: code, Status: status, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, nil
+	return &coreclient.SKU{ID: skuID, VariantID: variantID, Code: params.Code, Status: params.Status, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}, nil
 }
 
 // US2 routes: update, nested SKU update, delete, archive, Core-status

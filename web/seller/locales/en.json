@@ -982,6 +982,7 @@
   },
   "variantSpecs": {
     "title": "New Variant & Physical SKU Specs",
+    "editTitle": "Edit Variant & SKU Specs",
     "subtitle": "Enter the SKU code, barcode, weight, and package dimensions.",
     "close": "Close dialog",
     "identity": "1. Variant Identity",
@@ -1014,7 +1015,8 @@
     "requiredSkuCode": "SKU code is required for physical specifications.",
     "invalidWeight": "Weight must be a non-negative integer in grams.",
     "invalidPrice": "Price must be a non-negative integer in minor units.",
-    "createError": "Failed to create variant with specifications."
+    "createError": "Failed to create variant with specifications.",
+    "updateError": "Failed to save variant changes."
   },
   "products": {
     "catalogTitle": "Store Products Catalog",

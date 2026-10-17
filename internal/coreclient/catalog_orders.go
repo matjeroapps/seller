@@ -238,6 +238,32 @@ type ProductAttributeOptionValue struct {
 	Status string `json:"status"`
 }
 
+type Attribute struct {
+	ID      string  `json:"id"`
+	StoreID *string `json:"store_id,omitempty"`
+	Code    string  `json:"code"`
+	Status  string  `json:"status"`
+}
+
+type AttributeValue struct {
+	ID          string `json:"id"`
+	AttributeID string `json:"attribute_id"`
+	Code        string `json:"code"`
+	Status      string `json:"status"`
+}
+
+type StoreAttributeDraft struct {
+	Code   string            `json:"code"`
+	Status string            `json:"status"`
+	Names  map[string]string `json:"names"`
+}
+
+type StoreAttributeValueDraft struct {
+	Code   string            `json:"code"`
+	Status string            `json:"status"`
+	Names  map[string]string `json:"names"`
+}
+
 type SellerProductListItem struct {
 	Product          SellerProduct    `json:"product"`
 	Source           string           `json:"source"`
@@ -495,6 +521,24 @@ func (c *Client) CreateVariant(ctx context.Context, subject, storeID, productID,
 	return c.CreateVariantWithAttributes(ctx, subject, storeID, productID, code, status, nil)
 }
 
+func (c *Client) CreateStoreAttribute(ctx context.Context, subject, storeID string, draft StoreAttributeDraft) (*Attribute, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/attributes", url.PathEscape(storeID))
+	var result Attribute
+	if err := c.post(ctx, path, draft, requestOptions{Subject: subject}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) CreateStoreAttributeValue(ctx context.Context, subject, storeID, attributeID string, draft StoreAttributeValueDraft) (*AttributeValue, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/attributes/%s/values", url.PathEscape(storeID), url.PathEscape(attributeID))
+	var result AttributeValue
+	if err := c.post(ctx, path, draft, requestOptions{Subject: subject}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) CreateVariantWithAttributes(ctx context.Context, subject, storeID, productID, code, status string, attributeValues []AttributeValueMapping) (*Variant, error) {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants", url.PathEscape(storeID), url.PathEscape(productID))
 	body := map[string]any{"code": code, "status": status}
@@ -557,18 +601,18 @@ func (c *Client) UpdateVariant(ctx context.Context, subject, storeID, productID,
 	return &res, nil
 }
 
+func (c *Client) UpdateVariantWithOptions(ctx context.Context, subject, storeID, productID, variantID string, params CreateVariantParams) (*VariantWithDetails, error) {
+	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
+	var result VariantWithDetails
+	if err := c.put(ctx, path, params, requestOptions{Subject: subject}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) DeleteVariant(ctx context.Context, subject, storeID, productID, variantID string) error {
 	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
 	return c.delete(ctx, path, requestOptions{Subject: subject}, nil)
-}
-
-func (c *Client) ArchiveVariant(ctx context.Context, subject, storeID, productID, variantID string) (*Variant, error) {
-	path := fmt.Sprintf("/internal/v1/stores/%s/products/%s/variants/%s/archive", url.PathEscape(storeID), url.PathEscape(productID), url.PathEscape(variantID))
-	var res Variant
-	if err := c.post(ctx, path, nil, requestOptions{Subject: subject}, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
 }
 
 func (c *Client) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*SKU, error) {
