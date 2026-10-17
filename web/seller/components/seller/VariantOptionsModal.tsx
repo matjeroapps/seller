@@ -400,7 +400,7 @@ function VariantBatchModal({
               type="button"
               onClick={() => runBatch('retry')}
               disabled={busy}
-              aria-label={`Retry ${failedCount} failed variants`}
+              aria-label={`إعادة محاولة حفظ ${failedCount} متغير - Retry ${failedCount} failed variants`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
             >
               <RotateCcw className="h-3.5 w-3.5" /> إعادة محاولة حفظ {failedCount} متغير
@@ -418,7 +418,7 @@ function VariantBatchModal({
             type="button"
             onClick={() => runBatch('create')}
             disabled={busy || dimensions.length === 0 || preview.errors.length > 0 || pendingCount === 0}
-            aria-label={`Create ${pendingCount || preview.items.length} variants`}
+            aria-label={`حفظ ${pendingCount || preview.items.length} متغير - Create ${pendingCount || preview.items.length} variants`}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
