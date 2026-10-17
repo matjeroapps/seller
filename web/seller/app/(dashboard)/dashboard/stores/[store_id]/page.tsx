@@ -166,7 +166,7 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ store_
 
       setDashboard({
         stores: storesResult?.items || [],
-        products: getValue('products', productsResult, { items: [] })?.items || [],
+        products: getValue('products', productsResult, { items: [], total: 0, limit: 0, offset: 0 })?.items || [],
         listings: getValue('listings', listingsResult, { items: [] })?.items || [],
         inventory: getValue('inventory', inventoryResult, { items: [] })?.items || [],
         orders: ordersResponse?.orders || [],

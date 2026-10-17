@@ -53,6 +53,21 @@ export interface Product {
   media_count?: number;
 }
 
+export interface ProductListQuery {
+  query?: string;
+  status?: string;
+  source?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface PagedProducts {
+  items: Product[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface ProductRemovalResult {
   product_id: string;
   outcome: 'removed' | 'archived' | 'not_found' | 'failed';

@@ -37,6 +37,22 @@ test.describe('Seller Catalog Operations E2E', () => {
     await expect(page.getByRole('link', { name: /Create Product/ })).toBeVisible();
   });
 
+  test('Seller can search, filter, and toggle catalog views via stable anchors', async ({ page }) => {
+    await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/catalog/products`);
+    await expect(page.getByTestId('product-search')).toBeVisible();
+    await expect(page.getByTestId('product-filter-source')).toBeVisible();
+    await expect(page.getByTestId('product-filter-status')).toBeVisible();
+    await expect(page.getByTestId('product-create')).toBeVisible();
+
+    await page.getByTestId('product-search').fill('phone');
+    await expect(page.getByText(/of \d+/).first()).toBeVisible();
+
+    const gridToggle = page.getByRole('button', { name: /grid view/i });
+    await gridToggle.click();
+    await expect(page.getByTestId('product-grid-view')).toBeVisible();
+    await expect(page.getByRole('button', { name: /list view/i })).toBeVisible();
+  });
+
   test('Seller can navigate to supplier offers and search eligible catalog', async ({ page }) => {
     await page.goto(`${SELLER_APP_URL}/dashboard/stores/str_dev_01/catalog/supplier-offers`);
     await expect(page.getByRole('heading', { name: 'Supplier Offers Catalog' })).toBeVisible();

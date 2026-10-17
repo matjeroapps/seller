@@ -1074,6 +1074,10 @@
     "colActions": "الإجراءات",
     "availableCount": "متاح",
     "priceNotSet": "السعر غير محدد",
+    "prevPage": "السابق",
+    "nextPage": "التالي",
+    "pageStatus": "صفحة {page} من {pages}",
+    "errorLoadProducts": "تعذّر تحميل كتالوج المنتجات.",
     "moneyNotSet": "غير محدد",
     "dateUnavailable": "غير متاح",
     "supplierPrefix": "المورد: ",
@@ -1220,6 +1224,49 @@
     },
     "descriptionLabel": "الوصف",
     "descriptionPlaceholder": "اكتب وصف المنتج؛ ستظهر اقتراحات الذكاء الاصطناعي هنا ويمكنك تعديلها."
+    ,"exportImport": "تصدير / استيراد"
+    ,"kpiTotal": "إجمالي المنتجات المسجلة"
+    ,"kpiUnique": "صنف فريد"
+    ,"kpiActive": "نشط"
+    ,"kpiDrafts": "مسودة"
+    ,"kpiArchived": "مؤرشف"
+    ,"kpiStockAlerts": "تنبيهات المخزون الحرج"
+    ,"kpiNeedRestock": "أصناف بحاجة لإعادة التزويد"
+    ,"kpiOutOfStock": "نفدت بالكامل"
+    ,"kpiRestockAction": "طلب تزويد"
+    ,"kpiSupplierOffers": "عروض الموردين المرتبطة"
+    ,"kpiSynced": "منتج بمزامنة آلية"
+    ,"kpiSyncActive": "مزامنة الأسعار والكميات نشطة"
+    ,"kpiMarginWarnings": "تنبيهات هوامش الربح"
+    ,"kpiMarginNote": "منتجات أقل من 15% هامش"
+    ,"kpiMarginPending": "بيانات الهامش غير متاحة"
+    ,"kpiUnavailable": "—"
+    ,"tabAll": "الكل"
+    ,"tabActive": "نشط ومعروض"
+    ,"tabDrafts": "مسودات غير معروضة"
+    ,"tabArchived": "المؤرشفة"
+    ,"tabLowStock": "مخزون منخفض / نافذ"
+    ,"tabMargin": "تنبيهات الهامش"
+    ,"channelFilterAria": "تصفية حسب قناة البيع"
+    ,"allChannels": "القناة: جميع القنوات"
+    ,"columnsAria": "تخصيص الأعمدة المعروضة"
+    ,"bulkPrice": "تعديل الأسعار جماعياً"
+    ,"bulkStatus": "تغيير الحالة"
+    ,"bulkArchive": "نقل للأرشيف"
+    ,"syncActive": "تحديث تلقائي للمخزون: نشط"
+    ,"bulkSelected": "تم تحديد ({count} منتج)"
+    ,"rangeStatus": "عرض {start} إلى {end} من أصل {total} منتج مسجل"
+    ,"rowsPerPage": "عدد الصفوف"
+    ,"syncBannerTitle": "تكامل مستودعات الشحن السريع في الرياض ودبي"
+    ,"syncBannerDescription": "تمت مطابقة أسعار الشحن ومستويات المخزون مع مراكز التوزيع المحلية بنجاح اليوم في الساعة 08:30 ص."
+    ,"syncBannerAction": "عرض سجل التزامن"
+    ,"colSkuBarcode": "رمز SKU والباركود"
+    ,"colCostMargin": "التكلفة والبيع والهامش"
+    ,"colChannels": "قنوات المبيعات"
+    ,"barcodeUnavailable": "الباركود غير متاح"
+    ,"costUnavailable": "التكلفة غير متاحة"
+    ,"marginUnavailable": "الهامش غير متاح"
+    ,"channelDirect": "المتجر المباشر"
   },
   "supplierOffers": {
     "title": "كتالوج عروض الموردين",

@@ -118,7 +118,7 @@ The storefront test suite support utilities were updated to conform to the exten
 - **Repository**: `matjeroapps/seller`
 - **PR**: `#17`
 - **Branch**: `feature/theme-platform-foundation-hardening`
-- **Final commit SHA**: `__FINAL_SHA__`
+- **Final commit SHA**: `4944662bd2aee4855a31880d06d6aed53cf65f96`
 - **Scope**: Phase T2.5 Theme Platform Foundation Hardening
 - **Verification commands**:
   ```bash

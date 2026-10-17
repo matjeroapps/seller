@@ -24,6 +24,8 @@ import type {
   ProductTranslation,
   ProductVariant,
   OrderTransitionPayload,
+  PagedProducts,
+  ProductListQuery,
   SellerListing,
   SellerCategory,
   StoreCategory,
@@ -63,6 +65,9 @@ function getBaseUrl() {
 }
 
 type SellerProductListPayload = {
+  total?: number;
+  limit?: number;
+  offset?: number;
   products?: Array<{
     product?: {
       id?: string;
@@ -288,17 +293,29 @@ export const sellerApi = {
   },
 
   // Products & Listings
-  async listStoreProducts(storeId: string): Promise<{ items: Product[] }> {
+  async listStoreProducts(storeId: string, filters: ProductListQuery = {}): Promise<PagedProducts> {
+    const params = new URLSearchParams();
+    if (filters.query?.trim()) params.set('query', filters.query.trim());
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.source && filters.source !== 'all') params.set('source', filters.source);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.offset) params.set('offset', String(filters.offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
     const payload = await request<SellerProductListPayload | null>(
-      `/v1/seller/stores/${encodeURIComponent(storeId)}/products`
+      `/v1/seller/stores/${encodeURIComponent(storeId)}/products${suffix}`
     );
 
     if (Array.isArray(payload?.items)) {
-      return { items: payload.items };
+      const items = payload.items;
+      return {
+        items,
+        total: payload?.total ?? items.length,
+        limit: payload?.limit ?? items.length,
+        offset: payload?.offset ?? 0
+      };
     }
 
-    return {
-      items: (payload?.products || []).map((row) => ({
+    const items: Product[] = (payload?.products || []).map((row) => ({
         id: row.product?.id || row.name || 'unknown-product',
         store_id: storeId,
         source: row.source === 'supplier_backed' ? 'supplier_backed' : 'seller_owned',
@@ -312,7 +329,12 @@ export const sellerApi = {
         current_price: row.current_price,
         inventory_summary: row.inventory_summary,
         publish_readiness: row.publish_readiness
-      }))
+      }));
+    return {
+      items,
+      total: payload?.total ?? items.length,
+      limit: payload?.limit ?? items.length,
+      offset: payload?.offset ?? 0
     };
   },
 
