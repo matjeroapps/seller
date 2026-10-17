@@ -171,7 +171,7 @@ func TestUpdateSKURoutesNestedUnderVariant(t *testing.T) {
 	}
 }
 
-func TestDeleteAndArchiveVariantLifecycleStatuses(t *testing.T) {
+func TestDeleteVariantLifecycleStatus(t *testing.T) {
 	var deleteMethod, deletePath string
 	deleteStub := newStubCore(t, func(w http.ResponseWriter, r *http.Request) {
 		deleteMethod, deletePath = r.Method, r.URL.Path
@@ -184,23 +184,6 @@ func TestDeleteAndArchiveVariantLifecycleStatuses(t *testing.T) {
 		t.Fatalf("delete request = %s %s", deleteMethod, deletePath)
 	}
 
-	var archiveMethod, archivePath string
-	archiveStub := newStubCore(t, func(w http.ResponseWriter, r *http.Request) {
-		archiveMethod, archivePath = r.Method, r.URL.Path
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"variant-1","product_id":"p1","code":"red-s","status":"archived"}`))
-	})
-	archived, err := archiveStub.client(t).ArchiveVariant(context.Background(), "subject-1", "store-1", "prod-1", "variant-1")
-	if err != nil {
-		t.Fatalf("ArchiveVariant: %v", err)
-	}
-	if archiveMethod != http.MethodPost || archivePath != "/internal/v1/stores/store-1/products/prod-1/variants/variant-1/archive" {
-		t.Fatalf("archive request = %s %s", archiveMethod, archivePath)
-	}
-	if archived.Status != "archived" {
-		t.Fatalf("archived variant = %+v", archived)
-	}
 }
 
 // A variant owned by another store/product is isolated: Core answers not_found,

@@ -68,9 +68,8 @@ type CoreCapabilities interface {
 	CreateVariantItem(ctx context.Context, subject, storeID, productID string, params coreclient.CreateVariantParams, idempotencyKey string) (*coreclient.VariantWithDetails, string, error)
 	UpdateVariant(ctx context.Context, subject, storeID, productID, variantID, code, status string) (*coreclient.Variant, error)
 	DeleteVariant(ctx context.Context, subject, storeID, productID, variantID string) error
-	ArchiveVariant(ctx context.Context, subject, storeID, productID, variantID string) (*coreclient.Variant, error)
 	CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error)
-	UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error)
+	UpdateSKUWithSpecs(ctx context.Context, subject, storeID, productID, variantID, skuID string, params coreclient.CreateSKUParams) (*coreclient.SKU, error)
 	CreateMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.MediaUploadRequest) (*coreclient.MediaUploadResponse, error)
 	CompleteMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.CompleteMediaUploadRequest) (*coreclient.MediaMetadata, error)
 	UpdateMedia(ctx context.Context, subject, storeID, productID, mediaID, altText string, sortOrder int, isPrimary bool) (*coreclient.MediaMetadata, error)
@@ -153,6 +152,15 @@ type CoreCapabilities interface {
 	GetSupplyFulfillmentRequest(ctx context.Context, subject, merchantID, requestID string) (*coreclient.SupplyFulfillmentRequestDetail, error)
 }
 
+type StoreAttributeCapabilities interface {
+	CreateStoreAttribute(ctx context.Context, subject, storeID string, draft coreclient.StoreAttributeDraft) (*coreclient.Attribute, error)
+	CreateStoreAttributeValue(ctx context.Context, subject, storeID, attributeID string, draft coreclient.StoreAttributeValueDraft) (*coreclient.AttributeValue, error)
+}
+
+type VariantOptionCapabilities interface {
+	UpdateVariantWithOptions(ctx context.Context, subject, storeID, productID, variantID string, params coreclient.CreateVariantParams) (*coreclient.VariantWithDetails, error)
+}
+
 // Dependencies wires the seller routes.
 type Dependencies struct {
 	Core             CoreCapabilities
@@ -209,6 +217,8 @@ func RegisterSellerRoutes(deps Dependencies) func(r chi.Router) {
 			r.Post("/seller/stores/{store_id}/products", deps.handleCreateStoreProduct)
 			r.Get("/seller/stores/{store_id}/products/{product_id}", deps.handleGetStoreProductDetail)
 			r.Put("/seller/stores/{store_id}/products/{product_id}", deps.handleUpdateStoreProduct)
+			r.Post("/seller/stores/{store_id}/attributes", deps.handleCreateStoreAttribute)
+			r.Post("/seller/stores/{store_id}/attributes/{attribute_id}/values", deps.handleCreateStoreAttributeValue)
 			r.Post("/seller/stores/{store_id}/products/{product_id}/status", deps.handleTransitionProductStatus)
 			r.Post("/seller/stores/{store_id}/products/{product_id}/archive", deps.handleArchiveProduct)
 			r.Delete("/seller/stores/{store_id}/products/{product_id}", deps.handleRemoveStoreProduct)

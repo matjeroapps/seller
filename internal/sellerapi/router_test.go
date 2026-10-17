@@ -284,7 +284,7 @@ func (s *stubCore) ArchiveVariant(ctx context.Context, subject, storeID, product
 func (s *stubCore) CreateSKU(ctx context.Context, subject, storeID, productID, variantID, code string, barcode *string, status string) (*coreclient.SKU, error) {
 	return &coreclient.SKU{}, s.err
 }
-func (s *stubCore) UpdateSKU(ctx context.Context, subject, storeID, productID, variantID, skuID, code string, barcode *string, status string) (*coreclient.SKU, error) {
+func (s *stubCore) UpdateSKUWithSpecs(ctx context.Context, subject, storeID, productID, variantID, skuID string, params coreclient.CreateSKUParams) (*coreclient.SKU, error) {
 	return &coreclient.SKU{}, s.err
 }
 func (s *stubCore) CreateMediaUpload(ctx context.Context, subject, storeID, productID string, req coreclient.MediaUploadRequest) (*coreclient.MediaUploadResponse, error) {

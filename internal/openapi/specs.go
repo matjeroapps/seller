@@ -753,6 +753,26 @@ func sellerRoutes() []RouteSpec {
 		},
 		{
 			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/attributes",
+			OperationID: "createStoreAttribute",
+			Summary:     "Create a store-owned product attribute",
+			Tags:        []string{"Variants"}, Auth: true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier")},
+			RequestBody: coreclient.StoreAttributeDraft{},
+			Responses:   AuthCreatedResponses("Store attribute created", coreclient.Attribute{}),
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        "/v1/seller/stores/{store_id}/attributes/{attribute_id}/values",
+			OperationID: "createStoreAttributeValue",
+			Summary:     "Create a value for a store-owned product attribute",
+			Tags:        []string{"Variants"}, Auth: true,
+			Parameters:  []ParameterSpec{PathStringParam("store_id", "Store identifier"), PathStringParam("attribute_id", "Attribute identifier")},
+			RequestBody: coreclient.StoreAttributeValueDraft{},
+			Responses:   AuthCreatedResponses("Store attribute value created", coreclient.AttributeValue{}),
+		},
+		{
+			Method:      http.MethodPost,
 			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants",
 			OperationID: "createProductVariant",
 			Summary:     "Create a product variant",
@@ -791,8 +811,9 @@ func sellerRoutes() []RouteSpec {
 				PathStringParam("variant_id", "Variant identifier"),
 			},
 			RequestBody: struct {
-				Code   string `json:"code"`
-				Status string `json:"status"`
+				Code            string                             `json:"code"`
+				Status          string                             `json:"status"`
+				AttributeValues []coreclient.AttributeValueMapping `json:"attribute_values,omitempty"`
 			}{},
 			Responses: AuthOKResponses("Variant updated", coreclient.Variant{}),
 		},
@@ -801,7 +822,7 @@ func sellerRoutes() []RouteSpec {
 			Path:        "/v1/seller/stores/{store_id}/products/{product_id}/variants/{variant_id}",
 			OperationID: "deleteProductVariant",
 			Summary:     "Delete a product variant",
-			Description: "Deletes the variant, its selected-value junction rows and its associated SKU records atomically, but only while nothing operationally references it; a variant referenced by inventory or orders returns 409 resource_in_use and the caller should archive instead.",
+			Description: "Removes the variant from the current catalog while preserving its variant, SKU, mapping, order, inventory, and reservation history. Removal is idempotent for a previously removed variant.",
 			Tags:        []string{"Variants"},
 			Auth:        true,
 			Parameters: []ParameterSpec{

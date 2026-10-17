@@ -373,15 +373,15 @@ test.describe('Product Variant Management E2E', () => {
 
     await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
-    await expect(dialog.getByText('Select attribute values to preview variant combinations')).toBeVisible();
+    await expect(dialog.getByText('اختر الخصائص والقيم، راجع التركيبات، ثم احفظ المتغيرات دفعة واحدة.')).toBeVisible();
 
     await selectAllDimensions(dialog, colorSizeDimensionOptions());
 
     // 2 colors x 3 sizes = 6 distinct combinations, all rendered as rows.
-    await expect(dialog.getByText('6 combinations')).toBeVisible();
+    await expect(dialog.getByText(/6 تركيبة/)).toBeVisible();
     await expect(previewRows(page)).toHaveCount(6);
     // Existing signatures of the seeded variants are flagged, the rest are new.
-    await expect(dialog.getByText('exists', { exact: true })).toHaveCount(2);
+    await expect(dialog.getByText('موجودة مسبقاً', { exact: true })).toHaveCount(2);
   });
 
   test('variant and SKU codes are editable and used on creation', async ({ page }) => {
@@ -391,7 +391,7 @@ test.describe('Product Variant Management E2E', () => {
     await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     await selectAllDimensions(dialog, colorSizeDimensionOptions());
-    await expect(dialog.getByText('6 combinations')).toBeVisible();
+    await expect(dialog.getByText(/6 تركيبة/)).toBeVisible();
 
     // Rows render in (Color blue→red, Size L→M→S) order: the first rows are
     // the existing Blue-L and then the createable Blue-M combination.
@@ -409,7 +409,7 @@ test.describe('Product Variant Management E2E', () => {
     await variantCodeInput.fill('MERCHANT-EDITED-VAR');
     await skuCodeInput.fill('SKU-MERCHANT-EDITED');
 
-    await dialog.getByRole('button', { name: /Create 4 variants/ }).click();
+    await dialog.getByRole('button', { name: /حفظ 4 متغير/ }).click();
     await expect.poll(() => state.createdVariantCodes.length).toBe(4);
     // Only the non-existing rows are POSTed; the two existing rows are skipped.
     expect(state.createdVariantCodes).toContain('MERCHANT-EDITED-VAR');
@@ -422,20 +422,20 @@ test.describe('Product Variant Management E2E', () => {
     await page.getByRole('button', { name: 'إدارة الخيارات والمتغيرات' }).click();
     const dialog = previewDialog(page);
     await selectAllDimensions(dialog, colorSizeDimensionOptions());
-    await expect(dialog.getByRole('button', { name: /Create 4 variants/ })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /حفظ 4 متغير/ })).toBeVisible();
 
     // Remove the Blue-M row: the first createable (non-existing) combination.
     // Removing an existing row would not change the creation count because
     // existing rows are skipped from the batch anyway.
     const blueMRow = previewRows(page).filter({ hasText: 'Color: Blue' }).filter({ hasText: 'Size: M' });
     await expect(blueMRow).toHaveCount(1);
-    await blueMRow.getByRole('button', { name: /^Remove / }).click();
+    await blueMRow.getByRole('button', { name: /^استبعاد / }).click();
     // Row stays for review, collapsed to the removed state.
     await expect(blueMRow).toHaveClass(/opacity-50/);
-    await expect(blueMRow.getByText('removed', { exact: true })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: /Create 3 variants/ })).toBeVisible();
+    await expect(blueMRow.getByText('مستبعدة', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /حفظ 3 متغير/ })).toBeVisible();
 
-    await dialog.getByRole('button', { name: /Create 3 variants/ }).click();
+    await dialog.getByRole('button', { name: /حفظ 3 متغير/ }).click();
     await expect.poll(() => state.createdVariantCodes.length).toBe(3);
   });
 
@@ -460,9 +460,9 @@ test.describe('Product Variant Management E2E', () => {
     }
 
     // 4 x 4 x 6 = 96 combinations is still allowed within the cap.
-    await expect(dialog.getByText('96 combinations')).toBeVisible();
+    await expect(dialog.getByText(/96 تركيبة/)).toBeVisible();
     await expect(errors).toHaveCount(0);
-    await expect(dialog.getByRole('button', { name: /Create 96 variants/ })).toBeEnabled();
+    await expect(dialog.getByRole('button', { name: /حفظ 96 متغير/ })).toBeEnabled();
 
     // The eighth material pushes the selection to 4 x 4 x 7 = 112 > 100, so
     // validation blocks creation before any save request is made.
@@ -471,7 +471,7 @@ test.describe('Product Variant Management E2E', () => {
     await expect(errors.getByText(/Selection creates \d+ combinations\./)).toHaveText(
       /Selection creates 112 combinations\./
     );
-    await expect(dialog.getByRole('button', { name: /Create .* variants/ })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: /حفظ .* متغير/ })).toBeDisabled();
     expect(state.createdVariantCodes).toHaveLength(0);
   });
 
