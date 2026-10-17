@@ -318,10 +318,10 @@ function VariantBatchModal({
                               </span>
                             ))}
                             {item.existing && (
-                              <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
-                                موجودة مسبقاً
+                              <>
+                                <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">موجودة مسبقاً</span>
                                 <span className="sr-only">Already exists</span>
-                              </span>
+                              </>
                             )}
                           </td>
                           <td className="px-3 py-2">
@@ -377,7 +377,7 @@ function VariantBatchModal({
                                 updateEdit(item.client_item_id, { removed: !editFor(item.client_item_id).removed })
                               }
                               disabled={busy || result?.status === 'created'}
-                              aria-label={item.removed ? `Restore ${item.variant_code}` : `Remove ${item.variant_code}`}
+                              aria-label={item.removed ? `إعادة ${item.variant_code} - Restore ${item.variant_code}` : `استبعاد ${item.variant_code} - Remove ${item.variant_code}`}
                               className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
