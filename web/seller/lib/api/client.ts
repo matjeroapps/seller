@@ -58,7 +58,7 @@ import type {
   WebhookSubscription
 } from './types';
 
-const SELLER_API_BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
+const SELLER_API_BASE_URL = process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:8082';
 
 function getBaseUrl() {
   return typeof window === 'undefined' ? SELLER_API_BASE_URL : '/api/seller';

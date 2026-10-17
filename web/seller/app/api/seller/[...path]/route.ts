@@ -3,7 +3,7 @@ import { getCurrentSession } from '@/lib/auth';
 import { isOptionalStoreReadNotFound } from '@/lib/api/optional-dashboard-response';
 
 const SELLER_API_BASE_URL =
-  process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081';
+  process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:8082';
 
 type RouteContext = {
   params: Promise<{ path: string[] }>;

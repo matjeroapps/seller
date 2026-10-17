@@ -180,7 +180,7 @@ export async function fetchUserInfo(endpoints: ZitadelEndpoints, accessToken: st
 }
 
 export async function verifySellerApiAccess(accessToken: string, expectedSubject: string): Promise<void> {
-  const baseUrl = (process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:18081').replace(/\/$/, '');
+  const baseUrl = (process.env.SELLER_API_BASE_URL || process.env.NEXT_PUBLIC_SELLER_API_BASE_URL || 'http://127.0.0.1:8082').replace(/\/$/, '');
   const url = `${baseUrl}/v1/bootstrap?locale=en`;
 
   let response: Response;

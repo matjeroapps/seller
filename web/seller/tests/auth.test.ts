@@ -130,7 +130,7 @@ describe('verifySellerApiAccess', () => {
     await expect(verifySellerApiAccess('secret-token-123', 'user-sub-123')).resolves.toBeUndefined();
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:18081/v1/bootstrap?locale=en',
+      'http://127.0.0.1:8082/v1/bootstrap?locale=en',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({
